@@ -3,21 +3,31 @@
 import { useState } from 'react';
 import { ExternalLink, Search } from 'lucide-react';
 
-export default function ArticleList({ initialArticles }: { initialArticles: any[] }) {
+interface Article {
+  id: number;
+  source: string;
+  title: string;
+  url: string;
+  published_date: string;
+  status: string;
+  [key: string]: any;
+}
+
+export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   // 검색어 필터링 적용 (제목 또는 출처에 검색어가 포함되어 있는지)
-  const filteredArticles = initialArticles.filter(article => 
+  const filteredArticles = initialArticles.filter((article: Article) => 
     article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     article.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   // 출처별로 그룹화
-  const articlesBySource = filteredArticles.reduce((acc, article) => {
+  const articlesBySource = filteredArticles.reduce((acc: Record<string, Article[]>, article: Article) => {
     if (!acc[article.source]) acc[article.source] = [];
     acc[article.source].push(article);
     return acc;
-  }, {} as Record<string, any[]>);
+  }, {});
 
   return (
     <>
