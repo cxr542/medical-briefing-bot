@@ -210,6 +210,16 @@ if __name__ == "__main__":
     # 3. 오픈 API
     total_articles.extend(fetch_law_api())
     
+    # 4. AI 기반 중복 기사 통합 및 교차 검증 (Phase 2)
+    gemini_api_key = os.environ.get("GEMINI_API_KEY")
+    if gemini_api_key:
+        from ai_processor import process_articles_with_ai
+        # AI에게 원본 리스트를 넘겨서 병합된 리스트를 반환받음
+        processed_articles = process_articles_with_ai(total_articles, gemini_api_key)
+    else:
+        print("⚠️ GEMINI_API_KEY가 없어 AI 통합을 건너뜁니다.")
+        processed_articles = total_articles
+    
     # DB 저장
-    save_to_supabase(total_articles)
+    save_to_supabase(processed_articles)
     print("=== 수집 완료 ===")

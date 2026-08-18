@@ -49,29 +49,60 @@ function SourceTable({ source, articles }: { source: string; articles: Article[]
             {currentArticles.map((article) => {
               const isNew = article.status === 'NEW';
               return (
-                <tr key={article.id} className="hover:bg-[#F5EFE6] transition-colors group">
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                      isNew ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                    }`}>
-                      {article.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 font-medium">
-                    <a 
-                      href={article.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-[#333333] hover:text-[#C05A12] flex items-center gap-1 group-hover:underline"
-                    >
-                      {article.title}
-                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    </a>
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-center">
-                    {new Date(article.published_date).toISOString().split('T')[0]}
-                  </td>
-                </tr>
+                    <tr key={article.id} className="hover:bg-[#F5EFE6] transition-colors group">
+                      <td className="px-4 py-3 align-top">
+                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                          isNew ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                        }`}>
+                          {article.status}
+                        </span>
+                        {article.is_merged && (
+                          <span className="block mt-1 text-[10px] text-[#C05A12] font-semibold border border-[#C05A12] rounded px-1 text-center bg-orange-50">
+                            통합됨
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 font-medium align-top">
+                        <a 
+                          href={article.url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-[#333333] hover:text-[#C05A12] flex items-center gap-1 group-hover:underline text-base"
+                        >
+                          {article.title}
+                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </a>
+                        
+                        {/* 관련 기사 (AI가 묶어준 중복 기사들) */}
+                        {article.is_merged && article.related_links && article.related_links.length > 0 && (
+                          <div className="mt-3 pl-3 border-l-2 border-[#E8DCCB]">
+                            <p className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1">
+                              <Layers className="w-3 h-3" /> 연관 보도 ({article.related_links.length}건)
+                            </p>
+                            <ul className="space-y-1">
+                              {article.related_links.map((link: any, idx: number) => (
+                                <li key={idx}>
+                                  <a 
+                                    href={link.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm text-gray-600 hover:text-[#C05A12] hover:underline flex items-center gap-1.5"
+                                  >
+                                    <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200">
+                                      {link.source}
+                                    </span>
+                                    <span className="truncate max-w-[300px] md:max-w-[500px]">{link.title}</span>
+                                  </a>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-gray-500 text-center align-top">
+                        {new Date(article.published_date).toISOString().split('T')[0]}
+                      </td>
+                    </tr>
               );
             })}
           </tbody>
