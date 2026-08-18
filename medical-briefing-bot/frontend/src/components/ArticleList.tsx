@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { ExternalLink, Search, Layers } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ExternalLink, Search, Layers, ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -13,34 +13,134 @@ interface Article {
   [key: string]: any;
 }
 
+// 각 출처별 테이블을 렌더링하고 페이지네이션을 관리하는 컴포넌트
+function SourceTable({ source, articles }: { source: string; articles: Article[] }) {
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+  const totalPages = Math.ceil(articles.length / itemsPerPage);
+
+  // 검색어나 탭이 바뀌어서 articles가 변하면 첫 페이지로 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [articles]);
+
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentArticles = articles.slice(startIndex, startIndex + itemsPerPage);
+
+  return (
+    <section className="mb-10 bg-white p-4 md:p-8 rounded-xl shadow-sm border border-[#E8DCCB]/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      <div className="flex justify-between items-center mb-6 border-b-2 border-[#C05A12] pb-3">
+        <h2 className="text-lg md:text-xl font-bold text-[#5C2D0C] flex items-center gap-2">
+          <span className="text-[#C05A12]">■</span> {source}
+        </h2>
+        <span className="text-sm text-gray-500 font-medium">총 {articles.length}건</span>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm text-left min-w-[600px]">
+          <thead className="bg-[#C05A12] text-white">
+            <tr>
+              <th className="px-4 py-3 rounded-tl-md font-semibold w-24">상태</th>
+              <th className="px-4 py-3 font-semibold">제목 (클릭 시 원문 이동)</th>
+              <th className="px-4 py-3 rounded-tr-md font-semibold w-32 text-center">발행일자</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-[#E8DCCB]">
+            {currentArticles.map((article) => {
+              const isNew = article.status === 'NEW';
+              return (
+                <tr key={article.id} className="hover:bg-[#F5EFE6] transition-colors group">
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
+                      isNew ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                    }`}>
+                      {article.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 font-medium">
+                    <a 
+                      href={article.url} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-[#333333] hover:text-[#C05A12] flex items-center gap-1 group-hover:underline"
+                    >
+                      {article.title}
+                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </a>
+                  </td>
+                  <td className="px-4 py-3 text-gray-500 text-center">
+                    {new Date(article.published_date).toISOString().split('T')[0]}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* 페이지네이션 컨트롤 */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-2 mt-6">
+          <button
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronLeft className="w-5 h-5 text-[#5C2D0C]" />
+          </button>
+          
+          <div className="flex gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
+                  currentPage === page
+                    ? 'bg-[#5C2D0C] text-white'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+          >
+            <ChevronRight className="w-5 h-5 text-[#5C2D0C]" />
+          </button>
+        </div>
+      )}
+    </section>
+  );
+}
+
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<string | 'ALL'>('ALL');
 
-  // 원본 데이터에서 고유한 출처(Source) 목록 추출
   const sources = Array.from(new Set(initialArticles.map(a => a.source))).sort();
 
-  // 검색어 필터링 적용
   const filteredArticles = initialArticles.filter((article: Article) => 
     article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     article.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 출처별 그룹화
   const articlesBySource = filteredArticles.reduce((acc: Record<string, Article[]>, article: Article) => {
     if (!acc[article.source]) acc[article.source] = [];
     acc[article.source].push(article);
     return acc;
   }, {});
 
-  // 현재 활성화된 탭에 맞춰 보여줄 데이터 선별
   const displayedSources = activeTab === 'ALL' 
     ? Object.entries(articlesBySource) 
     : Object.entries(articlesBySource).filter(([source]) => source === activeTab);
 
   return (
     <>
-      {/* 검색 바 */}
       <div className="mb-6 relative max-w-2xl mx-auto md:mx-0">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-gray-400" />
@@ -54,7 +154,6 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         />
       </div>
 
-      {/* 탭 네비게이션 */}
       <div className="mb-8 flex flex-wrap gap-2 border-b-2 border-[#E8DCCB] pb-2">
         <button
           onClick={() => setActiveTab('ALL')}
@@ -81,55 +180,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         ))}
       </div>
 
-      {/* 게시물 목록 */}
       {displayedSources.map(([source, sourceArticles]) => (
-        <section key={source} className="mb-10 bg-white p-4 md:p-8 rounded-xl shadow-sm border border-[#E8DCCB]/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
-          <h2 className="text-lg md:text-xl font-bold text-[#5C2D0C] mb-6 flex items-center gap-2 border-b-2 border-[#C05A12] pb-3 pr-6 inline-block">
-            <span className="text-[#C05A12]">■</span> {source}
-          </h2>
-          
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left min-w-[600px]">
-              <thead className="bg-[#C05A12] text-white">
-                <tr>
-                  <th className="px-4 py-3 rounded-tl-md font-semibold w-24">상태</th>
-                  <th className="px-4 py-3 font-semibold">제목 (클릭 시 원문 이동)</th>
-                  <th className="px-4 py-3 rounded-tr-md font-semibold w-32 text-center">발행일자</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DCCB]">
-                {sourceArticles.map((article) => {
-                  const isNew = article.status === 'NEW';
-                  return (
-                    <tr key={article.id} className="hover:bg-[#F5EFE6] transition-colors group">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold ${
-                          isNew ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {article.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-medium">
-                        <a 
-                          href={article.url} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="text-[#333333] hover:text-[#C05A12] flex items-center gap-1 group-hover:underline"
-                        >
-                          {article.title}
-                          <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </a>
-                      </td>
-                      <td className="px-4 py-3 text-gray-500 text-center">
-                        {new Date(article.published_date).toISOString().split('T')[0]}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </section>
+        <SourceTable key={source} source={source} articles={sourceArticles} />
       ))}
 
       {displayedSources.length === 0 && (
