@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ExternalLink, Search } from 'lucide-react';
+import { ExternalLink, Search, Layers } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -15,24 +15,33 @@ interface Article {
 
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState<string | 'ALL'>('ALL');
 
-  // 검색어 필터링 적용 (제목 또는 출처에 검색어가 포함되어 있는지)
+  // 원본 데이터에서 고유한 출처(Source) 목록 추출
+  const sources = Array.from(new Set(initialArticles.map(a => a.source))).sort();
+
+  // 검색어 필터링 적용
   const filteredArticles = initialArticles.filter((article: Article) => 
     article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     article.source.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // 출처별로 그룹화
+  // 출처별 그룹화
   const articlesBySource = filteredArticles.reduce((acc: Record<string, Article[]>, article: Article) => {
     if (!acc[article.source]) acc[article.source] = [];
     acc[article.source].push(article);
     return acc;
   }, {});
 
+  // 현재 활성화된 탭에 맞춰 보여줄 데이터 선별
+  const displayedSources = activeTab === 'ALL' 
+    ? Object.entries(articlesBySource) 
+    : Object.entries(articlesBySource).filter(([source]) => source === activeTab);
+
   return (
     <>
       {/* 검색 바 */}
-      <div className="mb-8 relative max-w-2xl mx-auto md:mx-0">
+      <div className="mb-6 relative max-w-2xl mx-auto md:mx-0">
         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
           <Search className="h-5 w-5 text-gray-400" />
         </div>
@@ -45,8 +54,36 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         />
       </div>
 
-      {Object.entries(articlesBySource).map(([source, sourceArticles]) => (
-        <section key={source} className="mb-10 bg-white p-4 md:p-8 rounded-xl shadow-sm border border-[#E8DCCB]/50">
+      {/* 탭 네비게이션 */}
+      <div className="mb-8 flex flex-wrap gap-2 border-b-2 border-[#E8DCCB] pb-2">
+        <button
+          onClick={() => setActiveTab('ALL')}
+          className={`px-5 py-2.5 rounded-t-lg font-bold transition-colors flex items-center gap-2 ${
+            activeTab === 'ALL' 
+              ? 'bg-[#5C2D0C] text-white shadow-md' 
+              : 'bg-white text-gray-500 hover:bg-[#F5EFE6] border border-b-0 border-[#E8DCCB]'
+          }`}
+        >
+          <Layers className="w-4 h-4" /> 전체 보기
+        </button>
+        {sources.map(source => (
+          <button
+            key={source}
+            onClick={() => setActiveTab(source)}
+            className={`px-5 py-2.5 rounded-t-lg font-bold transition-colors ${
+              activeTab === source 
+                ? 'bg-[#C05A12] text-white shadow-md' 
+                : 'bg-white text-gray-500 hover:bg-[#F5EFE6] border border-b-0 border-[#E8DCCB]'
+            }`}
+          >
+            {source}
+          </button>
+        ))}
+      </div>
+
+      {/* 게시물 목록 */}
+      {displayedSources.map(([source, sourceArticles]) => (
+        <section key={source} className="mb-10 bg-white p-4 md:p-8 rounded-xl shadow-sm border border-[#E8DCCB]/50 animate-in fade-in slide-in-from-bottom-2 duration-300">
           <h2 className="text-lg md:text-xl font-bold text-[#5C2D0C] mb-6 flex items-center gap-2 border-b-2 border-[#C05A12] pb-3 pr-6 inline-block">
             <span className="text-[#C05A12]">■</span> {source}
           </h2>
@@ -95,10 +132,10 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         </section>
       ))}
 
-      {Object.keys(articlesBySource).length === 0 && (
+      {displayedSources.length === 0 && (
         <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-[#E8DCCB]/50">
           <p className="text-lg text-gray-500">
-            {searchTerm ? `'${searchTerm}'에 대한 검색 결과가 없습니다.` : '수집된 데이터가 없습니다.'}
+            {searchTerm ? `'${searchTerm}'에 대한 검색 결과가 없습니다.` : '해당 탭에 수집된 데이터가 없습니다.'}
           </p>
         </div>
       )}
