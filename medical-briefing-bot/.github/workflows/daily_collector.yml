@@ -1,0 +1,32 @@
+name: Daily Medical Briefing Collector
+
+on:
+  schedule:
+    # 한국 시간(KST) 오전 6시 = UTC 시간 기준 전날 오후 9시 (21:00)
+    - cron: '0 21 * * *'
+  workflow_dispatch: # 수동으로도 실행할 수 있도록 허용
+
+jobs:
+  collect-data:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 저장소 코드 체크아웃
+      uses: actions/checkout@v3
+      
+    - name: 파이썬 3.9 환경 설정
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: 파이썬 라이브러리 설치
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        
+    - name: 데이터 수집 및 Supabase 저장 스크립트 실행
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+      run: |
+        python collector.py
