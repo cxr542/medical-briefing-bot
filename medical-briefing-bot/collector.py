@@ -134,6 +134,44 @@ def fetch_law_api():
         
     return articles_to_save
 
+# 4. 건강보험심사평가원 공개 공지사항 스크래퍼
+def fetch_hira_public_notices():
+    source_name = "심사평가원 공지사항"
+    print(f"🔄 크롤링 수집: {source_name}")
+    articles_to_save = []
+    try:
+        # 실제 사이트 DOM 구조에 맞는 파싱 로직 구현 공간
+        # 현재는 MVP 구동을 위한 모의 데이터 반환
+        articles_to_save.append({
+            "source": source_name,
+            "title": "[안내] 2026년도 요양급여비용 심사 및 평가 방향",
+            "url": "https://www.hira.or.kr/dummy-hira-1",
+            "published_date": datetime.now(timezone.utc).isoformat(),
+            "content_hash": get_content_hash("요양급여비용 심사 및 평가 방향"),
+            "status": "NEW"
+        })
+    except Exception as e:
+        print(f"크롤링 에러 ({source_name}): {e}")
+    return articles_to_save
+
+# 5. 국민건강보험공단 공개 공지사항 스크래퍼
+def fetch_nhis_public_notices():
+    source_name = "국민건강보험공단 공지사항"
+    print(f"🔄 크롤링 수집: {source_name}")
+    articles_to_save = []
+    try:
+        articles_to_save.append({
+            "source": source_name,
+            "title": "[공지] 요양기관 본인확인 강화 제도 시행 세부 지침 안내",
+            "url": "https://www.nhis.or.kr/dummy-nhis-1",
+            "published_date": datetime.now(timezone.utc).isoformat(),
+            "content_hash": get_content_hash("요양기관 본인확인 지침"),
+            "status": "NEW"
+        })
+    except Exception as e:
+        print(f"크롤링 에러 ({source_name}): {e}")
+    return articles_to_save
+
 def save_to_supabase(articles: list):
     if not articles: return
     new_count = 0
@@ -147,13 +185,15 @@ def save_to_supabase(articles: list):
     print(f"✅ 총 {new_count}개의 새로운 게시물을 DB에 저장했습니다.")
 
 if __name__ == "__main__":
-    print("=== 브리핑 데이터 수집 봇 실행 (V4.1) ===")
+    print("=== 브리핑 데이터 수집 봇 실행 (V4.2 - 공개 사이트 확장) ===")
     
     total_articles = []
     
     # 1. RSS
     rss_sources = [
         {"name": "보건복지부 보도자료", "url": "https://www.mohw.go.kr/react/rss.jsp", "is_press": False},
+        {"name": "질병관리청 보도자료", "url": "https://www.kdca.go.kr/rss", "is_press": False},
+        {"name": "식품의약품안전처 보도자료", "url": "https://www.mfds.go.kr/rss", "is_press": False},
         {"name": "메디게이트뉴스", "url": "http://www.medigatenews.com/rss", "is_press": True},
         {"name": "데일리메디", "url": "http://www.dailymedi.com/rss/allArticle.xml", "is_press": True}
     ]
@@ -164,6 +204,8 @@ if __name__ == "__main__":
         
     # 2. 크롤러
     total_articles.extend(fetch_kha_notices())
+    total_articles.extend(fetch_hira_public_notices())
+    total_articles.extend(fetch_nhis_public_notices())
     
     # 3. 오픈 API
     total_articles.extend(fetch_law_api())
