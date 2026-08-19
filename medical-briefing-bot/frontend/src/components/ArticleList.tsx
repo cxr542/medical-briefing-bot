@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { ExternalLink, Search, Layers, ChevronLeft, ChevronRight, Download, Printer } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -15,201 +15,44 @@ interface Article {
   [key: string]: any;
 }
 
-// 개별 출처 테이블 컴포넌트
-function SourceTable({ source, articles }: { source: string; articles: Article[] }) {
-  const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
-  const totalPages = Math.ceil(articles.length / itemsPerPage);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [articles]);
-
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentArticles = articles.slice(startIndex, startIndex + itemsPerPage);
-
-  return (
-    <section className="mb-10 bg-white p-4 md:p-8 rounded-xl shadow-sm border border-[#E8DCCB]/50 animate-in fade-in slide-in-from-bottom-2 duration-300 print:shadow-none print:border-none print:mb-6 print:p-0">
-      <div className="flex justify-between items-center mb-6 border-b-2 border-[#C05A12] pb-3">
-        <h2 className="text-lg md:text-xl font-bold text-[#5C2D0C] flex items-center gap-2">
-          <span className="text-[#C05A12]">■</span> {source}
-        </h2>
-        <span className="text-sm text-gray-500 font-medium">총 {articles.length}건</span>
-      </div>
-      
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm text-left min-w-[600px] print:min-w-full print:text-xs">
-          <thead className="bg-[#C05A12] text-white print:bg-gray-200 print:text-black">
-            <tr>
-              <th className="px-4 py-3 rounded-tl-md font-semibold w-24 print:border">상태</th>
-              <th className="px-4 py-3 font-semibold print:border">제목 (원문 URL)</th>
-              <th className="px-4 py-3 rounded-tr-md font-semibold w-32 text-center print:border">발행일자</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-[#E8DCCB] print:divide-gray-300">
-            {currentArticles.map((article) => {
-              const isNew = article.status === 'NEW';
-              const isDeleted = article.status === 'DELETED';
-              const isUpdate = article.status === 'UPDATE';
-              
-              let statusBadgeClass = 'bg-gray-100 text-gray-700';
-              if (isNew) statusBadgeClass = 'bg-red-100 text-red-700';
-              if (isUpdate) statusBadgeClass = 'bg-yellow-100 text-yellow-700';
-              if (isDeleted) statusBadgeClass = 'bg-gray-300 text-gray-600 line-through';
-
-              return (
-                <tr key={article.id} className={`hover:bg-[#F5EFE6] transition-colors group print:break-inside-avoid ${isDeleted ? 'opacity-60' : ''}`}>
-                  <td className="px-4 py-3 align-top print:border">
-                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-bold print:border print:bg-transparent ${statusBadgeClass}`}>
-                      {article.status}
-                    </span>
-                    {article.is_merged && (
-                      <span className="block mt-1 text-[10px] text-[#C05A12] font-semibold border border-[#C05A12] rounded px-1 text-center bg-orange-50 print:hidden">
-                        통합됨
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 font-medium align-top print:border">
-                    <a 
-                      href={article.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={`text-[#333333] hover:text-[#C05A12] flex items-center gap-1 group-hover:underline text-base ${isDeleted ? 'line-through' : ''}`}
-                    >
-                      {article.title}
-                      <ExternalLink className="w-3 h-3 opacity-0 group-hover:opacity-100 transition-opacity print:hidden" />
-                    </a>
-                    
-                    {/* 인쇄용 URL 노출 */}
-                    <div className="hidden print:block text-[10px] text-gray-400 mt-1 break-all">
-                      {article.url}
-                    </div>
-                    
-                    {/* 관련 기사 */}
-                    {article.is_merged && article.related_links && article.related_links.length > 0 && (
-                      <div className="mt-3 pl-3 border-l-2 border-[#E8DCCB] print:border-gray-300">
-                        <p className="text-xs font-bold text-gray-500 mb-1 flex items-center gap-1">
-                          <Layers className="w-3 h-3 print:hidden" /> 연관 보도 ({article.related_links.length}건)
-                        </p>
-                        <ul className="space-y-1">
-                          {article.related_links.map((link: any, idx: number) => (
-                            <li key={idx} className="print:text-[10px]">
-                              <a 
-                                href={link.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-gray-600 hover:text-[#C05A12] hover:underline flex items-center gap-1.5"
-                              >
-                                <span className="text-xs px-1.5 py-0.5 bg-gray-100 rounded text-gray-500 border border-gray-200 print:border-gray-300">
-                                  {link.source}
-                                </span>
-                                <span className="truncate max-w-[300px] md:max-w-[500px] print:max-w-none">{link.title}</span>
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 text-center align-top print:border print:text-[10px]">
-                    {new Date(article.published_date).toISOString().split('T')[0]}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-
-      {totalPages > 1 && (
-        <div className="flex justify-center items-center gap-2 mt-6 print:hidden">
-          <button
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-[#5C2D0C]" />
-          </button>
-          
-          <div className="flex gap-1">
-            {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => setCurrentPage(page)}
-                className={`w-8 h-8 rounded text-sm font-medium transition-colors ${
-                  currentPage === page
-                    ? 'bg-[#5C2D0C] text-white'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="p-1 rounded hover:bg-gray-100 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
-          >
-            <ChevronRight className="w-5 h-5 text-[#5C2D0C]" />
-          </button>
-        </div>
-      )}
-    </section>
-  );
-}
-
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState<string | 'ALL'>('ALL');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 5;
 
-  const sources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
+  // 출처 분류 (전문지 vs 공공기관)
+  const pressSources = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사'];
   
-  // 통계 계산용 (전체 기사 건수)
-  const stats = useMemo(() => {
-    const counts: Record<string, number> = {};
-    let total = 0;
-    initialArticles.forEach(a => {
-      counts[a.source] = (counts[a.source] || 0) + 1;
-      total++;
-    });
-    return { counts, total };
-  }, [initialArticles]);
+  const publicArticles = initialArticles.filter(a => !pressSources.includes(a.source));
+  const pressArticles = initialArticles.filter(a => pressSources.includes(a.source));
 
-  const filteredArticles = initialArticles.filter((article: Article) => 
-    article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    article.source.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // 1. 7일 이내 주요 공지 (공공기관 최신순 정렬)
+  const topNotices = [...publicArticles].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+  const totalPages = Math.ceil(topNotices.length / itemsPerPage);
+  const currentNotices = topNotices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  const articlesBySource = filteredArticles.reduce((acc: Record<string, Article[]>, article: Article) => {
+  // 2. 기관별 공지사항 그룹화
+  const publicSourcesMap = publicArticles.reduce((acc: Record<string, Article[]>, article) => {
     if (!acc[article.source]) acc[article.source] = [];
     acc[article.source].push(article);
     return acc;
   }, {});
 
-  const displayedSources = activeTab === 'ALL' 
-    ? Object.entries(articlesBySource) 
-    : Object.entries(articlesBySource).filter(([source]) => source === activeTab);
+  // 3. 의료전문지 최신기사 그룹화
+  const pressSourcesMap = pressArticles.reduce((acc: Record<string, Article[]>, article) => {
+    if (!acc[article.source]) acc[article.source] = [];
+    acc[article.source].push(article);
+    return acc;
+  }, {});
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
   const handleDownloadCsv = () => {
     let csvContent = "상태,출처,발행일,제목,URL\n";
-    
-    // 현재 표시된 기사들만 내보내기
-    displayedSources.forEach(([_, articles]) => {
-      articles.forEach(a => {
-        // CSV 안전하게 따옴표 처리
-        const title = `"${a.title.replace(/"/g, '""')}"`;
-        const date = new Date(a.published_date).toISOString().split('T')[0];
-        csvContent += `${a.status},"${a.source}",${date},${title},"${a.url}"\n`;
-      });
+    initialArticles.forEach(a => {
+      const title = `"${a.title.replace(/"/g, '""')}"`;
+      const date = new Date(a.published_date).toISOString().split('T')[0];
+      csvContent += `${a.status},"${a.source}",${date},${title},"${a.url}"\n`;
     });
-
-    // BOM 추가 (엑셀에서 한글 깨짐 방지)
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
@@ -220,102 +63,164 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     document.body.removeChild(link);
   };
 
-  return (
-    <>
-      {/* 요약 카드 대시보드 */}
-      <div className="mb-8 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 print:hidden">
-        <div 
-          className={`p-4 rounded-xl shadow-sm border cursor-pointer transition-all ${activeTab === 'ALL' ? 'bg-[#5C2D0C] text-white border-[#5C2D0C]' : 'bg-white text-gray-700 border-[#E8DCCB] hover:border-[#C05A12]'}`}
-          onClick={() => setActiveTab('ALL')}
-        >
-          <div className="text-xs font-semibold mb-1 opacity-80">전체 기사</div>
-          <div className="text-2xl font-bold">{stats.total}<span className="text-sm font-normal opacity-80 ml-1">건</span></div>
+  // 개별 카드 렌더링 컴포넌트
+  const SourceCard = ({ source, articles, isPress }: { source: string, articles: Article[], isPress?: boolean }) => {
+    const borderColor = isPress ? 'border-gray-200 hover:border-[#8E6E53]' : 'border-[#E8DCCB] hover:border-[#C05A12]';
+    const headerColor = isPress ? 'text-[#5C2D0C] bg-gray-50' : 'text-[#C05A12] bg-[#FDFBF7]';
+    
+    return (
+      <div className={`bg-white rounded-xl shadow-sm border ${borderColor} flex flex-col h-full overflow-hidden transition-all duration-300`}>
+        <div className={`px-4 py-3 border-b ${borderColor} ${headerColor} font-bold text-lg flex items-center gap-2`}>
+          {isPress ? <FileText className="w-5 h-5 opacity-70" /> : <Megaphone className="w-5 h-5 opacity-70" />}
+          {source}
         </div>
-        
-        {sources.map(source => (
-          <div 
-            key={source}
-            className={`p-4 rounded-xl shadow-sm border cursor-pointer transition-all ${activeTab === source ? 'bg-[#C05A12] text-white border-[#C05A12]' : 'bg-white text-gray-700 border-[#E8DCCB] hover:border-[#C05A12]'}`}
-            onClick={() => setActiveTab(source)}
-          >
-            <div className="text-xs font-semibold mb-1 opacity-80 truncate" title={source}>{source}</div>
-            <div className="text-2xl font-bold">{stats.counts[source]}<span className="text-sm font-normal opacity-80 ml-1">건</span></div>
-          </div>
-        ))}
-      </div>
-
-      {/* 컨트롤 패널 (검색 및 내보내기) */}
-      <div className="mb-6 flex flex-col md:flex-row justify-between items-center gap-4 print:hidden">
-        <div className="relative w-full md:max-w-md">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-gray-400" />
-          </div>
-          <input
-            type="text"
-            placeholder="기사 제목이나 출처(예: 심평원) 검색..."
-            className="block w-full pl-11 pr-4 py-2.5 border border-[#E8DCCB] rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#C05A12] focus:border-[#C05A12] transition-colors shadow-sm"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        <div className="p-4 flex-grow">
+          <ul className="space-y-4">
+            {articles.slice(0, 4).map(article => (
+              <li key={article.id} className="group">
+                <a href={article.url} target="_blank" rel="noopener noreferrer" className="block">
+                  <div className="text-sm font-medium text-gray-800 group-hover:text-[#C05A12] group-hover:underline line-clamp-2 leading-snug">
+                    <span className="text-xs text-[#C05A12] mr-1.5">•</span>
+                    {article.title}
+                  </div>
+                  <div className="text-xs text-gray-400 mt-1.5 ml-3">
+                    {new Date(article.published_date).toISOString().split('T')[0]}
+                  </div>
+                </a>
+              </li>
+            ))}
+          </ul>
         </div>
-        
-        <div className="flex gap-2 w-full md:w-auto">
-          <button 
-            onClick={handleDownloadCsv}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-[#E8DCCB] text-[#5C2D0C] font-semibold py-2.5 px-4 rounded-xl hover:bg-[#F5EFE6] transition-colors shadow-sm"
-          >
-            <Download className="w-4 h-4" /> 엑셀 저장
-          </button>
-          <button 
-            onClick={handlePrint}
-            className="flex-1 md:flex-none flex items-center justify-center gap-2 bg-white border border-[#E8DCCB] text-[#5C2D0C] font-semibold py-2.5 px-4 rounded-xl hover:bg-[#F5EFE6] transition-colors shadow-sm"
-          >
-            <Printer className="w-4 h-4" /> 인쇄 (PDF)
-          </button>
-        </div>
-      </div>
-
-      {/* 탭 네비게이션 (모바일 최적화) */}
-      <div className="mb-8 flex overflow-x-auto gap-2 border-b-2 border-[#E8DCCB] pb-2 print:hidden scrollbar-hide">
-        <button
-          onClick={() => setActiveTab('ALL')}
-          className={`whitespace-nowrap px-5 py-2.5 rounded-t-lg font-bold transition-colors flex items-center gap-2 ${
-            activeTab === 'ALL' 
-              ? 'bg-[#5C2D0C] text-white shadow-md' 
-              : 'bg-white text-gray-500 hover:bg-[#F5EFE6] border border-b-0 border-[#E8DCCB]'
-          }`}
-        >
-          <Layers className="w-4 h-4" /> 전체 보기
-        </button>
-        {sources.map(source => (
-          <button
-            key={source}
-            onClick={() => setActiveTab(source)}
-            className={`whitespace-nowrap px-5 py-2.5 rounded-t-lg font-bold transition-colors ${
-              activeTab === source 
-                ? 'bg-[#C05A12] text-white shadow-md' 
-                : 'bg-white text-gray-500 hover:bg-[#F5EFE6] border border-b-0 border-[#E8DCCB]'
-            }`}
-          >
-            {source}
-          </button>
-        ))}
-      </div>
-
-      {/* 게시물 목록 */}
-      <div className="print:bg-white print:text-black">
-        {displayedSources.map(([source, sourceArticles]) => (
-          <SourceTable key={source} source={source} articles={sourceArticles} />
-        ))}
-
-        {displayedSources.length === 0 && (
-          <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-[#E8DCCB]/50 print:hidden">
-            <p className="text-lg text-gray-500">
-              {searchTerm ? `'${searchTerm}'에 대한 검색 결과가 없습니다.` : '해당 조건에 데이터가 없습니다.'}
-            </p>
+        {articles.length > 4 && (
+          <div className="p-3 border-t border-gray-100 text-center bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-[#5C2D0C] cursor-pointer text-sm font-medium transition-colors">
+            더보기 →
           </div>
         )}
       </div>
-    </>
+    );
+  };
+
+  return (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      
+      {/* 액션 버튼 */}
+      <div className="flex justify-end gap-2 print:hidden mb-2">
+        <button onClick={handleDownloadCsv} className="flex items-center gap-1.5 bg-white border border-[#E8DCCB] text-[#5C2D0C] text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#F5EFE6] shadow-sm transition-colors">
+          <Download className="w-4 h-4" /> 엑셀 다운로드
+        </button>
+        <button onClick={handlePrint} className="flex items-center gap-1.5 bg-[#5C2D0C] border border-[#5C2D0C] text-white text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#8E6E53] shadow-sm transition-colors">
+          <Printer className="w-4 h-4" /> 리포트 인쇄
+        </button>
+      </div>
+
+      {/* 1. 7일 이내 주요 공지 */}
+      <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden print:shadow-none print:border-none">
+        <div className="px-5 py-4 border-b border-[#E8DCCB] flex justify-between items-center bg-[#FDFBF7]">
+          <h2 className="text-xl font-bold text-[#5C2D0C] flex items-center gap-2">
+            <Star className="w-6 h-6 text-[#C05A12] fill-[#C05A12]" /> 
+            주요 공지 및 최신 법령
+            <span className="bg-[#C05A12] text-white text-xs px-2.5 py-0.5 rounded-full ml-2">전체 {topNotices.length}건</span>
+          </h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
+              <tr>
+                <th className="px-5 py-3 font-semibold w-32">상태</th>
+                <th className="px-5 py-3 font-semibold w-40">기관</th>
+                <th className="px-5 py-3 font-semibold">제목 (클릭 시 원문 이동)</th>
+                <th className="px-5 py-3 font-semibold w-28 text-center">날짜</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {currentNotices.map((article) => {
+                const isDeleted = article.status === 'DELETED';
+                return (
+                  <tr key={article.id} className={`hover:bg-[#F5EFE6]/50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
+                    <td className="px-5 py-3 align-top">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
+                        article.status === 'NEW' ? 'bg-red-50 text-red-600 border border-red-200' : 
+                        article.status === 'UPDATE' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
+                        article.status === 'DELETED' ? 'bg-gray-100 text-gray-600 border border-gray-200 line-through' :
+                        'bg-gray-50 text-gray-600 border border-gray-200'
+                      }`}>
+                        {article.status}
+                      </span>
+                      {article.is_merged && (
+                        <span className="block mt-1 text-[10px] text-[#C05A12] font-semibold">↳ AI 통합됨</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 align-top font-medium text-gray-700">{article.source}</td>
+                    <td className="px-5 py-3 align-top">
+                      <a href={article.url} target="_blank" rel="noopener noreferrer" className={`text-gray-900 hover:text-[#C05A12] font-medium flex items-center gap-1 group ${isDeleted ? 'line-through' : ''}`}>
+                        {article.title}
+                        <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-[#C05A12]" />
+                      </a>
+                      {article.is_merged && article.related_links && article.related_links.length > 0 && (
+                        <div className="mt-2 pl-2 border-l-2 border-[#E8DCCB]">
+                          <ul className="space-y-1">
+                            {article.related_links.map((link: any, idx: number) => (
+                              <li key={idx}>
+                                <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-[#C05A12]">
+                                  <span className="font-semibold mr-1">[{link.source}]</span>{link.title}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 align-top text-gray-500 text-center text-xs">
+                      {new Date(article.published_date).toISOString().split('T')[0]}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex justify-center items-center gap-1 py-4 border-t border-gray-100 bg-gray-50 print:hidden">
+            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded text-gray-500 hover:text-[#5C2D0C] disabled:opacity-30">
+              <ChevronLeft className="w-5 h-5" />
+            </button>
+            <span className="text-sm font-medium text-gray-600 px-3">{currentPage} / {totalPages}</span>
+            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1 rounded text-gray-500 hover:text-[#5C2D0C] disabled:opacity-30">
+              <ChevronRight className="w-5 h-5" />
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* 2. 기관별 공지사항 */}
+      <section className="print:break-before-page">
+        <h2 className="text-xl font-bold text-[#5C2D0C] flex items-center gap-2 mb-4 border-b-2 border-[#C05A12] pb-2">
+          <Megaphone className="w-6 h-6 text-[#C05A12]" /> 
+          기관별 공지사항
+          <span className="text-sm font-normal text-gray-500 ml-2">각 기관의 최신 공지사항을 확인하세요.</span>
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(publicSourcesMap).map(([source, articles]) => (
+            <SourceCard key={source} source={source} articles={articles} />
+          ))}
+        </div>
+      </section>
+
+      {/* 3. 의료전문지 최신기사 */}
+      <section className="print:break-before-page">
+        <h2 className="text-xl font-bold text-[#5C2D0C] flex items-center gap-2 mb-4 border-b-2 border-[#8E6E53] pb-2">
+          <FileText className="w-6 h-6 text-[#8E6E53]" /> 
+          의료전문지 최신기사
+          <span className="text-sm font-normal text-gray-500 ml-2">의료계 주요 뉴스를 확인하세요.</span>
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(pressSourcesMap).map(([source, articles]) => (
+            <SourceCard key={source} source={source} articles={articles} isPress={true} />
+          ))}
+        </div>
+      </section>
+
+    </div>
   );
 }
