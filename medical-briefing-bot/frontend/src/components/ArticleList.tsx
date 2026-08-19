@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText } from 'lucide-react';
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2 } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -135,6 +135,15 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     );
   };
 
+  // 기관별 누적 수집 건수 계산
+  const sourceCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    initialArticles.forEach(a => {
+      counts[a.source] = (counts[a.source] || 0) + 1;
+    });
+    return counts;
+  }, [initialArticles]);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
@@ -172,6 +181,44 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             </button>
           ))}
         </div>
+      </div>
+
+      {/* 0. 기관별 수집 건수 요약 대시보드 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 print:hidden">
+        {allSources.map(source => {
+          const count = sourceCounts[source] || 0;
+          // 이 카드 하나만 단독으로 선택되어 있는지 확인
+          const isSelected = selectedSources.length === 1 && selectedSources[0] === source;
+          const isPress = pressSources.includes(source);
+          
+          return (
+            <button 
+              key={source}
+              onClick={() => {
+                setSelectedSources([source]);
+                setCurrentPage(1);
+              }}
+              className={`p-4 rounded-xl border text-left transition-all duration-300 relative overflow-hidden group
+                ${isSelected 
+                  ? 'bg-blue-600 border-blue-600 shadow-md transform -translate-y-1 ring-4 ring-blue-100' 
+                  : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow hover:-translate-y-0.5'
+                }`}
+            >
+              <div className={`flex justify-between items-start mb-2 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
+                {isPress ? <FileText className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
+              </div>
+              <div className={`text-xs font-bold mb-1 line-clamp-1 ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                {source}
+              </div>
+              <div className={`text-2xl font-black ${isSelected ? 'text-white' : 'text-gray-800'}`}>
+                {count}<span className={`text-sm font-medium ml-1 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>건</span>
+              </div>
+              
+              {/* 꾸밈 요소 */}
+              <div className={`absolute -right-4 -bottom-4 w-16 h-16 rounded-full opacity-10 transition-transform group-hover:scale-125 ${isSelected ? 'bg-white' : 'bg-blue-500'}`}></div>
+            </button>
+          );
+        })}
       </div>
 
       {/* 메인 콘텐츠 영역 */}
