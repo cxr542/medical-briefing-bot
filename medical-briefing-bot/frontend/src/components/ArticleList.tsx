@@ -100,25 +100,36 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
   // 개별 카드 렌더링 컴포넌트
   const SourceCard = ({ source, articles, isPress }: { source: string, articles: Article[], isPress?: boolean }) => {
-    const borderColor = isPress ? 'border-gray-200 hover:border-[#8E6E53]' : 'border-[#E8DCCB] hover:border-[#C05A12]';
-    const headerColor = isPress ? 'text-[#5C2D0C] bg-gray-50' : 'text-[#C05A12] bg-[#FDFBF7]';
+    let theme = { border: 'border-gray-200', text: 'text-gray-700', bullet: 'text-gray-400', buttonBorder: 'border-gray-200', buttonHover: 'hover:bg-gray-50 hover:text-gray-700', groupHoverText: 'group-hover:text-gray-700' };
     
+    if (source.includes('복지부')) theme = { border: 'border-green-300', text: 'text-green-700', bullet: 'text-green-600', buttonBorder: 'border-green-200', buttonHover: 'hover:bg-green-50 hover:text-green-700', groupHoverText: 'group-hover:text-green-700' };
+    else if (source.includes('요양기관')) theme = { border: 'border-blue-300', text: 'text-blue-600', bullet: 'text-blue-500', buttonBorder: 'border-blue-200', buttonHover: 'hover:bg-blue-50 hover:text-blue-600', groupHoverText: 'group-hover:text-blue-600' };
+    else if (source.includes('건보공단') || source.includes('건강보험')) theme = { border: 'border-orange-300', text: 'text-orange-500', bullet: 'text-orange-400', buttonBorder: 'border-orange-200', buttonHover: 'hover:bg-orange-50 hover:text-orange-500', groupHoverText: 'group-hover:text-orange-500' };
+    else if (source.includes('병협') || source.includes('병원협회')) theme = { border: 'border-purple-300', text: 'text-purple-600', bullet: 'text-purple-500', buttonBorder: 'border-purple-200', buttonHover: 'hover:bg-purple-50 hover:text-purple-600', groupHoverText: 'group-hover:text-purple-600' };
+    else if (source.includes('평가')) theme = { border: 'border-teal-300', text: 'text-teal-600', bullet: 'text-teal-500', buttonBorder: 'border-teal-200', buttonHover: 'hover:bg-teal-50 hover:text-teal-600', groupHoverText: 'group-hover:text-teal-600' };
+    else if (source.includes('심사')) theme = { border: 'border-indigo-300', text: 'text-indigo-500', bullet: 'text-indigo-400', buttonBorder: 'border-indigo-200', buttonHover: 'hover:bg-indigo-50 hover:text-indigo-500', groupHoverText: 'group-hover:text-indigo-500' };
+    else if (source.includes('메디칼타임즈')) theme = { border: 'border-red-300', text: 'text-red-500', bullet: 'text-red-400', buttonBorder: 'border-red-200', buttonHover: 'hover:bg-red-50 hover:text-red-500', groupHoverText: 'group-hover:text-red-500' };
+    else if (source.includes('청년의사')) theme = { border: 'border-sky-300', text: 'text-sky-500', bullet: 'text-sky-400', buttonBorder: 'border-sky-200', buttonHover: 'hover:bg-sky-50 hover:text-sky-500', groupHoverText: 'group-hover:text-sky-500' };
+    else if (source.includes('메디게이트뉴스')) theme = { border: 'border-emerald-300', text: 'text-emerald-600', bullet: 'text-emerald-500', buttonBorder: 'border-emerald-200', buttonHover: 'hover:bg-emerald-50 hover:text-emerald-600', groupHoverText: 'group-hover:text-emerald-600' };
+    else if (source.includes('데일리메디')) theme = { border: 'border-blue-300', text: 'text-blue-600', bullet: 'text-blue-500', buttonBorder: 'border-blue-200', buttonHover: 'hover:bg-blue-50 hover:text-blue-600', groupHoverText: 'group-hover:text-blue-600' };
+    else if (source.includes('국가법령')) theme = { border: 'border-slate-300', text: 'text-slate-600', bullet: 'text-slate-500', buttonBorder: 'border-slate-200', buttonHover: 'hover:bg-slate-50 hover:text-slate-600', groupHoverText: 'group-hover:text-slate-600' };
+
     return (
-      <div className={`bg-white rounded-xl shadow-sm border ${borderColor} flex flex-col h-full overflow-hidden transition-all duration-300`}>
-        <div className={`px-4 py-3 border-b ${borderColor} ${headerColor} font-bold text-lg flex items-center gap-2`}>
-          {isPress ? <FileText className="w-5 h-5 opacity-70" /> : <Megaphone className="w-5 h-5 opacity-70" />}
+      <div className={`bg-white rounded-xl shadow-sm border ${theme.border} flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-md`}>
+        <div className={`px-4 pt-5 pb-2 font-bold text-lg flex items-center gap-2 ${theme.text}`}>
+          {isPress ? <FileText className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
           {source}
         </div>
-        <div className="p-4 flex-grow">
+        <div className="px-4 pb-4 flex-grow">
           <ul className="space-y-4">
             {articles.slice(0, 4).map(article => (
               <li key={article.id} className="group">
                 <a href={article.url} target="_blank" rel="noopener noreferrer" className="block">
-                  <div className="text-sm font-medium text-gray-800 group-hover:text-[#C05A12] group-hover:underline line-clamp-2 leading-snug">
-                    <span className="text-xs text-[#C05A12] mr-1.5">•</span>
+                  <div className={`text-sm font-medium text-gray-700 group-hover:underline line-clamp-2 leading-snug ${theme.groupHoverText}`}>
+                    <span className={`text-sm mr-1.5 ${theme.bullet}`}>•</span>
                     {article.title}
                   </div>
-                  <div className="text-xs text-gray-400 mt-1.5 ml-3">
+                  <div className="text-[11px] text-gray-400 mt-1.5 ml-3 font-medium">
                     {new Date(article.published_date).toISOString().split('T')[0]}
                   </div>
                 </a>
@@ -126,11 +137,11 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             ))}
           </ul>
         </div>
-        {articles.length > 4 && (
-          <div className="p-3 border-t border-gray-100 text-center bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-[#5C2D0C] cursor-pointer text-sm font-medium transition-colors">
-            더보기 ({articles.length - 4}건) →
-          </div>
-        )}
+        <div className="px-4 pb-4">
+          <button className={`w-full py-2 rounded-lg border text-sm font-medium transition-colors ${theme.buttonBorder} ${theme.text} ${theme.buttonHover}`}>
+            더보기 →
+          </button>
+        </div>
       </div>
     );
   };
