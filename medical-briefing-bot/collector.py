@@ -134,22 +134,38 @@ def fetch_law_api():
         
     return articles_to_save
 
+import urllib3
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+import requests
+from bs4 import BeautifulSoup
+
 # 4. 건강보험심사평가원 공개 공지사항 스크래퍼
 def fetch_hira_public_notices():
     source_name = "심사평가원 공지사항"
     print(f"🔄 크롤링 수집: {source_name}")
     articles_to_save = []
     try:
-        # 실제 사이트 DOM 구조에 맞는 파싱 로직 구현 공간
-        # 현재는 MVP 구동을 위한 모의 데이터 반환 (링크는 심평원 메인 공지사항 게시판)
-        articles_to_save.append({
-            "source": source_name,
-            "title": "[안내] 2026년도 요양급여비용 심사 및 평가 방향",
-            "url": "https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100",
-            "published_date": datetime.now(timezone.utc).isoformat(),
-            "content_hash": get_content_hash("요양급여비용 심사 및 평가 방향"),
-            "status": "NEW"
-        })
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get('https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100', headers=headers, verify=False, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        for tr in soup.select('table tbody tr')[:3]:
+            tds = tr.select('td')
+            if len(tds) >= 2:
+                a = tds[1].select_one('a')
+                if a:
+                    title = a.text.strip().replace('\t', '').replace('\n', '')
+                    href = a.get('href')
+                    full_url = f'https://www.hira.or.kr/bbsDummy.do{href}'
+                    
+                    articles_to_save.append({
+                        "source": source_name,
+                        "title": title,
+                        "url": full_url,
+                        "published_date": datetime.now(timezone.utc).isoformat(),
+                        "content_hash": get_content_hash(title),
+                        "status": "NEW"
+                    })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
     return articles_to_save
@@ -160,14 +176,24 @@ def fetch_nhis_public_notices():
     print(f"🔄 크롤링 수집: {source_name}")
     articles_to_save = []
     try:
-        articles_to_save.append({
-            "source": source_name,
-            "title": "[공지] 요양기관 본인확인 강화 제도 시행 세부 지침 안내",
-            "url": "https://www.nhis.or.kr/nhis/about/retrieveBbsList.do?bbsId=BBS_0000000000000001",
-            "published_date": datetime.now(timezone.utc).isoformat(),
-            "content_hash": get_content_hash("요양기관 본인확인 지침"),
-            "status": "NEW"
-        })
+        res = requests.get('https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do', verify=False, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        for tr in soup.select('tbody tr')[:3]:
+            a = tr.select_one('a')
+            if a:
+                title = a.text.strip().replace('\t', '').replace('\n', '')
+                href = a.get('href')
+                full_url = f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do{href}'
+                
+                articles_to_save.append({
+                    "source": source_name,
+                    "title": title,
+                    "url": full_url,
+                    "published_date": datetime.now(timezone.utc).isoformat(),
+                    "content_hash": get_content_hash(title),
+                    "status": "NEW"
+                })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
     return articles_to_save
