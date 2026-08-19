@@ -146,7 +146,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             }}
             className={`w-full py-2 rounded-lg border text-sm font-bold transition-colors ${theme.buttonBorder} ${theme.text} ${theme.buttonHover}`}
           >
-            {source} 데이터 전체보기 →
+            더보기 →
           </button>
         </div>
       </div>
