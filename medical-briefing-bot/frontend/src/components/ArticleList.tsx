@@ -138,8 +138,15 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           </ul>
         </div>
         <div className="px-4 pb-4">
-          <button className={`w-full py-2 rounded-lg border text-sm font-medium transition-colors ${theme.buttonBorder} ${theme.text} ${theme.buttonHover}`}>
-            더보기 →
+          <button 
+            onClick={() => {
+              setSelectedSources([source]);
+              setCurrentPage(1);
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`w-full py-2 rounded-lg border text-sm font-bold transition-colors ${theme.buttonBorder} ${theme.text} ${theme.buttonHover}`}
+          >
+            {source} 데이터 전체보기 →
           </button>
         </div>
       </div>
@@ -357,8 +364,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                               {article.keywords || mockKeywords}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
-                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center text-blue-500 hover:text-blue-700 transition-colors" title="원문 바로가기">
-                                <ExternalLink className="w-5 h-5" />
+                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" title="원문 바로가기">
+                                <ExternalLink className="w-4 h-4" />
                               </a>
                             </td>
                           </tr>
