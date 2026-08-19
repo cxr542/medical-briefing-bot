@@ -249,7 +249,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   <table className="w-full text-sm text-left">
                     <thead className="bg-white text-gray-500 border-b border-gray-200">
                       <tr>
-                        <th className="px-5 py-4 font-semibold w-24 relative">
+                        <th className="px-4 py-4 font-semibold w-24 relative whitespace-nowrap">
                           <div 
                             className="flex items-center gap-1 cursor-help"
                             onMouseEnter={() => setShowStatusTooltip(true)}
@@ -272,12 +272,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                             </div>
                           )}
                         </th>
-                        <th className="px-5 py-4 font-semibold w-28 text-center">날짜</th>
-                        <th className="px-5 py-4 font-semibold w-56">기관</th>
-                        <th className="px-5 py-4 font-semibold min-w-[200px]">제목</th>
-                        <th className="px-5 py-4 font-semibold w-32 text-center">구분</th>
-                        <th className="px-5 py-4 font-semibold w-48">주요 키워드</th>
-                        <th className="px-5 py-4 font-semibold w-28 text-center">원문 바로가기</th>
+                        <th className="px-4 py-4 font-semibold w-28 text-center whitespace-nowrap">날짜</th>
+                        <th className="px-4 py-4 font-semibold w-56 whitespace-nowrap">기관</th>
+                        <th className="px-4 py-4 font-semibold w-auto">제목</th>
+                        <th className="px-4 py-4 font-semibold w-28 text-center whitespace-nowrap">구분</th>
+                        <th className="px-4 py-4 font-semibold w-64 whitespace-nowrap">주요 키워드</th>
+                        <th className="px-4 py-4 font-semibold w-32 text-center whitespace-nowrap">원문 바로가기</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
@@ -302,7 +302,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
                         return (
                           <tr key={article.id} className={`hover:bg-gray-50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
-                            <td className="px-5 py-4 align-middle">
+                            <td className="px-4 py-4 align-middle whitespace-nowrap">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
                                 article.status === 'NEW' ? 'text-red-500 border border-red-200' : 
                                 article.status === 'UPDATE' ? 'text-yellow-600 border border-yellow-200' :
@@ -315,11 +315,11 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                                 <span className="block mt-1 text-[10px] text-blue-600 font-semibold">↳ AI 통합됨</span>
                               )}
                             </td>
-                            <td className="px-5 py-4 align-middle text-gray-600 text-center text-sm font-medium">
+                            <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
                               {new Date(article.published_date).toISOString().split('T')[0]}
                             </td>
-                            <td className="px-5 py-4 align-middle font-medium text-gray-700">{article.source}</td>
-                            <td className="px-5 py-4 align-middle">
+                            <td className="px-4 py-4 align-middle font-medium text-gray-700">{article.source}</td>
+                            <td className="px-4 py-4 align-middle">
                               <span className={`text-gray-800 font-medium ${isDeleted ? 'line-through' : ''}`}>
                                 {article.title}
                               </span>
@@ -337,15 +337,15 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                                 </div>
                               )}
                             </td>
-                            <td className="px-5 py-4 align-middle text-center">
+                            <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
                               <span className={`inline-flex px-2 py-1 border rounded text-xs font-semibold ${mockCatColor}`}>
                                 {article.category || mockCategory}
                               </span>
                             </td>
-                            <td className="px-5 py-4 align-middle text-xs text-gray-600 font-medium">
+                            <td className="px-4 py-4 align-middle text-xs text-gray-600 font-medium">
                               {article.keywords || mockKeywords}
                             </td>
-                            <td className="px-5 py-4 align-middle text-center">
+                            <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
                               <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center text-blue-500 hover:text-blue-700 transition-colors" title="원문 바로가기">
                                 <ExternalLink className="w-5 h-5" />
                               </a>
