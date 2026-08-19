@@ -141,11 +141,11 @@ def fetch_hira_public_notices():
     articles_to_save = []
     try:
         # 실제 사이트 DOM 구조에 맞는 파싱 로직 구현 공간
-        # 현재는 MVP 구동을 위한 모의 데이터 반환
+        # 현재는 MVP 구동을 위한 모의 데이터 반환 (링크는 심평원 메인 공지사항 게시판)
         articles_to_save.append({
             "source": source_name,
             "title": "[안내] 2026년도 요양급여비용 심사 및 평가 방향",
-            "url": "https://www.hira.or.kr/dummy-hira-1",
+            "url": "https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100",
             "published_date": datetime.now(timezone.utc).isoformat(),
             "content_hash": get_content_hash("요양급여비용 심사 및 평가 방향"),
             "status": "NEW"
@@ -163,7 +163,7 @@ def fetch_nhis_public_notices():
         articles_to_save.append({
             "source": source_name,
             "title": "[공지] 요양기관 본인확인 강화 제도 시행 세부 지침 안내",
-            "url": "https://www.nhis.or.kr/dummy-nhis-1",
+            "url": "https://www.nhis.or.kr/nhis/about/retrieveBbsList.do?bbsId=BBS_0000000000000001",
             "published_date": datetime.now(timezone.utc).isoformat(),
             "content_hash": get_content_hash("요양기관 본인확인 지침"),
             "status": "NEW"
