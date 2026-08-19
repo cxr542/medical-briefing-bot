@@ -20,16 +20,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const itemsPerPage = 5;
 
   const allSources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
-  const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
-  
-  // 최초 로드 시 '국가법령정보센터'를 제외하고 전체 선택
-  useMemo(() => {
-    if (selectedSources.length === 0 && allSources.length > 0) {
-      setSelectedSources(allSources.filter(s => s !== '국가법령정보센터'));
-    }
-  }, [allSources]);
-
   // 출처 필터링 적용
   const filteredInitialArticles = initialArticles.filter(a => selectedSources.includes(a.source));
 
