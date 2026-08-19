@@ -130,57 +130,51 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   };
 
   return (
-    <div className="flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
+    <div className="space-y-6 animate-in fade-in duration-500">
       
-      {/* 좌측 사이드바 필터 */}
-      <aside className="w-full md:w-56 shrink-0 print:hidden">
-        <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 sticky top-24">
-          <h3 className="font-bold text-[#5C2D0C] text-md mb-3 flex items-center gap-1.5 border-b border-[#E8DCCB] pb-2">
-            <Layers className="w-4 h-4 text-[#C05A12]" /> 출처 필터링
+      {/* 상단 컨트롤 패널 (필터 및 액션) */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 print:hidden flex flex-col gap-4">
+        <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+          <h3 className="font-bold text-[#5C2D0C] flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#C05A12]" /> 수집 출처 필터링
           </h3>
-          <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1 custom-scrollbar">
-            <label className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-[#F5EFE6] rounded-md transition-colors">
-              <input 
-                type="checkbox" 
-                checked={selectedSources.length === allSources.length && allSources.length > 0}
-                onChange={handleAllToggle}
-                className="w-4 h-4 rounded text-[#C05A12] focus:ring-[#C05A12] border-gray-300"
-              />
-              <span className="font-bold text-gray-800 text-sm">전체 선택</span>
-            </label>
-            <div className="border-t border-gray-100 my-1"></div>
-            {allSources.map(source => (
-              <label key={source} className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-[#F5EFE6] rounded-md transition-colors">
-                <input 
-                  type="checkbox" 
-                  checked={selectedSources.includes(source)}
-                  onChange={() => handleSourceToggle(source)}
-                  className="w-4 h-4 rounded text-[#C05A12] focus:ring-[#C05A12] border-gray-300"
-                />
-                <span className="text-sm text-gray-700">{source}</span>
-              </label>
-            ))}
+          <div className="flex gap-2">
+            <button onClick={handleDownloadCsv} className="flex items-center gap-1.5 bg-white border border-[#E8DCCB] text-[#5C2D0C] text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#F5EFE6] shadow-sm transition-colors">
+              <Download className="w-4 h-4" /> 엑셀 다운로드
+            </button>
+            <button onClick={handlePrint} className="flex items-center gap-1.5 bg-[#5C2D0C] border border-[#5C2D0C] text-white text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#8E6E53] shadow-sm transition-colors">
+              <Printer className="w-4 h-4" /> 리포트 인쇄
+            </button>
           </div>
         </div>
-      </aside>
-
-      {/* 우측 메인 콘텐츠 */}
-      <div className="flex-1 min-w-0 space-y-8">
         
-        {/* 액션 버튼 */}
-        <div className="flex justify-end gap-2 print:hidden mb-2">
-          <button onClick={handleDownloadCsv} className="flex items-center gap-1.5 bg-white border border-[#E8DCCB] text-[#5C2D0C] text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#F5EFE6] shadow-sm transition-colors">
-            <Download className="w-4 h-4" /> 현재 목록 엑셀 다운로드
+        <div className="flex flex-wrap gap-2 items-center">
+          <button 
+            onClick={handleAllToggle}
+            className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors shadow-sm ${selectedSources.length === allSources.length && allSources.length > 0 ? 'bg-[#5C2D0C] text-white border-[#5C2D0C]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+          >
+            전체 선택
           </button>
-          <button onClick={handlePrint} className="flex items-center gap-1.5 bg-[#5C2D0C] border border-[#5C2D0C] text-white text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#8E6E53] shadow-sm transition-colors">
-            <Printer className="w-4 h-4" /> 리포트 인쇄
-          </button>
+          <div className="w-px h-5 bg-gray-300 mx-1"></div>
+          {allSources.map(source => (
+            <button
+              key={source}
+              onClick={() => handleSourceToggle(source)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors shadow-sm ${selectedSources.includes(source) ? 'bg-[#C05A12] text-white border-[#C05A12]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+            >
+              {source}
+            </button>
+          ))}
         </div>
+      </div>
 
+      {/* 메인 콘텐츠 영역 */}
+      <div className="space-y-8">
+        
         {filteredInitialArticles.length === 0 ? (
           <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-[#E8DCCB]/50 print:hidden">
             <p className="text-lg text-gray-500">
-              선택된 출처가 없습니다. 좌측 메뉴에서 출처를 선택해주세요.
+              선택된 출처가 없습니다. 상단 메뉴에서 출처를 선택해주세요.
             </p>
           </div>
         ) : (
