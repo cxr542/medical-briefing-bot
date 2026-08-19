@@ -21,11 +21,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
   const allSources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
   const [selectedSources, setSelectedSources] = useState<string[]>([]);
+  const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   
-  // 최초 로드 시 전체 선택
+  // 최초 로드 시 '국가법령정보센터'를 제외하고 전체 선택
   useMemo(() => {
     if (selectedSources.length === 0 && allSources.length > 0) {
-      setSelectedSources(allSources);
+      setSelectedSources(allSources.filter(s => s !== '국가법령정보센터'));
     }
   }, [allSources]);
 
@@ -193,9 +194,31 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                       <tr>
-                        <th className="px-5 py-3 font-semibold w-24">상태</th>
+                        <th className="px-5 py-3 font-semibold w-28 relative">
+                          <div 
+                            className="flex items-center gap-1 cursor-help"
+                            onMouseEnter={() => setShowStatusTooltip(true)}
+                            onMouseLeave={() => setShowStatusTooltip(false)}
+                          >
+                            상태
+                            <div className="w-4 h-4 rounded-full border border-gray-400 text-gray-500 flex items-center justify-center text-[10px]">?</div>
+                          </div>
+                          
+                          {/* 상태 툴팁 */}
+                          {showStatusTooltip && (
+                            <div className="absolute top-10 left-4 z-50 w-64 p-3 bg-white border border-gray-200 shadow-lg rounded-lg text-xs font-normal text-gray-700 animate-in fade-in zoom-in-95">
+                              <p className="font-bold text-[#5C2D0C] mb-2 border-b pb-1">데이터 상태 안내</p>
+                              <ul className="space-y-1.5">
+                                <li><span className="inline-block w-12 font-bold text-red-600">NEW</span>: 오늘 새로 수집된 기사</li>
+                                <li><span className="inline-block w-12 font-bold text-yellow-600">UPDATE</span>: 내용이 수정되거나 통합된 기사</li>
+                                <li><span className="inline-block w-12 font-bold text-gray-500 line-through">DELETED</span>: 원본 사이트에서 삭제된 기사</li>
+                                <li><span className="inline-block w-12 font-bold text-gray-600">유지</span>: 내용 변경 없이 어제와 동일한 기사</li>
+                              </ul>
+                            </div>
+                          )}
+                        </th>
                         <th className="px-5 py-3 font-semibold w-28 text-center">날짜</th>
-                        <th className="px-5 py-3 font-semibold w-36">기관</th>
+                        <th className="px-5 py-3 font-semibold w-56">기관</th>
                         <th className="px-5 py-3 font-semibold min-w-[200px]">제목</th>
                         <th className="px-5 py-3 font-semibold w-32 text-center">구분</th>
                         <th className="px-5 py-3 font-semibold w-48">주요 키워드</th>
