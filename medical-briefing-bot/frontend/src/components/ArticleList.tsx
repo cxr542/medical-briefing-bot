@@ -124,12 +124,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           <ul className="space-y-4">
             {articles.slice(0, 4).map(article => (
               <li key={article.id} className="group">
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="block">
-                  <div className={`text-sm font-medium text-gray-700 group-hover:underline line-clamp-2 leading-snug ${theme.groupHoverText}`}>
+                <a href={article.url} target="_blank" rel="noopener noreferrer" className="block" title={article.title}>
+                  <div className={`text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
                     <span className={`text-sm mr-1.5 ${theme.bullet}`}>•</span>
                     {article.title}
                   </div>
-                  <div className="text-[11px] text-gray-400 mt-1.5 ml-3 font-medium">
+                  <div className="text-[11px] text-gray-400 mt-1 ml-3 font-medium">
                     {new Date(article.published_date).toISOString().split('T')[0]}
                   </div>
                 </a>
