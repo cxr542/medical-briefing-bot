@@ -16,17 +16,22 @@ export default async function Dashboard() {
     return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;
   }
 
-  // 한국 시간 기준으로 현재 시간 생성
+  // 데이터 수집이 매일 오전 6시(KST)에 이루어지므로, 가장 최근에 지나간 오전 6시를 계산
   const now = new Date();
-  const options: Intl.DateTimeFormatOptions = { 
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit'
-  };
-  const today = now.toLocaleDateString('ko-KR', options);
+  
+  // UTC 시간을 KST(UTC+9)로 변환
+  const kstDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  
+  // 만약 현재 KST 시간이 오전 6시 이전이라면, 업데이트 시점은 어제 오전 6시임
+  if (kstDate.getHours() < 6) {
+    kstDate.setDate(kstDate.getDate() - 1);
+  }
+  
+  const year = kstDate.getFullYear();
+  const month = kstDate.getMonth() + 1;
+  const date = kstDate.getDate();
+  
+  const formattedDate = `${year}년 ${month}월 ${date}일 오전 06:00`;
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#333333] font-sans pb-20">
@@ -37,7 +42,7 @@ export default async function Dashboard() {
         </h1>
         <div className="flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full text-xs md:text-sm">
           <Calendar className="w-4 h-4" />
-          <span>최종 업데이트: {today}</span>
+          <span>최종 업데이트: {formattedDate}</span>
         </div>
       </header>
 
