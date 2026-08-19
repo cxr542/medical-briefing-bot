@@ -199,18 +199,37 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   <table className="w-full text-sm text-left">
                     <thead className="bg-gray-50 text-gray-600 border-b border-gray-200">
                       <tr>
-                        <th className="px-5 py-3 font-semibold w-32">상태</th>
-                        <th className="px-5 py-3 font-semibold w-40">기관</th>
-                        <th className="px-5 py-3 font-semibold">제목 (클릭 시 원문 이동)</th>
+                        <th className="px-5 py-3 font-semibold w-24">상태</th>
                         <th className="px-5 py-3 font-semibold w-28 text-center">날짜</th>
+                        <th className="px-5 py-3 font-semibold w-36">기관</th>
+                        <th className="px-5 py-3 font-semibold min-w-[200px]">제목</th>
+                        <th className="px-5 py-3 font-semibold w-32 text-center">구분</th>
+                        <th className="px-5 py-3 font-semibold w-48">주요 키워드</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {currentNotices.map((article) => {
                         const isDeleted = article.status === 'DELETED';
+                        
+                        // 임시 데이터 로직 (DB에 구분/키워드 컬럼이 아직 없으므로, 제목 기반으로 간단히 분류)
+                        let mockCategory = "일반";
+                        let mockCatColor = "bg-gray-100 text-gray-600";
+                        if (article.title.includes('평가')) { mockCategory = "평가"; mockCatColor = "bg-purple-100 text-purple-700"; }
+                        else if (article.title.includes('심사') || article.title.includes('기준')) { mockCategory = "심사기준"; mockCatColor = "bg-green-100 text-green-700"; }
+                        else if (article.title.includes('시스템') || article.title.includes('점검')) { mockCategory = "시스템"; mockCatColor = "bg-orange-100 text-orange-700"; }
+                        else if (article.title.includes('제도') || article.title.includes('수가') || article.title.includes('정책')) { mockCategory = "정책/제도"; mockCatColor = "bg-blue-100 text-blue-700"; }
+                        else if (article.title.includes('교육') || article.title.includes('설명회')) { mockCategory = "행사/교육"; mockCatColor = "bg-teal-100 text-teal-700"; }
+                        
+                        let mockKeywords = "분석 대기중...";
+                        if (article.title.includes('수가')) mockKeywords = "수가, 건강보험, 인상";
+                        else if (article.title.includes('심사')) mockKeywords = "심사기준, 청구, 유의사항";
+                        else if (article.title.includes('시스템')) mockKeywords = "청구, 시스템, 점검";
+                        else if (article.title.includes('평가')) mockKeywords = "적정성평가, 지표, 변경";
+                        else if (article.title.includes('설명회')) mockKeywords = "경영지원, 정책설명회, 중소병원";
+
                         return (
                           <tr key={article.id} className={`hover:bg-[#F5EFE6]/50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
-                            <td className="px-5 py-3 align-top">
+                            <td className="px-5 py-3 align-middle">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
                                 article.status === 'NEW' ? 'bg-red-50 text-red-600 border border-red-200' : 
                                 article.status === 'UPDATE' ? 'bg-yellow-50 text-yellow-700 border border-yellow-200' :
@@ -223,8 +242,11 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                                 <span className="block mt-1 text-[10px] text-[#C05A12] font-semibold">↳ AI 통합됨</span>
                               )}
                             </td>
-                            <td className="px-5 py-3 align-top font-medium text-gray-700">{article.source}</td>
-                            <td className="px-5 py-3 align-top">
+                            <td className="px-5 py-3 align-middle text-gray-500 text-center text-xs">
+                              {new Date(article.published_date).toISOString().split('T')[0]}
+                            </td>
+                            <td className="px-5 py-3 align-middle font-medium text-gray-700">{article.source}</td>
+                            <td className="px-5 py-3 align-middle">
                               <a href={article.url} target="_blank" rel="noopener noreferrer" className={`text-gray-900 hover:text-[#C05A12] font-medium flex items-center gap-1 group ${isDeleted ? 'line-through' : ''}`}>
                                 {article.title}
                                 <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-[#C05A12]" />
@@ -243,8 +265,13 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                                 </div>
                               )}
                             </td>
-                            <td className="px-5 py-3 align-top text-gray-500 text-center text-xs">
-                              {new Date(article.published_date).toISOString().split('T')[0]}
+                            <td className="px-5 py-3 align-middle text-center">
+                              <span className={`inline-flex px-2 py-1 rounded text-xs font-semibold ${mockCatColor}`}>
+                                {article.category || mockCategory}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3 align-middle text-xs text-gray-600">
+                              {article.keywords || mockKeywords}
                             </td>
                           </tr>
                         );
