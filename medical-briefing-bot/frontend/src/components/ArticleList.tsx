@@ -296,7 +296,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   기관별 공지사항
                   <span className="text-sm font-normal text-gray-500 ml-2">각 기관의 최신 공지사항을 확인하세요.</span>
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {Object.entries(publicSourcesMap).map(([source, articles]) => (
                     <SourceCard key={source} source={source} articles={articles} />
                   ))}
@@ -312,7 +312,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   의료전문지 최신기사
                   <span className="text-sm font-normal text-gray-500 ml-2">의료계 주요 뉴스를 확인하세요.</span>
                 </h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {Object.entries(pressSourcesMap).map(([source, articles]) => (
                     <SourceCard key={source} source={source} articles={articles} isPress={true} />
                   ))}
