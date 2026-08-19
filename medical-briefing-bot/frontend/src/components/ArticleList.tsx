@@ -122,7 +122,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         </div>
         <div className="px-4 pb-4 flex-grow">
           <ul className="space-y-4">
-            {articles.slice(0, 4).map(article => (
+            {articles.slice(0, 3).map(article => (
               <li key={article.id} className="group">
                 <a href={article.url} target="_blank" rel="noopener noreferrer" className="block" title={article.title}>
                   <div className={`text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
