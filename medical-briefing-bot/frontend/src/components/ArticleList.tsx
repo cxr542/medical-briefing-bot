@@ -133,12 +133,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     <div className="flex flex-col md:flex-row gap-6 animate-in fade-in duration-500">
       
       {/* 좌측 사이드바 필터 */}
-      <aside className="w-full md:w-64 shrink-0 print:hidden">
-        <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-5 sticky top-24">
-          <h3 className="font-bold text-[#5C2D0C] text-lg mb-4 flex items-center gap-2 border-b border-[#E8DCCB] pb-3">
-            <Layers className="w-5 h-5 text-[#C05A12]" /> 출처 필터링
+      <aside className="w-full md:w-56 shrink-0 print:hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 sticky top-24">
+          <h3 className="font-bold text-[#5C2D0C] text-md mb-3 flex items-center gap-1.5 border-b border-[#E8DCCB] pb-2">
+            <Layers className="w-4 h-4 text-[#C05A12]" /> 출처 필터링
           </h3>
-          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+          <div className="space-y-2 max-h-[65vh] overflow-y-auto pr-1 custom-scrollbar">
             <label className="flex items-center gap-2.5 cursor-pointer p-1.5 hover:bg-[#F5EFE6] rounded-md transition-colors">
               <input 
                 type="checkbox" 

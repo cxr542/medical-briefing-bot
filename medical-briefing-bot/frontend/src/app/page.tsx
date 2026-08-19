@@ -42,7 +42,7 @@ export default async function Dashboard() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 md:mt-12">
+      <main className="max-w-[1600px] w-[95%] mx-auto mt-8 md:mt-12">
         {/* 클라이언트 컴포넌트(검색 및 렌더링)에 데이터 전달 */}
         <ArticleList initialArticles={articles || []} />
       </main>
