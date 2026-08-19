@@ -26,7 +26,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const filteredInitialArticles = initialArticles.filter(a => selectedSources.includes(a.source));
 
   // 출처 분류 (전문지 vs 공공기관)
-  const pressSources = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사'];
+  const pressSources = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
   
   const publicArticles = filteredInitialArticles.filter(a => !pressSources.includes(a.source));
   const pressArticles = filteredInitialArticles.filter(a => pressSources.includes(a.source));
@@ -102,6 +102,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     else if (source.includes('심사')) theme = { border: 'border-indigo-300', text: 'text-indigo-500', bullet: 'text-indigo-400', buttonBorder: 'border-indigo-200', buttonHover: 'hover:bg-indigo-50 hover:text-indigo-500', groupHoverText: 'group-hover:text-indigo-500' };
     else if (source.includes('메디칼타임즈')) theme = { border: 'border-red-300', text: 'text-red-500', bullet: 'text-red-400', buttonBorder: 'border-red-200', buttonHover: 'hover:bg-red-50 hover:text-red-500', groupHoverText: 'group-hover:text-red-500' };
     else if (source.includes('청년의사')) theme = { border: 'border-sky-300', text: 'text-sky-500', bullet: 'text-sky-400', buttonBorder: 'border-sky-200', buttonHover: 'hover:bg-sky-50 hover:text-sky-500', groupHoverText: 'group-hover:text-sky-500' };
+    else if (source.includes('의협신문')) theme = { border: 'border-pink-300', text: 'text-pink-500', bullet: 'text-pink-400', buttonBorder: 'border-pink-200', buttonHover: 'hover:bg-pink-50 hover:text-pink-500', groupHoverText: 'group-hover:text-pink-500' };
     else if (source.includes('메디게이트뉴스')) theme = { border: 'border-emerald-300', text: 'text-emerald-600', bullet: 'text-emerald-500', buttonBorder: 'border-emerald-200', buttonHover: 'hover:bg-emerald-50 hover:text-emerald-600', groupHoverText: 'group-hover:text-emerald-600' };
     else if (source.includes('데일리메디')) theme = { border: 'border-blue-300', text: 'text-blue-600', bullet: 'text-blue-500', buttonBorder: 'border-blue-200', buttonHover: 'hover:bg-blue-50 hover:text-blue-600', groupHoverText: 'group-hover:text-blue-600' };
     else if (source.includes('국가법령')) theme = { border: 'border-slate-300', text: 'text-slate-600', bullet: 'text-slate-500', buttonBorder: 'border-slate-200', buttonHover: 'hover:bg-slate-50 hover:text-slate-600', groupHoverText: 'group-hover:text-slate-600' };

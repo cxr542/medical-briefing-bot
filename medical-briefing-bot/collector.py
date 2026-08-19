@@ -280,8 +280,10 @@ if __name__ == "__main__":
         {"name": "보건복지부 보도자료", "url": "https://www.mohw.go.kr/react/rss.jsp", "is_press": False},
         {"name": "질병관리청 보도자료", "url": "https://www.kdca.go.kr/rss", "is_press": False},
         {"name": "식품의약품안전처 보도자료", "url": "https://www.mfds.go.kr/rss", "is_press": False},
-        {"name": "메디게이트뉴스", "url": "http://www.medigatenews.com/rss", "is_press": True},
-        {"name": "데일리메디", "url": "http://www.dailymedi.com/rss/allArticle.xml", "is_press": True}
+        {"name": "청년의사", "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml", "is_press": True},
+        {"name": "의협신문", "url": "http://www.doctorsnews.co.kr/rss/allArticle.xml", "is_press": True},
+        {"name": "메디게이트뉴스", "url": "https://news.google.com/rss/search?q=site:medigatenews.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True},
+        {"name": "데일리메디", "url": "https://news.google.com/rss/search?q=site:dailymedi.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True}
     ]
     for s in rss_sources:
         try:
