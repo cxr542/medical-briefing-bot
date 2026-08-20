@@ -38,6 +38,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
   };
 
+  const handleToday = () => {
+    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    setSelectedDate(`${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`);
+  };
+
   // 선택된 날짜의 KST 자정 직전(23:59:59)까지 수집된 기사만 필터링 (타임머신 기능)
   const timeFilteredArticles = useMemo(() => {
     const targetEndKst = new Date(`${selectedDate}T23:59:59+09:00`);
@@ -206,6 +212,9 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           />
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />
+          </button>
+          <button onClick={handleToday} className="ml-2 px-3 py-1.5 bg-[#F5EFE6] hover:bg-[#E8DCCB] text-[#5C2D0C] text-sm font-bold rounded-lg transition-colors shadow-sm">
+            오늘
           </button>
         </div>
       </div>
