@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2 } from 'lucide-react';
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar } from 'lucide-react';
 
 interface Article {
   id: number;
@@ -19,11 +19,37 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
+  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
+  });
+
+  const handlePrevDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 1);
+    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
+  const handleNextDay = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 1);
+    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  };
+
+  // 선택된 날짜의 KST 자정 직전(23:59:59)까지 수집된 기사만 필터링 (타임머신 기능)
+  const timeFilteredArticles = useMemo(() => {
+    const targetEndKst = new Date(`${selectedDate}T23:59:59+09:00`);
+    return initialArticles.filter(a => new Date(a.published_date) <= targetEndKst);
+  }, [initialArticles, selectedDate]);
+
   const allSources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
-  // 출처 필터링 적용
-  const filteredInitialArticles = initialArticles.filter(a => selectedSources.includes(a.source));
+  
+  // 출처 필터링 적용 (timeFilteredArticles 기반)
+  const filteredInitialArticles = timeFilteredArticles.filter(a => selectedSources.includes(a.source));
 
   // 출처 분류 (전문지 vs 공공기관)
   const pressSources = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
@@ -31,11 +57,15 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const publicArticles = filteredInitialArticles.filter(a => !pressSources.includes(a.source));
   const pressArticles = filteredInitialArticles.filter(a => pressSources.includes(a.source));
 
-  // 1. 7일 이내 주요 공지 (공공기관 최신순 정렬 및 7일 필터링)
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  // 1. 7일 이내 주요 공지 (선택한 날짜 기준 7일 필터링)
+  const recentNotices = useMemo(() => {
+    const targetEndKst = new Date(`${selectedDate}T23:59:59+09:00`);
+    const sevenDaysAgo = new Date(targetEndKst);
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+    return publicArticles.filter(a => new Date(a.published_date) >= sevenDaysAgo);
+  }, [publicArticles, selectedDate]);
   
-  const recentNotices = publicArticles.filter(a => new Date(a.published_date) >= sevenDaysAgo);
   const topNotices = [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
   
   const totalPages = Math.ceil(topNotices.length / itemsPerPage);
@@ -158,6 +188,28 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
+      {/* 날짜 선택 패널 */}
+      <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 print:hidden flex justify-between items-center">
+        <div className="flex items-center gap-3">
+          <Calendar className="w-5 h-5 text-[#C05A12]" />
+          <h3 className="font-bold text-[#5C2D0C]">브리핑 날짜</h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={handlePrevDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="이전 날짜">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
+          <input 
+            type="date" 
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
+          />
+          <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
+            <ChevronRight className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
       {/* 상단 컨트롤 패널 (필터 및 액션) */}
       <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 print:hidden flex flex-col gap-4">
         <div className="flex justify-between items-center border-b border-gray-100 pb-3">
