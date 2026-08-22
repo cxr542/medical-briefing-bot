@@ -3,6 +3,12 @@
 import { useState, useMemo } from 'react';
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar } from 'lucide-react';
 
+interface RelatedLink {
+  title: string;
+  url: string;
+  source: string;
+}
+
 interface Article {
   id: number;
   source: string;
@@ -10,10 +16,19 @@ interface Article {
   url: string;
   published_date: string;
   status: string;
+  category?: string;
+  keywords?: string;
   is_merged?: boolean;
-  related_links?: any[];
-  [key: string]: any;
+  related_links?: RelatedLink[];
 }
+
+interface BriefingAnalysis {
+  category: string;
+  categoryClassName: string;
+  keywords: string;
+}
+
+const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
 
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [currentPage, setCurrentPage] = useState(1);
@@ -55,13 +70,20 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   
   // 출처 필터링 적용 (timeFilteredArticles 기반)
-  const filteredInitialArticles = timeFilteredArticles.filter(a => selectedSources.includes(a.source));
+  const filteredInitialArticles = useMemo(
+    () => timeFilteredArticles.filter(a => selectedSources.includes(a.source)),
+    [timeFilteredArticles, selectedSources],
+  );
 
   // 출처 분류 (전문지 vs 공공기관)
-  const pressSources = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
-  
-  const publicArticles = filteredInitialArticles.filter(a => !pressSources.includes(a.source));
-  const pressArticles = filteredInitialArticles.filter(a => pressSources.includes(a.source));
+  const publicArticles = useMemo(
+    () => filteredInitialArticles.filter(a => !PRESS_SOURCES.includes(a.source)),
+    [filteredInitialArticles],
+  );
+  const pressArticles = useMemo(
+    () => filteredInitialArticles.filter(a => PRESS_SOURCES.includes(a.source)),
+    [filteredInitialArticles],
+  );
 
   // 1. 7일 이내 주요 공지 (선택한 날짜 기준 7일 필터링)
   const recentNotices = useMemo(() => {
@@ -191,6 +213,79 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     return counts;
   }, [initialArticles]);
 
+  const analyzeArticle = (article: Article): BriefingAnalysis => {
+    const text = `${article.source} ${article.title}`;
+    const matchedKeywords = [
+      ['의료질평가', ['의료질평가', '지표', '정정신청']],
+      ['적정성평가', ['적정성평가', '평가지표', '요양기관']],
+      ['평가', ['평가', '지표', '결과']],
+      ['수가', ['수가', '건강보험', '급여']],
+      ['급여', ['급여기준', '청구', '건강보험']],
+      ['심사', ['심사기준', '청구', '심평원']],
+      ['개인정보', ['개인정보', '제3자 제공', '공개내역']],
+      ['자동이체', ['보험료', '자동이체', '납부']],
+      ['검진', ['검진기관', '장비현황', '건강검진']],
+      ['공모', ['공모', '신청', '마감']],
+      ['교육', ['교육', '안내', '참여']],
+      ['설명회', ['설명회', '정책안내', '참여']],
+      ['시스템', ['시스템', '점검', '업무중단']],
+      ['법률', ['법령', '개정', '시행']],
+      ['법령', ['법령', '개정', '시행']],
+      ['의료법', ['의료법', '개정', '의료기관']],
+      ['연명의료', ['연명의료', '계획서', '입법']],
+      ['환자안전', ['환자안전', '자율규제', '의료계']],
+      ['의료기사', ['의료기사법', '원격지도', '쟁점']],
+      ['당뇨병', ['당뇨병', 'CGM', '급여확대']],
+      ['보직', ['기관인사', '임원', '공백']],
+      ['임명', ['기관인사', '임명', '보직']],
+    ] as const;
+
+    const keywordSet = new Set<string>();
+    matchedKeywords.forEach(([needle, keywords]) => {
+      if (text.includes(needle)) {
+        keywords.forEach(keyword => keywordSet.add(keyword));
+      }
+    });
+
+    if (keywordSet.size === 0) {
+      if (article.source.includes('국가법령')) {
+        ['법령', '보건의료', '제도'].forEach(keyword => keywordSet.add(keyword));
+      } else if (PRESS_SOURCES.includes(article.source)) {
+        ['의료계', '정책동향', '뉴스'].forEach(keyword => keywordSet.add(keyword));
+      } else {
+        ['공지', '기관안내', '확인필요'].forEach(keyword => keywordSet.add(keyword));
+      }
+    }
+
+    let category = '일반공지';
+    let categoryClassName = 'text-gray-600 border-gray-200 bg-gray-50';
+    if (text.includes('평가') || text.includes('지표')) {
+      category = '평가';
+      categoryClassName = 'text-purple-600 border-purple-200 bg-purple-50';
+    } else if (text.includes('심사') || text.includes('급여') || text.includes('수가') || text.includes('청구')) {
+      category = '심사/수가';
+      categoryClassName = 'text-green-600 border-green-200 bg-green-50';
+    } else if (text.includes('시스템') || text.includes('점검') || text.includes('자동이체')) {
+      category = '업무안내';
+      categoryClassName = 'text-orange-600 border-orange-200 bg-orange-50';
+    } else if (text.includes('법') || text.includes('법령') || text.includes('개정') || text.includes('시행')) {
+      category = '법령/제도';
+      categoryClassName = 'text-blue-600 border-blue-200 bg-blue-50';
+    } else if (text.includes('교육') || text.includes('설명회') || text.includes('공모')) {
+      category = '행사/신청';
+      categoryClassName = 'text-teal-600 border-teal-200 bg-teal-50';
+    } else if (text.includes('인사') || text.includes('임명') || text.includes('보직')) {
+      category = '인사/조직';
+      categoryClassName = 'text-slate-600 border-slate-200 bg-slate-50';
+    }
+
+    return {
+      category: article.category || category,
+      categoryClassName,
+      keywords: article.keywords || Array.from(keywordSet).slice(0, 3).join(', '),
+    };
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       
@@ -261,7 +356,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           const count = sourceCounts[source] || 0;
           // 이 카드 하나만 단독으로 선택되어 있는지 확인
           const isSelected = selectedSources.length === 1 && selectedSources[0] === source;
-          const isPress = pressSources.includes(source);
+          const isPress = PRESS_SOURCES.includes(source);
           
           return (
             <button 
@@ -355,22 +450,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {currentNotices.map((article) => {
                         const isDeleted = article.status === 'DELETED';
-                        
-                        // 임시 데이터 로직 (DB에 구분/키워드 컬럼이 아직 없으므로, 제목 기반으로 간단히 분류)
-                        let mockCategory = "일반";
-                        let mockCatColor = "text-gray-600 border-gray-200";
-                        if (article.title.includes('평가')) { mockCategory = "평가"; mockCatColor = "text-purple-600 border-purple-200 bg-purple-50"; }
-                        else if (article.title.includes('심사') || article.title.includes('기준')) { mockCategory = "심사기준"; mockCatColor = "text-green-600 border-green-200 bg-green-50"; }
-                        else if (article.title.includes('시스템') || article.title.includes('점검')) { mockCategory = "시스템"; mockCatColor = "text-orange-600 border-orange-200 bg-orange-50"; }
-                        else if (article.title.includes('제도') || article.title.includes('수가') || article.title.includes('정책')) { mockCategory = "정책/제도"; mockCatColor = "text-blue-600 border-blue-200 bg-blue-50"; }
-                        else if (article.title.includes('교육') || article.title.includes('설명회')) { mockCategory = "행사/교육"; mockCatColor = "text-teal-600 border-teal-200 bg-teal-50"; }
-                        
-                        let mockKeywords = "분석 대기중...";
-                        if (article.title.includes('수가')) mockKeywords = "수가, 건강보험, 인상";
-                        else if (article.title.includes('심사')) mockKeywords = "심사기준, 청구, 유의사항";
-                        else if (article.title.includes('시스템')) mockKeywords = "청구, 시스템, 점검";
-                        else if (article.title.includes('평가')) mockKeywords = "적정성평가, 지표, 변경";
-                        else if (article.title.includes('설명회')) mockKeywords = "경영지원, 정책설명회, 중소병원";
+                        const analysis = analyzeArticle(article);
 
                         return (
                           <tr key={article.id} className={`hover:bg-gray-50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
@@ -398,7 +478,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                               {article.is_merged && article.related_links && article.related_links.length > 0 && (
                                 <div className="mt-2 pl-2 border-l-2 border-gray-200">
                                   <ul className="space-y-1">
-                                    {article.related_links.map((link: any, idx: number) => (
+                                    {article.related_links.map((link, idx) => (
                                       <li key={idx}>
                                         <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-[#C05A12] flex items-center gap-1">
                                           <span className="font-semibold">[{link.source}]</span>{link.title}
@@ -410,12 +490,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                               )}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
-                              <span className={`inline-flex px-2 py-1 border rounded text-xs font-semibold ${mockCatColor}`}>
-                                {article.category || mockCategory}
+                              <span className={`inline-flex px-2 py-1 border rounded text-xs font-semibold ${analysis.categoryClassName}`}>
+                                {analysis.category}
                               </span>
                             </td>
                             <td className="px-4 py-4 align-middle text-xs text-gray-600 font-medium">
-                              {article.keywords || mockKeywords}
+                              {analysis.keywords}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
                               <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" title="원문 바로가기">
