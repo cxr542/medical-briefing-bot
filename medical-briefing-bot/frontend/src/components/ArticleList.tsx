@@ -34,10 +34,10 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST)
+  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 9시 이전이면 어제)
   const [selectedDate, setSelectedDate] = useState(() => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    if (kstDate.getHours() < 9) kstDate.setDate(kstDate.getDate() - 1);
     return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
   });
 
@@ -55,7 +55,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
   const handleToday = () => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    if (kstDate.getHours() < 9) kstDate.setDate(kstDate.getDate() - 1);
     setSelectedDate(`${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`);
   };
 

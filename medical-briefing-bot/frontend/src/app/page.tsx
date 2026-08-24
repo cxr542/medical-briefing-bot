@@ -16,14 +16,26 @@ export default async function Dashboard() {
     return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;
   }
 
-  // 데이터 수집이 매일 오전 6시(KST)에 이루어지므로, 가장 최근에 지나간 오전 6시를 계산
+  // 데이터 수집 스케줄 (KST 09:00, 12:00, 15:00) 기준 최근 업데이트 시점 계산
   const now = new Date();
-  
-  // UTC 시간을 KST(UTC+9)로 변환
   const kstDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const hours = kstDate.getHours();
   
-  // 만약 현재 KST 시간이 오전 6시 이전이라면, 업데이트 시점은 어제 오전 6시임
-  if (kstDate.getHours() < 6) {
+  let latestUpdateHour = 15;
+  let isYesterday = false;
+
+  if (hours < 9) {
+    latestUpdateHour = 15;
+    isYesterday = true;
+  } else if (hours < 12) {
+    latestUpdateHour = 9;
+  } else if (hours < 15) {
+    latestUpdateHour = 12;
+  } else {
+    latestUpdateHour = 15;
+  }
+
+  if (isYesterday) {
     kstDate.setDate(kstDate.getDate() - 1);
   }
   
@@ -31,7 +43,10 @@ export default async function Dashboard() {
   const month = kstDate.getMonth() + 1;
   const date = kstDate.getDate();
   
-  const formattedDate = `${year}년 ${month}월 ${date}일 오전 06:00`;
+  const ampm = latestUpdateHour === 9 ? '오전' : '오후';
+  const displayHour = latestUpdateHour === 9 ? '09' : (latestUpdateHour === 12 ? '12' : '03');
+  
+  const formattedDate = `${year}년 ${month}월 ${date}일 ${ampm} ${displayHour}:00`;
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#333333] font-sans pb-20">
