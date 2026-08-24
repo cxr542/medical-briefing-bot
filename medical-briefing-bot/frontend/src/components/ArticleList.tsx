@@ -244,6 +244,22 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   }, [initialArticles]);
 
   const analyzeArticle = (article: Article): BriefingAnalysis => {
+    // AI가 추출한 진짜 카테고리와 키워드가 DB에 있다면 우선 사용
+    if (article.category || article.keywords) {
+      let categoryClassName = "bg-gray-100 text-gray-700";
+      const cat = article.category || "일반공지";
+      if (cat.includes('평가')) categoryClassName = "bg-purple-100 text-purple-700";
+      else if (cat.includes('심사') || cat.includes('수가') || cat.includes('급여')) categoryClassName = "bg-teal-100 text-teal-700";
+      else if (cat.includes('보도') || cat.includes('뉴스') || cat.includes('기사')) categoryClassName = "bg-blue-100 text-blue-700";
+      else if (cat.includes('법령') || cat.includes('입법')) categoryClassName = "bg-rose-100 text-rose-700";
+      
+      return {
+        category: cat,
+        categoryClassName,
+        keywords: article.keywords || ""
+      };
+    }
+
     const text = `${article.source} ${article.title}`;
     const matchedKeywords = [
       ['의료질평가', ['의료질평가', '지표', '정정신청']],

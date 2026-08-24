@@ -254,9 +254,10 @@ def track_states(new_articles: list, supabase: Client):
             final_articles_to_upsert.append(new_art)
         else:
             old_art = db_dict[url]
-            # 해시값이 다르거나, 통합 상태가 달라졌으면 UPDATE
-            if (old_art.get('content_hash') != new_art['content_hash']) or \
-               (old_art.get('is_merged') != new_art.get('is_merged', False)):
+            if (old_art.get('content_hash') != new_art.get('content_hash')) or \
+               (old_art.get('is_merged') != new_art.get('is_merged', False)) or \
+               (old_art.get('category') != new_art.get('category')) or \
+               (old_art.get('keywords') != new_art.get('keywords')):
                 new_art['status'] = 'UPDATE'
                 final_articles_to_upsert.append(new_art)
             else:
