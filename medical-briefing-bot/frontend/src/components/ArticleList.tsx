@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar } from 'lucide-react';
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Home } from 'lucide-react';
 
 interface RelatedLink {
   title: string;
@@ -109,19 +109,26 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     return publicArticles.filter(a => new Date(a.published_date) >= sevenDaysAgo);
   }, [publicArticles, selectedDate]);
   
-  const isSingleSource = selectedSources.length === 1 && selectedSources[0] !== '국가법령정보센터';
+  const topNotices = [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
   
-  const tableArticles = useMemo(() => {
-    if (isSingleSource) {
-      return [...filteredInitialArticles].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
-    } else {
-      return [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
-    }
-  }, [isSingleSource, filteredInitialArticles, recentNotices]);
+  const totalPages = Math.ceil(topNotices.length / itemsPerPage);
+  const currentNotices = topNotices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+  // 모달 상태 관리
+  const [modalSource, setModalSource] = useState<string | null>(null);
+  const [modalPage, setModalPage] = useState(1);
+  const modalItemsPerPage = 10;
   
-  const totalPages = Math.ceil(tableArticles.length / itemsPerPage);
-  const currentTableArticles = tableArticles.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const tableTitle = isSingleSource ? `${selectedSources[0]} 전체 목록` : "7일 이내 주요 공지";
+  const modalArticles = useMemo(() => {
+    if (!modalSource) return [];
+    // 모달에서는 타임머신 필터링(timeFilteredArticles)은 유지하되, 해당 출처의 모든 기사 표시
+    return timeFilteredArticles
+      .filter(a => a.source === modalSource)
+      .sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+  }, [modalSource, timeFilteredArticles]);
+  
+  const modalTotalPages = Math.ceil(modalArticles.length / modalItemsPerPage);
+  const currentModalArticles = modalArticles.slice((modalPage - 1) * modalItemsPerPage, modalPage * modalItemsPerPage);
 
   // 2. 기관별 공지사항 그룹화
   const publicSourcesMap = publicArticles.reduce((acc: Record<string, Article[]>, article) => {
@@ -215,9 +222,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         <div className="px-4 pb-4">
           <button 
             onClick={() => {
-              setSelectedSources([source]);
-              setCurrentPage(1);
-              window.scrollTo({ top: 0, behavior: 'smooth' });
+              setModalSource(source);
+              setModalPage(1);
             }}
             className={`w-full py-2 rounded-lg border text-sm font-bold transition-colors ${theme.buttonBorder} ${theme.text} ${theme.buttonHover}`}
           >
@@ -592,6 +598,108 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           </>
         )}
       </div>
+      
+      {/* 4. '더보기' 모달 팝업 */}
+      {modalSource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b flex justify-between items-center bg-gray-50">
+              <h2 className="text-xl font-bold flex items-center gap-2">
+                <Star className="w-6 h-6 text-[#3B82F6] fill-[#3B82F6]" />
+                {modalSource} 전체 목록
+                <span className="bg-[#4285F4] text-white text-sm px-3 py-0.5 rounded-full ml-2">{modalArticles.length}건</span>
+              </h2>
+              <button 
+                onClick={() => setModalSource(null)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-600" />
+              </button>
+            </div>
+            
+            {/* Modal Body (Table) */}
+            <div className="flex-1 overflow-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-white text-gray-500 border-b border-gray-200 sticky top-0 z-10 shadow-sm">
+                  <tr>
+                    <th className="px-4 py-4 font-semibold w-24 whitespace-nowrap">상태</th>
+                    <th className="px-4 py-4 font-semibold w-32 text-center whitespace-nowrap">날짜</th>
+                    <th className="px-4 py-4 font-semibold">제목</th>
+                    <th className="px-4 py-4 font-semibold w-24 text-center whitespace-nowrap">구분</th>
+                    <th className="px-4 py-4 font-semibold w-64 whitespace-nowrap">주요 키워드</th>
+                    <th className="px-4 py-4 font-semibold w-32 text-center whitespace-nowrap">원문</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {currentModalArticles.map((article) => {
+                    const isDeleted = article.status === 'DELETED';
+                    const analysis = analyzeArticle(article);
+                    return (
+                      <tr key={article.id} className={`hover:bg-gray-50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
+                        <td className="px-4 py-4 align-middle whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
+                            article.status === 'NEW' ? 'text-red-500 border border-red-200' : 
+                            article.status === 'UPDATE' ? 'text-yellow-600 border border-yellow-200' :
+                            article.status === 'DELETED' ? 'text-gray-500 border border-gray-200 line-through' :
+                            'text-gray-500 border border-gray-200'
+                          }`}>
+                            {article.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
+                          {new Date(article.published_date).toISOString().split('T')[0]}
+                        </td>
+                        <td className="px-4 py-4 align-middle">
+                          <div className={`text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
+                            {article.title}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
+                          <span className={`inline-flex items-center px-2 py-1 rounded text-[11px] font-bold ${analysis.categoryClassName}`}>
+                            {analysis.category}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4 align-middle text-gray-500 text-xs">
+                          {analysis.keywords}
+                        </td>
+                        <td className="px-4 py-4 align-middle text-center">
+                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-2 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition-colors group">
+                            <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
+                          </a>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Modal Footer (Pagination) */}
+            {modalTotalPages > 1 && (
+              <div className="px-6 py-4 border-t bg-gray-50 flex items-center justify-center gap-4">
+                <button 
+                  onClick={() => setModalPage(p => Math.max(1, p - 1))}
+                  disabled={modalPage === 1}
+                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="text-sm font-medium text-gray-600">
+                  {modalPage} / {modalTotalPages}
+                </span>
+                <button 
+                  onClick={() => setModalPage(p => Math.min(modalTotalPages, p + 1))}
+                  disabled={modalPage === modalTotalPages}
+                  className="p-1 text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <ChevronRight className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

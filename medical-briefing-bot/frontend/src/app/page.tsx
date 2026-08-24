@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import { Calendar } from 'lucide-react';
+import { Calendar, Home } from 'lucide-react';
 import ArticleList from '@/components/ArticleList';
 
 export const revalidate = 60; // 60초 단위 캐시 갱신 (ISR)
@@ -53,6 +53,9 @@ export default async function Dashboard() {
       {/* Header */}
       <header className="bg-[#5C2D0C] text-white py-5 px-4 md:px-8 flex flex-col md:flex-row items-center justify-between shadow-md sticky top-0 z-10 gap-3 md:gap-0 print:hidden">
         <h1 className="text-lg md:text-2xl font-bold flex items-center gap-2">
+          <a href="/" className="p-1 hover:bg-white/20 rounded-full transition-colors" title="홈으로 새로고침">
+            <Home className="w-5 h-5 md:w-6 md:h-6" />
+          </a>
           🏥 병원·보건의료 종합 모닝 브리핑
         </h1>
         <div className="flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full text-xs md:text-sm">
