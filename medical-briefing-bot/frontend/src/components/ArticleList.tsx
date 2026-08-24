@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
-import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Home } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
+import { supabase } from '@/lib/supabase';
+
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Home, Search } from 'lucide-react';
 
 interface RelatedLink {
   title: string;
@@ -31,6 +33,9 @@ interface BriefingAnalysis {
 const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
 
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
+  const [articles, setArticles] = useState<Article[]>(initialArticles);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
@@ -73,14 +78,40 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     setSelectedTime(getLatestScheduleTime());
   };
 
-  // 선택된 날짜와 시간의 59분 59초까지 수집된 기사만 필터링 (타임머신 기능)
-  const timeFilteredArticles = useMemo(() => {
-    const [hh] = selectedTime.split(':');
-    const targetEndKst = new Date(`${selectedDate}T${hh}:59:59+09:00`);
-    return initialArticles.filter(a => new Date(a.published_date) <= targetEndKst);
-  }, [initialArticles, selectedDate, selectedTime]);
+  // 선택된 날짜와 시간, 검색어에 맞춰 동적으로 데이터 페칭 (서버 사이드 필터링)
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true);
+      let query = supabase.from('articles').select('*').order('published_date', { ascending: false });
+      
+      if (searchTerm.trim()) {
+         const term = searchTerm.trim();
+         query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
+         query = query.limit(200);
+      } else {
+         const [hh] = selectedTime.split(':');
+         const targetEndKst = new Date(`${selectedDate}T${hh}:59:59+09:00`);
+         query = query.lte('published_date', targetEndKst.toISOString());
+         query = query.limit(150);
+      }
+      
+      const { data, error } = await query;
+      if (!error && data) {
+         setArticles(data as Article[]);
+      }
+      setIsLoading(false);
+    };
 
-  const allSources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
+    const timer = setTimeout(() => {
+      fetchData();
+    }, 300); // 300ms 디바운스
+    return () => clearTimeout(timer);
+  }, [selectedDate, selectedTime, searchTerm]);
+
+  // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
+  const timeFilteredArticles = articles;
+
+  const allSources = useMemo(() => Array.from(new Set(articles.map(a => a.source))).sort(), [articles]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   
@@ -455,6 +486,21 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           </div>
         ) : (
           <>
+
+            {/* Loading Skeleton */}
+            {isLoading && (
+              <div className="animate-pulse space-y-8 mb-8">
+                <div className="h-10 bg-gray-200 rounded w-1/4 mb-4"></div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+                   {[1,2,3,4,5].map(i => (
+                     <div key={i} className="h-48 bg-gray-200 rounded-xl"></div>
+                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Main Content Render */}
+            <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
             {/* 1. 7일 이내 주요 공지 */}
             {/* 1. 7일 이내 주요 공지 */}
             {topNotices.length > 0 && (
@@ -611,6 +657,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                 </div>
               </section>
             )}
+            </div>
+
           </>
         )}
       </div>

@@ -5,11 +5,12 @@ import ArticleList from '@/components/ArticleList';
 export const revalidate = 60; // 60초 단위 캐시 갱신 (ISR)
 
 export default async function Dashboard() {
-  // Supabase에서 기사 조회 (발행일 기준 내림차순)
+  // Supabase에서 초기 데이터 100건만 제한적으로 조회 (대용량 대비 서버사이드 최적화)
   const { data: articles, error } = await supabase
     .from('articles')
     .select('*')
-    .order('published_date', { ascending: false });
+    .order('published_date', { ascending: false })
+    .limit(100);
 
   if (error) {
     console.error(error);
