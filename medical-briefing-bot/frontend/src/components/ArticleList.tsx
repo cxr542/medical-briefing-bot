@@ -34,12 +34,25 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 9시 이전이면 어제)
+  // 가장 최근 수집 시간 계산 (06, 09, 12, 15)
+  const getLatestScheduleTime = () => {
+    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+    const h = kstDate.getHours();
+    if (h < 6) return '15:00'; // 어제 15시
+    if (h < 9) return '06:00';
+    if (h < 12) return '09:00';
+    if (h < 15) return '12:00';
+    return '15:00';
+  };
+
+  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 6시 이전이면 어제)
   const [selectedDate, setSelectedDate] = useState(() => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 9) kstDate.setDate(kstDate.getDate() - 1);
+    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
     return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
   });
+
+  const [selectedTime, setSelectedTime] = useState(getLatestScheduleTime());
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -55,15 +68,17 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
   const handleToday = () => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 9) kstDate.setDate(kstDate.getDate() - 1);
+    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
     setSelectedDate(`${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`);
+    setSelectedTime(getLatestScheduleTime());
   };
 
-  // 선택된 날짜의 KST 자정 직전(23:59:59)까지 수집된 기사만 필터링 (타임머신 기능)
+  // 선택된 날짜와 시간의 59분 59초까지 수집된 기사만 필터링 (타임머신 기능)
   const timeFilteredArticles = useMemo(() => {
-    const targetEndKst = new Date(`${selectedDate}T23:59:59+09:00`);
+    const [hh] = selectedTime.split(':');
+    const targetEndKst = new Date(`${selectedDate}T${hh}:59:59+09:00`);
     return initialArticles.filter(a => new Date(a.published_date) <= targetEndKst);
-  }, [initialArticles, selectedDate]);
+  }, [initialArticles, selectedDate, selectedTime]);
 
   const allSources = useMemo(() => Array.from(new Set(initialArticles.map(a => a.source))).sort(), [initialArticles]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
@@ -305,6 +320,16 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             onChange={(e) => setSelectedDate(e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
           />
+          <select 
+            value={selectedTime}
+            onChange={(e) => setSelectedTime(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
+          >
+            <option value="06:00">오전 06:00</option>
+            <option value="09:00">오전 09:00</option>
+            <option value="12:00">오후 12:00</option>
+            <option value="15:00">오후 03:00</option>
+          </select>
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />
           </button>
