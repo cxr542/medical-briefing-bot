@@ -109,10 +109,19 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     return publicArticles.filter(a => new Date(a.published_date) >= sevenDaysAgo);
   }, [publicArticles, selectedDate]);
   
-  const topNotices = [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+  const isSingleSource = selectedSources.length === 1 && selectedSources[0] !== '국가법령정보센터';
   
-  const totalPages = Math.ceil(topNotices.length / itemsPerPage);
-  const currentNotices = topNotices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const tableArticles = useMemo(() => {
+    if (isSingleSource) {
+      return [...filteredInitialArticles].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+    } else {
+      return [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
+    }
+  }, [isSingleSource, filteredInitialArticles, recentNotices]);
+  
+  const totalPages = Math.ceil(tableArticles.length / itemsPerPage);
+  const currentTableArticles = tableArticles.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const tableTitle = isSingleSource ? `${selectedSources[0]} 전체 목록` : "7일 이내 주요 공지";
 
   // 2. 기관별 공지사항 그룹화
   const publicSourcesMap = publicArticles.reduce((acc: Record<string, Article[]>, article) => {
@@ -425,13 +434,14 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         ) : (
           <>
             {/* 1. 7일 이내 주요 공지 */}
-            {topNotices.length > 0 && (
+            {/* 1. 상단 메인 테이블 (7일 이내 주요 공지 OR 단일 출처 전체 목록) */}
+            {tableArticles.length > 0 && (
               <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden print:shadow-none print:border-none">
                 <div className="px-5 py-4 flex justify-between items-center bg-white border-b border-gray-200">
                   <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                     <Star className="w-6 h-6 text-[#3B82F6] fill-[#3B82F6]" /> 
-                    7일 이내 주요 공지
-                    <span className="bg-[#4285F4] text-white text-sm px-3 py-0.5 rounded-full ml-2">{topNotices.length}건</span>
+                    {tableTitle}
+                    <span className="bg-[#4285F4] text-white text-sm px-3 py-0.5 rounded-full ml-2">{tableArticles.length}건</span>
                   </h2>
                   <button className="text-sm font-medium text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 transition-colors">
                     전체 보기 →
@@ -473,7 +483,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {currentNotices.map((article) => {
+                      {currentTableArticles.map((article) => {
                         const isDeleted = article.status === 'DELETED';
                         const analysis = analyzeArticle(article);
 
