@@ -27,6 +27,7 @@ class AnalyzedArticleList(BaseModel):
 def process_articles_with_ai(articles: list, api_key: str) -> list:
     """
     수집된 기사 리스트를 Gemini AI에 전달하여 카테고리/키워드를 추출하고 중복 기사를 통합합니다.
+    (청크 단위로 처리하여 JSON 파싱 에러 방지)
     """
     if not articles:
         return []
@@ -51,21 +52,28 @@ def process_articles_with_ai(articles: list, api_key: str) -> list:
     결과물은 반드시 JSON 스키마를 따라야 하며, 누락되는 기사 없이 모두 포함되어야 합니다.
     """
     
-    try:
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=[prompt, json.dumps(articles, ensure_ascii=False, indent=2)],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                response_schema=AnalyzedArticleList,
-                temperature=0.1,
-            ),
-        )
-        
-        result_json = response.text
-        parsed_data = json.loads(result_json)
-        return parsed_data.get("articles", [])
-        
-    except Exception as e:
-        print(f"❌ AI 처리 중 오류 발생: {e}")
-        return articles
+    final_results = []
+    chunk_size = 15
+    for i in range(0, len(articles), chunk_size):
+        chunk = articles[i:i+chunk_size]
+        print(f"  -> Chunk {i//chunk_size + 1}/{(len(articles)-1)//chunk_size + 1} 처리 중 ({len(chunk)}개)...")
+        try:
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=[prompt, json.dumps(chunk, ensure_ascii=False, indent=2)],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=AnalyzedArticleList,
+                    temperature=0.1,
+                ),
+            )
+            
+            result_json = response.text
+            parsed_data = json.loads(result_json)
+            final_results.extend(parsed_data.get("articles", []))
+            
+        except Exception as e:
+            print(f"❌ AI 처리 중 오류 발생 (Chunk {i//chunk_size + 1}): {e}")
+            final_results.extend(chunk) # 오류 발생 시 원본 유지
+            
+    return final_results
