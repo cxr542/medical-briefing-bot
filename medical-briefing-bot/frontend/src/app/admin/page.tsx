@@ -17,7 +17,7 @@ export default function AdminPage() {
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
     // 심플한 비밀번호 (추후 환경변수로 분리 권장)
-    if (password.trim() === 'admin1234!' || password.trim() === 'admin1234') {
+    if (password.trim().toLowerCase() === 'admin1234!' || password.trim().toLowerCase() === 'admin1234') {
       setIsAuthenticated(true);
       fetchStats();
     } else {
