@@ -399,6 +399,20 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             오늘
           </button>
         </div>
+        
+        {/* 검색창 */}
+        <div className="relative w-full max-w-xs ml-4 hidden md:block">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            className="block w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#C05A12] focus:border-[#C05A12] transition-colors"
+            placeholder="기사 제목, 키워드 검색..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
       </div>
 
       {/* 상단 컨트롤 패널 (필터 및 액션) */}
