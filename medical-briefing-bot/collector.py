@@ -146,26 +146,27 @@ def fetch_hira_public_notices():
     articles_to_save = []
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get('https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100', headers=headers, verify=False, timeout=10)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        for tr in soup.select('table tbody tr')[:3]:
-            tds = tr.select('td')
-            if len(tds) >= 2:
-                a = tds[1].select_one('a')
-                if a:
-                    title = a.text.strip().replace('\t', '').replace('\n', '')
-                    href = a.get('href')
-                    full_url = f'https://www.hira.or.kr/bbsDummy.do{href}'
-                    
-                    articles_to_save.append({
-                        "source": source_name,
-                        "title": title,
-                        "url": full_url,
-                        "published_date": datetime.now(timezone.utc).isoformat(),
-                        "content_hash": get_content_hash(title),
-                        "status": "NEW"
-                    })
+        for page in [1, 2, 3]:
+            res = requests.get(f'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100&pageIndex={page}', headers=headers, verify=False, timeout=10)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            
+            for tr in soup.select('table tbody tr'):
+                tds = tr.select('td')
+                if len(tds) >= 2:
+                    a = tds[1].select_one('a')
+                    if a:
+                        title = a.text.strip().replace('\t', '').replace('\n', '')
+                        href = a.get('href')
+                        full_url = f'https://www.hira.or.kr/bbsDummy.do{href}'
+                        
+                        articles_to_save.append({
+                            "source": source_name,
+                            "title": title,
+                            "url": full_url,
+                            "published_date": datetime.now(timezone.utc).isoformat(),
+                            "content_hash": get_content_hash(title),
+                            "status": "NEW"
+                        })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
     return articles_to_save
@@ -176,24 +177,25 @@ def fetch_nhis_public_notices():
     print(f"🔄 크롤링 수집: {source_name}")
     articles_to_save = []
     try:
-        res = requests.get('https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do', verify=False, timeout=10)
-        soup = BeautifulSoup(res.text, 'html.parser')
-        
-        for tr in soup.select('tbody tr')[:3]:
-            a = tr.select_one('a')
-            if a:
-                title = a.text.strip().replace('\t', '').replace('\n', '')
-                href = a.get('href')
-                full_url = f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do{href}'
-                
-                articles_to_save.append({
-                    "source": source_name,
-                    "title": title,
-                    "url": full_url,
-                    "published_date": datetime.now(timezone.utc).isoformat(),
-                    "content_hash": get_content_hash(title),
-                    "status": "NEW"
-                })
+        for offset in [0, 10, 20]:
+            res = requests.get(f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do?mode=list&article.offset={offset}', verify=False, timeout=10)
+            soup = BeautifulSoup(res.text, 'html.parser')
+            
+            for tr in soup.select('tbody tr'):
+                a = tr.select_one('a')
+                if a:
+                    title = a.text.strip().replace('\t', '').replace('\n', '')
+                    href = a.get('href')
+                    full_url = f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do{href}'
+                    
+                    articles_to_save.append({
+                        "source": source_name,
+                        "title": title,
+                        "url": full_url,
+                        "published_date": datetime.now(timezone.utc).isoformat(),
+                        "content_hash": get_content_hash(title),
+                        "status": "NEW"
+                    })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
     return articles_to_save
