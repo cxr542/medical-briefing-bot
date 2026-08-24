@@ -514,7 +514,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             )}
 
             {/* Main Content Render */}
-            <div className={`transition-opacity duration-300 ${isLoading ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+            <div className={`space-y-8 transition-opacity duration-300 ${isLoading ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
             {/* 1. 7일 이내 주요 공지 */}
             {/* 1. 7일 이내 주요 공지 */}
             {topNotices.length > 0 && (
