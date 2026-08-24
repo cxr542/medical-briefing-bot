@@ -69,25 +69,48 @@ def fetch_kha_notices():
     articles_to_save = []
     
     try:
-        url = "https://www.kha.or.kr/kha_home/board/noticeList.do"
-        # 병협 사이트는 경우에 따라 User-Agent를 요구할 수 있음
-        headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # 병협 공지사항 테이블 파싱 로직 (실제 HTML 구조에 맞춰 조정 필요)
-        # 예시로 최근 3개의 공지사항만 추출한다고 가정
-        today = datetime.now(timezone.utc).isoformat()
-        
-        # TODO: 실제 병협 사이트의 tr > td 파싱
-        articles_to_save.append({
-            "source": source_name,
-            "title": "[모의] 2026년도 병원신임평가 시행계획 안내",
-            "url": "https://www.kha.or.kr/kha_home/board/noticeList.do?id=123",
-            "published_date": today,
-            "content_hash": get_content_hash("2026년도 병원신임평가 시행계획 안내"),
-            "status": "NEW"
-        })
+        # 병협 공지사항은 페이지당 10개, offset 방식으로 페이징
+        for offset in [0, 10, 20]:
+            url = f"https://www.kha.or.kr/kha_home/notice_list.do?article.offset={offset}&articleLimit=10"
+            headers = {'User-Agent': 'Mozilla/5.0'}
+            # SSL 인증서 오류 방지를 위해 verify=False 설정 (InsecureRequestWarning 무시)
+            requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
+            response = requests.get(url, headers=headers, timeout=10, verify=False)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            rows = soup.select('div.tr')
+            for row in rows:
+                tb_03 = row.select_one('.tb_03 a')
+                tb_05 = row.select_one('.tb_05')
+                if tb_03 and tb_05:
+                    title = tb_03.text.strip()
+                    href = tb_03.get('href', '')
+                    if href.startswith('?'):
+                        link = f"https://www.kha.or.kr/kha_home/notice_list.do{href}"
+                    elif href.startswith('/'):
+                        link = f"https://www.kha.or.kr{href}"
+                    else:
+                        link = href
+                    
+                    date_str = tb_05.text.strip()
+                    try:
+                        dt = datetime.strptime(date_str, "%Y-%m-%d")
+                        # KST 기준 오후 3시(15:00)로 세팅
+                        dt = dt.replace(hour=15, minute=0, second=0)
+                        kst = timezone(timedelta(hours=9))
+                        dt = dt.replace(tzinfo=kst)
+                        iso_date = dt.isoformat()
+                    except ValueError:
+                        iso_date = datetime.now(timezone.utc).isoformat()
+                        
+                    articles_to_save.append({
+                        "source": source_name,
+                        "title": title,
+                        "url": link,
+                        "published_date": iso_date,
+                        "content_hash": get_content_hash(f"{title}_{date_str}"),
+                        "status": "NEW"
+                    })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
         
