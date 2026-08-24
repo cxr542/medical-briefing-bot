@@ -158,12 +158,22 @@ def fetch_hira_public_notices():
                         title = a.text.strip().replace('\t', '').replace('\n', '')
                         href = a.get('href')
                         full_url = f'https://www.hira.or.kr/bbsDummy.do{href}'
+                        # 날짜 추출 (tds[3] 예상)
+                        pub_date_iso = datetime.now(timezone.utc).isoformat()
+                        try:
+                            if len(tds) >= 4:
+                                date_str = tds[3].text.strip()
+                                kst = timezone(timedelta(hours=9))
+                                dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=kst)
+                                pub_date_iso = dt.isoformat()
+                        except:
+                            pass
                         
                         articles_to_save.append({
                             "source": source_name,
                             "title": title,
                             "url": full_url,
-                            "published_date": datetime.now(timezone.utc).isoformat(),
+                            "published_date": pub_date_iso,
                             "content_hash": get_content_hash(title),
                             "status": "NEW"
                         })
@@ -187,12 +197,23 @@ def fetch_nhis_public_notices():
                     title = a.text.strip().replace('\t', '').replace('\n', '')
                     href = a.get('href')
                     full_url = f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do{href}'
+                    # 날짜 추출 (tds[4] 예상)
+                    pub_date_iso = datetime.now(timezone.utc).isoformat()
+                    try:
+                        tds = tr.select('td')
+                        if len(tds) >= 5:
+                            date_str = tds[4].text.strip()
+                            kst = timezone(timedelta(hours=9))
+                            dt = datetime.strptime(date_str, "%Y.%m.%d").replace(tzinfo=kst)
+                            pub_date_iso = dt.isoformat()
+                    except:
+                        pass
                     
                     articles_to_save.append({
                         "source": source_name,
                         "title": title,
                         "url": full_url,
-                        "published_date": datetime.now(timezone.utc).isoformat(),
+                        "published_date": pub_date_iso,
                         "content_hash": get_content_hash(title),
                         "status": "NEW"
                     })
