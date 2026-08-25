@@ -61,9 +61,14 @@ export default async function Dashboard() {
             🏥 병원·보건의료 종합 모닝 브리핑
           </Link>
         </h1>
-        <div className="flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full text-xs md:text-sm">
-          <Calendar className="w-4 h-4" />
-          <span>최종 업데이트: {formattedDate}</span>
+        <div className="flex flex-col md:flex-row items-center gap-3">
+          <Link href="/neurology-dashboard" className="flex items-center gap-2 bg-white/20 hover:bg-white/30 transition-colors px-4 py-1.5 rounded-full text-xs md:text-sm">
+            <span>📊 신경과 지표 대시보드</span>
+          </Link>
+          <div className="flex items-center gap-2 bg-white/20 px-4 py-1.5 rounded-full text-xs md:text-sm">
+            <Calendar className="w-4 h-4" />
+            <span>최종 업데이트: {formattedDate}</span>
+          </div>
         </div>
       </header>
 
