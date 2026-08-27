@@ -1,6 +1,7 @@
+from datetime import datetime, timezone, timedelta
 import os
 import hashlib
-from datetime import datetime, timezone, timedelta
+
 import feedparser
 import requests
 from bs4 import BeautifulSoup
@@ -205,6 +206,94 @@ def fetch_hira_public_notices():
     return articles_to_save
 
 # 5. 국민건강보험공단 공개 공지사항 스크래퍼
+
+def fetch_hira_biz_notices():
+    source_name = "심평원 업무포탈"
+    print(f"🔄 크롤링 수집: {source_name}")
+    articles_to_save = []
+    
+    try:
+        from playwright.sync_api import sync_playwright
+        import json
+    except ImportError:
+        print("⚠️ Playwright 라이브러리가 없습니다. (pip install playwright && playwright install)")
+        return articles_to_save
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
+            
+            # API 응답 가로채기
+            def handle_response(response):
+                if 'biz.hira.or.kr' in response.url and '.ndo' in response.url:
+                    try:
+                        text = response.text()
+                        # SSV 응답 포맷인 경우
+                        if 'Dataset:dsBoard' in text:
+                            # 1. dsBoard 데이터 블록 찾기
+                            start_idx = text.find('Dataset:dsBoard')
+                            if start_idx != -1:
+                                ds_board_text = text[start_idx:]
+                                # 2. 다음 Dataset이 있으면 거기까지만
+                                next_ds_idx = ds_board_text.find('Dataset:', 10)
+                                if next_ds_idx != -1:
+                                    ds_board_text = ds_board_text[:next_ds_idx]
+                                
+                                # 3. SSV 행 구분자는 보통 , 열 구분자는 
+                                rows = ds_board_text.split('\x1e')
+                                for row in rows:
+                                    cols = row.split('\x1f')
+                                    if len(cols) >= 5 and 'BBSMSTR' in cols[1]:
+                                        item_id = cols[2].strip()
+                                        title = cols[3].strip()
+                                        date_str = cols[5].strip()[:8] # YYYYMMDD
+                                        
+                                        # 날짜 파싱
+                                        pub_date_iso = datetime.now(timezone.utc).isoformat()
+                                        if len(date_str) == 8:
+                                            
+                                            kst = timezone(timedelta(hours=9))
+                                            dt = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=kst)
+                                            pub_date_iso = dt.isoformat()
+                                        
+                                        # 게시판에 따라 출처명 세분화 (선택사항)
+                                        board_type = source_name
+                                        if '00000663' in cols[1]:
+                                            board_type = f"{source_name} (자보알림방)"
+                                        else:
+                                            board_type = f"{source_name} (공지사항)"
+                                            
+                                        articles_to_save.append({
+                                            "source": board_type,
+                                            "title": title,
+                                            "url": f"http://biz.hira.or.kr/indexS.ndo?PROGRAM_ID=MP00000616&PROGRAM_PARAM=nttId=={item_id}",
+                                            "published_date": pub_date_iso,
+                                            "content_hash": get_content_hash(title),
+                                            "status": "NEW"
+                                        })
+                    except Exception as e:
+                        pass
+
+            page.on("response", handle_response)
+            
+            # 메인 접속 (공지사항 로드)
+            page.goto('https://biz.hira.or.kr/index.do', wait_until='networkidle')
+            page.wait_for_timeout(3000)
+            
+            # 자보알림방 클릭
+            try:
+                page.get_by_text('자보알림방', exact=True).first.click()
+                page.wait_for_timeout(3000)
+            except Exception as e:
+                print(f"자보알림방 클릭 실패: {e}")
+                
+            browser.close()
+    except Exception as e:
+        print(f"크롤링 에러 ({source_name}): {e}")
+        
+    return articles_to_save
+
 def fetch_nhis_public_notices():
     source_name = "국민건강보험공단 공지사항"
     print(f"🔄 크롤링 수집: {source_name}")
@@ -341,6 +430,7 @@ if __name__ == "__main__":
     total_articles.extend(fetch_kha_notices())
     total_articles.extend(fetch_hira_public_notices())
     total_articles.extend(fetch_nhis_public_notices())
+    total_articles.extend(fetch_hira_biz_notices())
     
     # 3. 오픈 API
     total_articles.extend(fetch_law_api())
