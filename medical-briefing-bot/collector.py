@@ -294,44 +294,75 @@ def fetch_hira_biz_notices():
         
     return articles_to_save
 
+
 def fetch_nhis_public_notices():
-    source_name = "국민건강보험공단 공지사항"
+    source_name = "건보공단 업무포탈"
     print(f"🔄 크롤링 수집: {source_name}")
     articles_to_save = []
     try:
-        for offset in [0, 10, 20]:
-            res = requests.get(f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do?mode=list&article.offset={offset}', verify=False, timeout=10)
-            soup = BeautifulSoup(res.text, 'html.parser')
-            
-            for tr in soup.select('tbody tr'):
-                a = tr.select_one('a')
-                if a:
-                    title = a.text.strip().replace('\t', '').replace('\n', '')
-                    href = a.get('href')
-                    full_url = f'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do{href}'
-                    # 날짜 추출 (tds[4] 예상)
-                    pub_date_iso = datetime.now(timezone.utc).isoformat()
-                    try:
-                        tds = tr.select('td')
-                        if len(tds) >= 5:
-                            date_str = tds[4].text.strip()
-                            kst = timezone(timedelta(hours=9))
-                            dt = datetime.strptime(date_str, "%Y.%m.%d").replace(tzinfo=kst)
-                            pub_date_iso = dt.isoformat()
-                    except:
-                        pass
+        import requests
+        import urllib3
+        import re
+        from datetime import datetime, timezone, timedelta
+        urllib3.disable_warnings()
+        
+        res = requests.post('https://medicare.nhis.or.kr/portal/main/getNoticeList.do', json={}, verify=False, timeout=10)
+        data = res.json()
+        
+        if 'data1' in data:
+            for item in data['data1']:
+                title = item.get('title', '')
+                title_clean = re.sub(r'<[^>]+>', '', title).strip()
+                date_str = item.get('sysRegDttm', '')
+                artiId = item.get('brdCtsNo', item.get('artiId', ''))
+                full_url = f"https://medicare.nhis.or.kr/portal/index.do?artiId={artiId}"
+                
+                pub_date_iso = datetime.now(timezone.utc).isoformat()
+                try:
+                    kst = timezone(timedelta(hours=9))
+                    dt = datetime.strptime(date_str, "%Y.%m.%d").replace(tzinfo=kst)
+                    pub_date_iso = dt.isoformat()
+                except:
+                    pass
                     
-                    articles_to_save.append({
-                        "source": source_name,
-                        "title": title,
-                        "url": full_url,
-                        "published_date": pub_date_iso,
-                        "content_hash": get_content_hash(title),
-                        "status": "NEW"
-                    })
+                articles_to_save.append({
+                    "source": source_name,
+                    "title": title_clean,
+                    "url": full_url,
+                    "published_date": pub_date_iso,
+                    "content_hash": get_content_hash(title_clean),
+                    "status": "NEW"
+                })
+                
+        if 'data4' in data:
+            for item in data['data4']:
+                title = item.get('title', '')
+                title_clean = re.sub(r'<[^>]+>', '', title).strip()
+                date_str = item.get('sysRegDttm', '')
+                artiId = item.get('brdCtsNo', item.get('artiId', ''))
+                full_url = f"https://medicare.nhis.or.kr/portal/index.do?artiId={artiId}"
+                
+                pub_date_iso = datetime.now(timezone.utc).isoformat()
+                try:
+                    kst = timezone(timedelta(hours=9))
+                    dt = datetime.strptime(date_str, "%Y.%m.%d").replace(tzinfo=kst)
+                    pub_date_iso = dt.isoformat()
+                except:
+                    pass
+                    
+                articles_to_save.append({
+                    "source": f"{source_name} (요양기관)",
+                    "title": title_clean,
+                    "url": full_url,
+                    "published_date": pub_date_iso,
+                    "content_hash": get_content_hash(title_clean),
+                    "status": "NEW"
+                })
+                
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
     return articles_to_save
+
 
 def track_states(new_articles: list, supabase: Client):
     """
@@ -406,6 +437,61 @@ def save_to_supabase(articles: list):
             
     print(f"✅ 총 {upsert_count}개의 게시물(신규/수정/삭제)을 DB에 동기화했습니다.")
 
+
+def fetch_mohw_legislation():
+    source_name = "보건복지부 법령"
+    print(f"🔄 크롤링 수집: {source_name}")
+    articles_to_save = []
+    try:
+        from bs4 import BeautifulSoup
+        import requests
+        import urllib3
+        from datetime import datetime, timezone, timedelta
+        urllib3.disable_warnings()
+        
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        res = requests.get('https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026', headers=headers, verify=False, timeout=10)
+        soup = BeautifulSoup(res.text, 'html.parser')
+        
+        for tr in soup.select('tbody tr')[:15]:
+            tds = tr.select('td')
+            if len(tds) >= 4:
+                a = tds[3].select_one('a')
+                if not a and len(tds) >= 5:
+                    for td in tds:
+                        a_tag = td.select_one('a')
+                        if a_tag and 'board.es' in a_tag.get('href', ''):
+                            a = a_tag
+                            break
+                            
+                if a:
+                    title_text = a.text.strip().replace('새글', '').strip()
+                    href = a.get('href')
+                    full_url = f'https://www.mohw.go.kr{href}'
+                    
+                    date_str = tds[-2].text.strip()
+                    
+                    pub_date_iso = datetime.now(timezone.utc).isoformat()
+                    try:
+                        kst = timezone(timedelta(hours=9))
+                        dt = datetime.strptime(date_str, "%Y-%m-%d").replace(tzinfo=kst)
+                        pub_date_iso = dt.isoformat()
+                    except:
+                        pass
+                        
+                    articles_to_save.append({
+                        "source": source_name,
+                        "title": title_text,
+                        "url": full_url,
+                        "published_date": pub_date_iso,
+                        "content_hash": get_content_hash(title_text),
+                        "status": "NEW"
+                    })
+    except Exception as e:
+        print(f"크롤링 에러 ({source_name}): {e}")
+    return articles_to_save
+
+
 if __name__ == "__main__":
     print("=== 브리핑 데이터 수집 봇 실행 (V4.3 - 상태 감지 완비) ===")
     
@@ -431,6 +517,7 @@ if __name__ == "__main__":
     total_articles.extend(fetch_hira_public_notices())
     total_articles.extend(fetch_nhis_public_notices())
     total_articles.extend(fetch_hira_biz_notices())
+    total_articles.extend(fetch_mohw_legislation())
     
     # 3. 오픈 API
     total_articles.extend(fetch_law_api())
