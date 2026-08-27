@@ -30,7 +30,13 @@ interface BriefingAnalysis {
   keywords: string;
 }
 
-const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문'];
+const KNOWN_SOURCES = [
+  '메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문', '의학신문', '보건신문',
+  '보건복지부 법령', '건보공단 업무포탈', '건보공단 업무포탈 (요양기관)', '심평원 e-평가 (평가알림방)',
+  '국가법령정보센터', '대한병원협회 공지사항', '심사평가원 공지사항', '심평원 업무포탈 (공지사항)', '심평원 업무포탈 (자보알림방)', '국민건강보험공단 공지사항'
+];
+
+const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문', '의학신문', '보건신문'];
 
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [articles, setArticles] = useState<Article[]>(initialArticles);
@@ -111,7 +117,11 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
   const timeFilteredArticles = articles;
 
-  const allSources = useMemo(() => Array.from(new Set(articles.map(a => a.source))).sort(), [articles]);
+  const allSources = useMemo(() => {
+    const dbSources = Array.from(new Set(articles.map(a => a.source)));
+    const combined = Array.from(new Set([...KNOWN_SOURCES, ...dbSources]));
+    return combined.sort();
+  }, [articles]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   
@@ -225,6 +235,9 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     else if (source.includes('의협신문')) theme = { border: 'border-pink-300', text: 'text-pink-500', bullet: 'text-pink-400', buttonBorder: 'border-pink-200', buttonHover: 'hover:bg-pink-50 hover:text-pink-500', groupHoverText: 'group-hover:text-pink-500' };
     else if (source.includes('메디게이트뉴스')) theme = { border: 'border-emerald-300', text: 'text-emerald-600', bullet: 'text-emerald-500', buttonBorder: 'border-emerald-200', buttonHover: 'hover:bg-emerald-50 hover:text-emerald-600', groupHoverText: 'group-hover:text-emerald-600' };
     else if (source.includes('데일리메디')) theme = { border: 'border-blue-300', text: 'text-blue-600', bullet: 'text-blue-500', buttonBorder: 'border-blue-200', buttonHover: 'hover:bg-blue-50 hover:text-blue-600', groupHoverText: 'group-hover:text-blue-600' };
+    else if (source.includes('의학신문')) theme = { border: 'border-rose-300', text: 'text-rose-600', bullet: 'text-rose-500', buttonBorder: 'border-rose-200', buttonHover: 'hover:bg-rose-50 hover:text-rose-600', groupHoverText: 'group-hover:text-rose-600' };
+    else if (source.includes('보건신문')) theme = { border: 'border-cyan-300', text: 'text-cyan-600', bullet: 'text-cyan-500', buttonBorder: 'border-cyan-200', buttonHover: 'hover:bg-cyan-50 hover:text-cyan-600', groupHoverText: 'group-hover:text-cyan-600' };
+    else if (source.includes('건보공단')) theme = { border: 'border-yellow-400', text: 'text-yellow-700', bullet: 'text-yellow-600', buttonBorder: 'border-yellow-200', buttonHover: 'hover:bg-yellow-50 hover:text-yellow-700', groupHoverText: 'group-hover:text-yellow-700' };
     else if (source.includes('국가법령')) theme = { border: 'border-slate-300', text: 'text-slate-600', bullet: 'text-slate-500', buttonBorder: 'border-slate-200', buttonHover: 'hover:bg-slate-50 hover:text-slate-600', groupHoverText: 'group-hover:text-slate-600' };
 
     return (
