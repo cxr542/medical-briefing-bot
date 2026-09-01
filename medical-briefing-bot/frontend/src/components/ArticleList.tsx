@@ -38,6 +38,15 @@ const KNOWN_SOURCES = [
 
 const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문', '의학신문', '보건신문'];
 
+
+const formatLocalYYYYMMDD = (dateStr: string | Date | number) => {
+  const d = new Date(dateStr);
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
   const [articles, setArticles] = useState<Article[]>(initialArticles);
   const [searchTerm, setSearchTerm] = useState('');
@@ -192,14 +201,14 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     let csvContent = "상태,출처,발행일,제목,URL\n";
     filteredInitialArticles.forEach(a => {
       const title = `"${a.title.replace(/"/g, '""')}"`;
-      const date = new Date(a.published_date).toISOString().split('T')[0];
+      const date = formatLocalYYYYMMDD(a.published_date);
       csvContent += `${a.status},"${a.source}",${date},${title},"${a.url}"\n`;
     });
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `의료브리핑_${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `의료브리핑_${formatLocalYYYYMMDD(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -257,7 +266,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                     {article.title}
                   </div>
                   <div className="text-[11px] text-gray-400 mt-1 ml-3 font-medium">
-                    {new Date(article.published_date).toISOString().split('T')[0]}
+                    {formatLocalYYYYMMDD(article.published_date)}
                   </div>
                 </a>
               </li>
@@ -599,7 +608,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                               )}
                             </td>
                             <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
-                              {new Date(article.published_date).toISOString().split('T')[0]}
+                              {formatLocalYYYYMMDD(article.published_date)}
                             </td>
                             <td className="px-4 py-4 align-middle font-medium text-gray-700">{article.source}</td>
                             <td className="px-4 py-4 align-middle">
@@ -740,7 +749,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                           </span>
                         </td>
                         <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
-                          {new Date(article.published_date).toISOString().split('T')[0]}
+                          {formatLocalYYYYMMDD(article.published_date)}
                         </td>
                         <td className="px-4 py-4 align-middle">
                           <div className={`text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
