@@ -124,6 +124,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   }, [articles]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
+  const [showAllNotices, setShowAllNotices] = useState(false);
   
   // 출처 필터링 적용 (timeFilteredArticles 기반)
   const filteredInitialArticles = useMemo(
@@ -153,7 +154,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const topNotices = [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
   
   const totalPages = Math.ceil(topNotices.length / itemsPerPage);
-  const currentNotices = topNotices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const currentNotices = showAllNotices ? topNotices : topNotices.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   // 모달 상태 관리
   const [modalSource, setModalSource] = useState<string | null>(null);
@@ -538,8 +539,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                     7일 이내 주요 공지
                     <span className="bg-[#4285F4] text-white text-sm px-3 py-0.5 rounded-full ml-2">{topNotices.length}건</span>
                   </h2>
-                  <button className="text-sm font-medium text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 transition-colors">
-                    전체 보기 →
+                  <button onClick={() => setShowAllNotices(!showAllNotices)} className="text-sm font-medium text-gray-600 border border-gray-300 rounded px-3 py-1.5 hover:bg-gray-50 transition-colors">
+                    {showAllNotices ? '페이징 보기 ↑' : '전체 보기 →'}
                   </button>
                 </div>
                 <div className="overflow-x-auto">
@@ -639,7 +640,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
                   </table>
                 </div>
                 {/* Pagination */}
-                {totalPages > 1 && (
+                {!showAllNotices && totalPages > 1 && (
                   <div className="flex justify-center items-center gap-1 py-4 border-t border-gray-100 bg-gray-50 print:hidden">
                     <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1 rounded text-gray-500 hover:text-[#5C2D0C] disabled:opacity-30">
                       <ChevronLeft className="w-5 h-5" />
