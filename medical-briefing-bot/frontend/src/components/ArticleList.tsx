@@ -102,12 +102,12 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
       if (searchTerm.trim()) {
          const term = searchTerm.trim();
          query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
-         query = query.limit(200);
+         query = query.limit(500);
       } else {
          const [hh] = selectedTime.split(':');
          const targetEndKst = new Date(`${selectedDate}T${hh}:59:59+09:00`);
          query = query.lte('published_date', targetEndKst.toISOString());
-         query = query.limit(150);
+         query = query.limit(500);
       }
       
       const { data, error } = await query;

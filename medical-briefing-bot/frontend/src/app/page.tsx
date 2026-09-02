@@ -8,11 +8,15 @@ export const revalidate = 60; // 60초 단위 캐시 갱신 (ISR)
 
 export default async function Dashboard() {
   // Supabase에서 초기 데이터 100건만 제한적으로 조회 (대용량 대비 서버사이드 최적화)
+  // 14일치 데이터를 가져와 넉넉하게 풀을 확보 (limit 대신 날짜 기반 필터링)
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
   const { data: articles, error } = await supabase
     .from('articles')
     .select('*')
+    .gte('published_date', fourteenDaysAgo.toISOString())
     .order('published_date', { ascending: false })
-    .limit(100);
+    .limit(500);
 
   if (error) {
     console.error(error);
