@@ -564,6 +564,59 @@ def fetch_hurb_notices():
         
     return articles_to_save
 
+
+def fetch_comwel_notices():
+    source_name = "산재업무포탈"
+    print(f"🔄 API 수집: {source_name}")
+    articles_to_save = []
+    
+    try:
+        import requests
+        import urllib3
+        from datetime import datetime, timezone, timedelta
+        urllib3.disable_warnings()
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0',
+            'Accept': 'application/json, text/plain, */*',
+            'Content-Type': 'application/json'
+        }
+        data = {"dlt_search":{}}
+        # 산재업무포탈 메인 공지사항 API
+        res = requests.post('https://total.comwel.or.kr/api/v1/total/bizsupport/public/mainPageNotice', headers=headers, json=data, verify=False, timeout=15)
+        
+        if res.status_code == 200:
+            js = res.json()
+            notice_list = js.get('dlt_result', {}).get('noticeList', [])
+            
+            for item in notice_list[:15]:
+                title = item.get('title', '').strip()
+                date_str = item.get('first_input_ilsi', '')
+                ser = item.get('ser', '')
+                
+                if not title: continue
+                
+                pub_date_iso = datetime.now(timezone.utc).isoformat()
+                if date_str:
+                    try:
+                        kst = timezone(timedelta(hours=9))
+                        dt = datetime.strptime(date_str.strip(), "%Y-%m-%d").replace(tzinfo=kst)
+                        pub_date_iso = dt.isoformat()
+                    except: pass
+                
+                articles_to_save.append({
+                    "source": source_name,
+                    "title": title,
+                    "url": "https://total.comwel.or.kr/",
+                    "published_date": pub_date_iso,
+                    "content_hash": get_content_hash(title + str(ser)),
+                    "status": "NEW"
+                })
+    except Exception as e:
+        print(f"크롤링 에러 ({source_name}): {e}")
+        
+    return articles_to_save
+
 def fetch_mohw_legislation():
     source_name = "보건복지부 법령"
     print(f"🔄 크롤링 수집: {source_name}")
@@ -647,6 +700,7 @@ if __name__ == "__main__":
     total_articles.extend(fetch_hira_biz_notices())
     total_articles.extend(fetch_hira_aq_notices())
     total_articles.extend(fetch_hurb_notices())
+    total_articles.extend(fetch_comwel_notices())
     total_articles.extend(fetch_mohw_legislation())
     
     # 3. 오픈 API
