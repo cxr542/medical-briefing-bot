@@ -483,7 +483,7 @@ def fetch_hira_aq_notices():
                                         articles_to_save.append({
                                             "source": f"{source_name} (평가알림방)",
                                             "title": title,
-                                            "url": "https://aq.hira.or.kr/hira_aq/index.jsp", # SPA이므로 메인페이지 연결
+                                            "url": f"https://aq.hira.or.kr/hira_aq/index.jsp#brdSno={brdSno}",
                                             "published_date": pub_date_iso,
                                             "content_hash": get_content_hash(title),
                                             "status": "NEW"
@@ -532,6 +532,7 @@ def fetch_hurb_notices():
                                         
                                         title = cols.get('teme', '').strip()
                                         date_str = cols.get('creDthms', '') # YYYY-MM-DD
+                                        no = cols.get('no', '')
                                         
                                         if not title: continue
                                         
@@ -546,7 +547,7 @@ def fetch_hurb_notices():
                                         articles_to_save.append({
                                             "source": source_name,
                                             "title": title,
-                                            "url": "https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok",
+                                            "url": f"https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok#no={no}",
                                             "published_date": pub_date_iso,
                                             "content_hash": get_content_hash(title),
                                             "status": "NEW"
@@ -607,7 +608,7 @@ def fetch_comwel_notices():
                 articles_to_save.append({
                     "source": source_name,
                     "title": title,
-                    "url": "https://total.comwel.or.kr/",
+                    "url": f"https://total.comwel.or.kr/#ser={ser}",
                     "published_date": pub_date_iso,
                     "content_hash": get_content_hash(title + str(ser)),
                     "status": "NEW"
