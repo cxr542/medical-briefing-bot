@@ -3,7 +3,9 @@ name: Daily Medical Briefing Collector
 on:
   schedule:
     # 한국 시간(KST) 오전 6시, 9시, 오후 12시, 오후 3시 = UTC 시간 기준 21, 0, 3, 6
-    - cron: '0 21,0,3,6 * * *'
+    - cron: '0 21,3,6 * * *'
+    # 한국 시간(KST) 오전 8시 30분 = UTC 시간 기준 23시 30분
+    - cron: '30 23 * * *'
   workflow_dispatch: # 수동으로도 실행할 수 있도록 허용
 
 jobs:

@@ -1,0 +1,36 @@
+/Users/yhkim/Documents/antigravity/joyful-hopper/medical-briefing-bot/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+=== 브리핑 데이터 수집 봇 실행 (V4.3 - 상태 감지 완비) ===
+🔄 RSS 수집: 보건복지부 보도자료
+🔄 RSS 수집: 질병관리청 보도자료
+🔄 RSS 수집: 식품의약품안전처 보도자료
+🔄 RSS 수집: 청년의사
+🔄 RSS 수집: 의협신문
+🔄 RSS 수집: 메디게이트뉴스
+🔄 RSS 수집: 데일리메디
+🔄 RSS 수집: 의학신문
+🔄 RSS 수집: 보건신문
+🔄 크롤링 수집: 대한병원협회 공지사항
+🔄 크롤링 수집: 심사평가원 공지사항
+🔄 크롤링 수집: 건보공단 업무포탈
+🔄 크롤링 수집: 심평원 업무포탈
+🔄 크롤링 수집: 심평원 e-평가
+🔄 크롤링 수집: 보건복지부 법령
+🔄 오픈 API 수집: 국가법령정보센터
+/Users/yhkim/Documents/antigravity/joyful-hopper/medical-briefing-bot/.venv/lib/python3.9/site-packages/google/auth/__init__.py:54: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+/Users/yhkim/Documents/antigravity/joyful-hopper/medical-briefing-bot/.venv/lib/python3.9/site-packages/google/oauth2/__init__.py:40: FutureWarning: You are using a Python version 3.9 past its end of life. Google will update google-auth with critical bug fixes on a best-effort basis, but not with any other fixes or features. Please upgrade your Python version, and then update google-auth.
+  warnings.warn(eol_message.format("3.9"), FutureWarning)
+🧠 Gemini AI를 사용하여 129개의 기사 분석을 시작합니다...
+  -> Chunk 1/9 처리 중 (15개)...
+  -> Chunk 2/9 처리 중 (15개)...
+  -> Chunk 3/9 처리 중 (15개)...
+  -> Chunk 4/9 처리 중 (15개)...
+  -> Chunk 5/9 처리 중 (15개)...
+  -> Chunk 6/9 처리 중 (15개)...
+  -> Chunk 7/9 처리 중 (15개)...
+  -> Chunk 8/9 처리 중 (15개)...
+  -> Chunk 9/9 처리 중 (9개)...
+🔄 DB 기존 데이터와 비교하여 상태(NEW/UPDATE/DELETED)를 감지합니다...
+✅ 총 75개의 게시물(신규/수정/삭제)을 DB에 동기화했습니다.
+=== 수집 완료 ===
