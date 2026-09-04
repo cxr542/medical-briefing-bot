@@ -87,7 +87,13 @@ def fetch_kha_notices():
                     title = tb_03.text.strip()
                     href = tb_03.get('href', '')
                     if href.startswith('?'):
-                        link = f"https://www.kha.or.kr/kha_home/notice_list.do{href}"
+                        import urllib.parse as urlparse
+                        parsed = urlparse.urlparse(href)
+                        qs = urlparse.parse_qs(parsed.query)
+                        # offset 쿼리파라미터를 고정하여 URL 변동 방지 (DB 고유키 유지)
+                        mode = qs.get('mode', [''])[0]
+                        articleNo = qs.get('articleNo', [''])[0]
+                        link = f"https://www.kha.or.kr/kha_home/notice_list.do?mode={mode}&articleNo={articleNo}"
                     elif href.startswith('/'):
                         link = f"https://www.kha.or.kr{href}"
                     else:
