@@ -1,9 +1,24 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Home, Shield, Database, Trash2, Activity, RefreshCw } from 'lucide-react';
+import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
+
+type SourceHealth = Record<string, { count: number; status: 'OK' | 'WARN' | 'FAILED'; reason: string }>;
+
+type CollectorRun = {
+  id: number;
+  started_at: string;
+  finished_at: string;
+  result: 'SUCCESS' | 'DEGRADED' | 'FAILED';
+  collected_count: number;
+  ai_output_count: number;
+  db_attempted: number;
+  db_succeeded: number;
+  db_failed: number;
+  source_health: SourceHealth;
+};
 
 export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -13,6 +28,8 @@ export default function AdminPage() {
   const [stats, setStats] = useState<{source: string, count: number}[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
+  const [collectorRuns, setCollectorRuns] = useState<CollectorRun[]>([]);
+  const [collectorRunsError, setCollectorRunsError] = useState('');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,11 +44,12 @@ export default function AdminPage() {
 
   const fetchStats = async () => {
     setIsLoading(true);
-    // 가장 최신 기사 1000개만 가져와서 출처별로 집계 (전체 카운트도 쿼리)
-    const { data, count } = await supabase
-      .from('articles')
-      .select('source', { count: 'exact' })
-      .limit(1000);
+    const [articleResponse, runResponse] = await Promise.all([
+      supabase.from('articles').select('source', { count: 'exact' }).limit(1000),
+      supabase.from('collector_runs').select('*').order('finished_at', { ascending: false }).limit(10),
+    ]);
+
+    const { data, count } = articleResponse;
       
     if (data) {
       const counts: Record<string, number> = {};
@@ -48,8 +66,27 @@ export default function AdminPage() {
     if (count !== null) {
       setTotalCount(count);
     }
+    if (runResponse.error) {
+      setCollectorRunsError('collector_runs 테이블을 조회할 수 없습니다. SQL migration 적용 여부를 확인해주세요.');
+    } else {
+      setCollectorRunsError('');
+      setCollectorRuns(runResponse.data || []);
+    }
     setIsLoading(false);
   };
+
+  const latestRun = collectorRuns[0];
+  const resultLabel = { SUCCESS: '정상', DEGRADED: '주의', FAILED: '실패' } as const;
+  const resultClass = {
+    SUCCESS: 'bg-green-100 text-green-700',
+    DEGRADED: 'bg-yellow-100 text-yellow-700',
+    FAILED: 'bg-red-100 text-red-700',
+  } as const;
+  const resultIcon = {
+    SUCCESS: <CheckCircle2 className="w-4 h-4" />,
+    DEGRADED: <AlertTriangle className="w-4 h-4" />,
+    FAILED: <XCircle className="w-4 h-4" />,
+  } as const;
 
   if (!isAuthenticated) {
     return (
@@ -114,6 +151,82 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl w-full px-6 mx-auto mt-8">
+
+        <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="font-bold text-gray-800 flex items-center gap-2">
+                <Activity className="w-5 h-5 text-[#C05A12]" /> 수집 운영 상태
+              </h2>
+              <p className="text-xs text-gray-500 mt-1">최근 GitHub Actions collector 실행 결과</p>
+            </div>
+            {latestRun && (
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-bold ${resultClass[latestRun.result]}`}>
+                {resultIcon[latestRun.result]} {resultLabel[latestRun.result]}
+              </span>
+            )}
+          </div>
+          <div className="p-6">
+            {collectorRunsError && <p className="mb-4 text-sm text-yellow-700 bg-yellow-50 border border-yellow-200 rounded-lg px-4 py-3">{collectorRunsError}</p>}
+            {latestRun ? (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                  <div className="rounded-lg bg-gray-50 p-3"><p className="text-xs text-gray-500">마지막 수집</p><p className="mt-1 text-sm font-bold text-gray-800">{new Date(latestRun.finished_at).toLocaleString('ko-KR')}</p></div>
+                  <div className="rounded-lg bg-blue-50 p-3"><p className="text-xs text-blue-600">Collected</p><p className="mt-1 text-xl font-black text-blue-800">{latestRun.collected_count}</p></div>
+                  <div className="rounded-lg bg-purple-50 p-3"><p className="text-xs text-purple-600">AI output</p><p className="mt-1 text-xl font-black text-purple-800">{latestRun.ai_output_count}</p></div>
+                  <div className="rounded-lg bg-orange-50 p-3"><p className="text-xs text-orange-600">DB attempted</p><p className="mt-1 text-xl font-black text-orange-800">{latestRun.db_attempted}</p></div>
+                  <div className="rounded-lg bg-green-50 p-3"><p className="text-xs text-green-600">DB succeeded</p><p className="mt-1 text-xl font-black text-green-800">{latestRun.db_succeeded}</p></div>
+                  <div className="rounded-lg bg-red-50 p-3"><p className="text-xs text-red-600">DB failed</p><p className="mt-1 text-xl font-black text-red-800">{latestRun.db_failed}</p></div>
+                </div>
+
+                <div className="mt-6">
+                  <h3 className="font-bold text-gray-800 mb-3">기관별 최근 수집 상태</h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm text-left">
+                      <thead className="text-xs uppercase text-gray-500 bg-gray-50">
+                        <tr><th className="px-4 py-3">기관/출처</th><th className="px-4 py-3">수집 건수</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">사유</th></tr>
+                      </thead>
+                      <tbody>
+                        {Object.entries(latestRun.source_health || {}).map(([source, health]) => (
+                          <tr key={source} className="border-b border-gray-100 last:border-0">
+                            <td className="px-4 py-3 font-semibold text-gray-700">{source}</td>
+                            <td className="px-4 py-3 text-gray-600">{health.count}</td>
+                            <td className="px-4 py-3"><span className={`px-2 py-1 rounded-full text-xs font-bold ${health.status === 'OK' ? 'bg-green-100 text-green-700' : health.status === 'WARN' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{health.status}</span></td>
+                            <td className="px-4 py-3 text-gray-500">{health.reason || '-'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : !isLoading && !collectorRunsError ? (
+              <div className="py-8 text-center text-gray-500">저장된 collector 실행 이력이 없습니다.</div>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+            <Clock className="w-5 h-5 text-gray-500" />
+            <h2 className="font-bold text-gray-800">최근 collector 실행 이력</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="text-xs uppercase text-gray-500 bg-gray-50"><tr><th className="px-6 py-3">실행 시각</th><th className="px-6 py-3">결과</th><th className="px-6 py-3">Collected</th><th className="px-6 py-3">DB succeeded</th><th className="px-6 py-3">DB failed</th><th className="px-6 py-3">실행 시간</th></tr></thead>
+              <tbody>
+                {collectorRuns.map(run => (
+                  <tr key={run.id} className="border-t border-gray-100">
+                    <td className="px-6 py-3 text-gray-700">{new Date(run.finished_at).toLocaleString('ko-KR')}</td>
+                    <td className="px-6 py-3"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${resultClass[run.result]}`}>{resultIcon[run.result]} {resultLabel[run.result]}</span></td>
+                    <td className="px-6 py-3">{run.collected_count}</td><td className="px-6 py-3">{run.db_succeeded}</td><td className="px-6 py-3">{run.db_failed}</td>
+                    <td className="px-6 py-3">{Math.max(0, Math.round((new Date(run.finished_at).getTime() - new Date(run.started_at).getTime()) / 1000))}초</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
         
         {/* Overview Stats */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
