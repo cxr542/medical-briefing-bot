@@ -427,21 +427,38 @@ def track_states(new_articles: list, supabase: Client):
 
     return final_articles_to_upsert
 
-def save_to_supabase(articles: list):
+def save_to_supabase(articles: list) -> dict[str, int]:
+    attempted = len(articles)
+    succeeded = 0
+    failed = 0
+
     if not articles:
         print("✅ 새로 저장하거나 업데이트할 변경사항이 없습니다.")
-        return
-    
-    upsert_count = 0
+        return {"attempted": 0, "succeeded": 0, "failed": 0}
+
     for article in articles:
         try:
             # upsert를 사용하여 기존 데이터 덮어쓰기 (url이 UNIQUE key라고 가정)
             supabase.table('articles').upsert(article, on_conflict='url').execute()
-            upsert_count += 1
+            succeeded += 1
         except Exception as e:
-            print(f"⚠️ 저장 실패 [{article.get('title', 'N/A')}]: {e}")
-            
-    print(f"✅ 총 {upsert_count}개의 게시물(신규/수정/삭제)을 DB에 동기화했습니다.")
+            failed += 1
+            schema_fields = [
+                field for field in ("is_merged", "related_links") if field in article
+            ]
+            schema_hint = (
+                f" schema-sensitive fields present: {', '.join(schema_fields)}."
+                if schema_fields else ""
+            )
+            print(
+                f"⚠️ 저장 실패 [{article.get('title', 'N/A')}]"
+                f"{schema_hint} error: {e}"
+            )
+
+    print(f"DB attempted: {attempted}")
+    print(f"DB succeeded: {succeeded}")
+    print(f"DB failed: {failed}")
+    return {"attempted": attempted, "succeeded": succeeded, "failed": failed}
 
 
 
@@ -682,6 +699,23 @@ if __name__ == "__main__":
     print("=== 브리핑 데이터 수집 봇 실행 (V4.3 - 상태 감지 완비) ===")
     
     total_articles = []
+    source_health = {}
+
+    def collect_source(name: str, collector) -> None:
+        try:
+            collected = collector()
+            source_health[name] = {
+                "count": len(collected),
+                "status": "OK" if collected else "WARN",
+                "reason": "" if collected else "0건 반환",
+            }
+            total_articles.extend(collected)
+        except Exception as e:
+            source_health[name] = {
+                "count": 0,
+                "status": "FAILED",
+                "reason": str(e),
+            }
     
     # 1. RSS
     rss_sources = [
@@ -696,22 +730,23 @@ if __name__ == "__main__":
         {"name": "보건신문", "url": "http://www.bokuennews.com/data/rss/news.xml", "is_press": True}
     ]
     for s in rss_sources:
-        try:
-            total_articles.extend(fetch_rss_feed(s["name"], s["url"], s["is_press"]))
-        except: pass
+        collect_source(
+            s["name"],
+            lambda s=s: fetch_rss_feed(s["name"], s["url"], s["is_press"]),
+        )
         
     # 2. 크롤러
-    total_articles.extend(fetch_kha_notices())
-    total_articles.extend(fetch_hira_public_notices())
-    total_articles.extend(fetch_nhis_public_notices())
-    total_articles.extend(fetch_hira_biz_notices())
-    total_articles.extend(fetch_hira_aq_notices())
-    total_articles.extend(fetch_hurb_notices())
-    total_articles.extend(fetch_comwel_notices())
-    total_articles.extend(fetch_mohw_legislation())
+    collect_source("대한병원협회 공지사항", fetch_kha_notices)
+    collect_source("심사평가원 공지사항", fetch_hira_public_notices)
+    collect_source("국민건강보험공단 공지사항", fetch_nhis_public_notices)
+    collect_source("심평원 e-평가", fetch_hira_biz_notices)
+    collect_source("심평원 e-평가 (평가알림방)", fetch_hira_aq_notices)
+    collect_source("보건의료자원포탈", fetch_hurb_notices)
+    collect_source("산재업무포탈", fetch_comwel_notices)
+    collect_source("보건복지부 법령", fetch_mohw_legislation)
     
     # 3. 오픈 API
-    total_articles.extend(fetch_law_api())
+    collect_source("국가법령정보센터", fetch_law_api)
     
     # 4. AI 기반 중복 기사 통합 및 교차 검증 (Phase 2)
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
@@ -726,5 +761,30 @@ if __name__ == "__main__":
     final_sync_articles = track_states(processed_articles, supabase)
     
     # DB 저장
-    save_to_supabase(final_sync_articles)
-    print("=== 수집 완료 ===")
+    db_stats = save_to_supabase(final_sync_articles)
+    failed_sources = [name for name, health in source_health.items() if health["status"] == "FAILED"]
+    empty_sources = [name for name, health in source_health.items() if health["count"] == 0]
+
+    if db_stats["failed"] > 0:
+        result = "FAILED"
+    elif failed_sources or empty_sources:
+        result = "DEGRADED"
+    else:
+        result = "SUCCESS"
+
+    print("=== Collector Health Summary ===")
+    for name, health in source_health.items():
+        reason = f" reason={health['reason']}" if health["reason"] else ""
+        print(
+            f"{name}: collected count={health['count']} "
+            f"status={health['status']}{reason}"
+        )
+    print(f"Collected: {len(total_articles)}")
+    print(f"AI output: {len(processed_articles)}")
+    print(f"DB attempted: {db_stats['attempted']}")
+    print(f"DB succeeded: {db_stats['succeeded']}")
+    print(f"DB failed: {db_stats['failed']}")
+    print(f"RESULT: {result}")
+
+    if result == "FAILED":
+        raise SystemExit(1)
