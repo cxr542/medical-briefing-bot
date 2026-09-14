@@ -36,10 +36,19 @@ def persist_collector_run() -> None:
     if collector_run_persisted:
         return
 
+    safe_source_health = {
+        name: {
+            "count": health.get("count", 0),
+            "status": health.get("status", "FAILED"),
+            "reason": "수집기 예외" if health.get("status") == "FAILED" else health.get("reason", ""),
+        }
+        for name, health in collector_run_summary["source_health"].items()
+    }
     payload = {
         "started_at": collector_run_started_at.isoformat(),
         "finished_at": datetime.now(timezone.utc).isoformat(),
-        **collector_run_summary,
+        **{key: value for key, value in collector_run_summary.items() if key != "source_health"},
+        "source_health": safe_source_health,
     }
     try:
         supabase.table("collector_runs").insert(payload).execute()

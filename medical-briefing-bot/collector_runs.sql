@@ -13,9 +13,15 @@ CREATE TABLE public.collector_runs (
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_collector_runs_created_at ON public.collector_runs(created_at DESC);
+CREATE INDEX idx_collector_runs_finished_at ON public.collector_runs(finished_at DESC);
 
 ALTER TABLE public.collector_runs ENABLE ROW LEVEL SECURITY;
 
+CREATE POLICY "collector service can insert runs" ON public.collector_runs
+    FOR INSERT TO service_role WITH CHECK (true);
+
 CREATE POLICY "collector runs are readable" ON public.collector_runs
     FOR SELECT USING (true);
+
+GRANT SELECT ON public.collector_runs TO anon, authenticated;
+GRANT INSERT ON public.collector_runs TO service_role;
