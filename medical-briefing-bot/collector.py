@@ -1,4 +1,5 @@
 from datetime import datetime, timezone, timedelta
+import atexit
 import os
 import hashlib
 
@@ -15,6 +16,46 @@ key: str = os.environ.get("SUPABASE_KEY")
 law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용자가 발급받은 키
 
 supabase: Client = create_client(url, key)
+
+collector_run_started_at = datetime.now(timezone.utc)
+collector_run_summary = {
+    "result": "FAILED",
+    "collected_count": 0,
+    "ai_output_count": 0,
+    "db_attempted": 0,
+    "db_succeeded": 0,
+    "db_failed": 0,
+    "source_health": {},
+    "error_message": None,
+}
+collector_run_persisted = False
+
+
+def persist_collector_run() -> None:
+    global collector_run_persisted
+    if collector_run_persisted:
+        return
+
+    safe_source_health = {
+        name: {
+            "count": health.get("count", 0),
+            "status": health.get("status", "FAILED"),
+            "reason": "수집기 예외" if health.get("status") == "FAILED" else health.get("reason", ""),
+        }
+        for name, health in collector_run_summary["source_health"].items()
+    }
+    payload = {
+        "started_at": collector_run_started_at.isoformat(),
+        "finished_at": datetime.now(timezone.utc).isoformat(),
+        **{key: value for key, value in collector_run_summary.items() if key != "source_health"},
+        "source_health": safe_source_health,
+    }
+    try:
+        supabase.table("collector_runs").insert(payload).execute()
+        collector_run_persisted = True
+        print("✅ collector_runs 실행 이력을 저장했습니다.")
+    except Exception as error:
+        print(f"⚠️ collector_runs 실행 이력 저장 실패: {error}")
 
 WHITE_LIST = [
     "건강보험", "심사평가", "수가", "급여기준", "심사기준", "의료질평가", 
@@ -696,6 +737,8 @@ def fetch_mohw_legislation():
 
 
 if __name__ == "__main__":
+    collector_run_started_at = datetime.now(timezone.utc)
+    atexit.register(persist_collector_run)
     print("=== 브리핑 데이터 수집 봇 실행 (V4.3 - 상태 감지 완비) ===")
     
     total_articles = []
@@ -785,6 +828,18 @@ if __name__ == "__main__":
     print(f"DB succeeded: {db_stats['succeeded']}")
     print(f"DB failed: {db_stats['failed']}")
     print(f"RESULT: {result}")
+
+    collector_run_summary = {
+        "result": result,
+        "collected_count": len(total_articles),
+        "ai_output_count": len(processed_articles),
+        "db_attempted": db_stats["attempted"],
+        "db_succeeded": db_stats["succeeded"],
+        "db_failed": db_stats["failed"],
+        "source_health": source_health,
+        "error_message": None,
+    }
+    persist_collector_run()
 
     if result == "FAILED":
         raise SystemExit(1)
