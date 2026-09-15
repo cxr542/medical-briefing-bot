@@ -705,7 +705,15 @@ def fetch_comwel_notices():
             'Accept': 'application/json, text/plain, */*',
             'Content-Type': 'application/json'
         }
-        data = {"dlt_search":{}}
+        data = {
+            "session": {
+                "client_ip": None,
+                "ADMIN_SESSION_VO": None,
+                "SESSION_VO": None,
+                "MENU_ID": None,
+                "MENU_SER": None,
+            }
+        }
         # 산재업무포탈 메인 공지사항 API
         res = requests.post('https://total.comwel.or.kr/api/v1/total/bizsupport/public/mainPageNotice', headers=headers, json=data, verify=False, timeout=15)
         
@@ -719,6 +727,14 @@ def fetch_comwel_notices():
 
         if not isinstance(js, dict) or "dlt_result" not in js:
             raise ValueError("산재업무포탈 API 응답에 dlt_result가 없습니다")
+        rs_msg = js.get("rsMsg")
+        if isinstance(rs_msg, dict) and rs_msg.get("statusCode") not in (None, "S"):
+            status_code = rs_msg.get("statusCode")
+            status_message = rs_msg.get("statusMessage") or rs_msg.get("message") or ""
+            raise ValueError(
+                f"산재업무포탈 API 응답 오류: statusCode={status_code}, "
+                f"message={str(status_message)[:200]}"
+            )
         dlt_result = js["dlt_result"]
         if not isinstance(dlt_result, dict) or "noticeList" not in dlt_result:
             raise ValueError("산재업무포탈 API 응답에 noticeList가 없습니다")
