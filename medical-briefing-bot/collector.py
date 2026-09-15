@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 import atexit
 import os
 import hashlib
+from urllib.parse import urlparse
 
 import feedparser
 import requests
@@ -16,6 +17,22 @@ key: str = os.environ.get("SUPABASE_KEY")
 law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용자가 발급받은 키
 
 supabase: Client = create_client(url, key)
+
+source_collection_diagnostics = {}
+
+
+def validate_feed_redirects(response, rss_url: str) -> None:
+    expected_host = urlparse(rss_url).hostname
+    if not expected_host:
+        raise ValueError(f"RSS URL host가 없습니다: {rss_url}")
+    expected_host = expected_host.removeprefix("www.")
+    redirect_urls = [history.url for history in response.history] + [response.url]
+    for redirect_url in redirect_urls:
+        redirect_host = urlparse(redirect_url).hostname
+        if not redirect_host or redirect_host.removeprefix("www.") != expected_host:
+            raise ValueError(
+                f"RSS redirect가 공식 host를 벗어났습니다: {rss_url} -> {redirect_url}"
+            )
 
 collector_run_started_at = datetime.now(timezone.utc)
 collector_run_summary = {
@@ -76,23 +93,54 @@ def is_valid_press_article(title: str) -> bool:
 # 1. RSS 파서 (복지부, 질병청, 식약처, 언론사)
 def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
     print(f"🔄 RSS 수집: {source_name}")
-    feed = feedparser.parse(rss_url)
+    response = requests.get(
+        rss_url,
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=20,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    validate_feed_redirects(response, rss_url)
+    content_type = response.headers.get("Content-Type", "").lower()
+    if not response.content:
+        raise ValueError(f"RSS 응답 본문이 비어 있습니다: {rss_url}")
+    print(
+        f"RSS 응답 ({source_name}): status={response.status_code} "
+        f"content-type={content_type or '미지정'} final_url={response.url} "
+        f"redirects={len(response.history)}"
+    )
+
+    feed = feedparser.parse(response.content)
+    if feed.bozo and not feed.entries:
+        raise ValueError(
+            f"RSS 파싱 실패: url={response.url}, bozo_exception={feed.bozo_exception}"
+        )
+    if "html" in content_type and not feed.entries:
+        raise ValueError(f"RSS가 아닌 HTML 응답입니다: content-type={content_type}, url={response.url}")
+    if feed.bozo:
+        print(f"⚠️ RSS 파싱 경고 ({source_name}): {feed.bozo_exception}")
+
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
     articles_to_save = []
-    
+    recent_count = 0
+    filtered_count = 0
+
     for entry in feed.entries:
         title = entry.title
         link = entry.link
-        
-        if is_press and not is_valid_press_article(title):
-            continue
-            
+
         pub_date = datetime.now(timezone.utc)
         if hasattr(entry, 'published_parsed') and entry.published_parsed:
             pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
             
         if pub_date < seven_days_ago:
             continue
+
+        recent_count += 1
+        if is_press and not is_valid_press_article(title):
+            continue
+
+        filtered_count += 1
             
         articles_to_save.append({
             "source": source_name,
@@ -102,6 +150,11 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
             "content_hash": get_content_hash(title + link),
             "status": "NEW"
         })
+
+    if is_press:
+        source_collection_diagnostics[source_name] = (
+            f"feed={len(feed.entries)} recent={recent_count} filtered={filtered_count}"
+        )
     return articles_to_save
 
 # 2. 대한병원협회 웹 스크래퍼 (BeautifulSoup)
@@ -161,6 +214,7 @@ def fetch_kha_notices():
                     })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -175,33 +229,34 @@ def fetch_law_api():
         url = f"https://www.law.go.kr/DRF/lawSearch.do?OC={law_api_key}&target=law&type=JSON&query=의료법"
         headers = {'Referer': 'https://medical-briefing-bot.vercel.app'} # Referer 검증 통과용
         response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            data = response.json()
-            # 데이터 추출 (LawSearch > law 객체 배열)
-            # 여기서는 API가 작동한다는 전제하에 임시 데이터를 삽입합니다.
-            if "LawSearch" in data and "law" in data["LawSearch"]:
-                for law in data["LawSearch"]["law"]:
-                    articles_to_save.append({
-                        "source": source_name,
-                        "title": f"[법령] {law.get('법령명한글', '의료법')}",
-                        "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law.get('법령일련번호')}",
-                        "published_date": datetime.now(timezone.utc).isoformat(),
-                        "content_hash": get_content_hash(law.get('법령일련번호', '0')),
-                        "status": "NEW"
-                    })
-            else:
-                # API 파라미터나 키 오류 시 임시 데이터 반환 (화면 확인용)
+        if response.status_code != 200:
+            raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
+        data = response.json()
+        # 데이터 추출 (LawSearch > law 객체 배열)
+        # 여기서는 API가 작동한다는 전제하에 임시 데이터를 삽입합니다.
+        if "LawSearch" in data and "law" in data["LawSearch"]:
+            for law in data["LawSearch"]["law"]:
                 articles_to_save.append({
                     "source": source_name,
-                    "title": "[최신개정] 의료법 시행령 일부개정령안",
-                    "url": "https://www.law.go.kr/법령/의료법시행령",
+                    "title": f"[법령] {law.get('법령명한글', '의료법')}",
+                    "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law.get('법령일련번호')}",
                     "published_date": datetime.now(timezone.utc).isoformat(),
-                    "content_hash": get_content_hash("의료법시행령 일부개정령안"),
+                    "content_hash": get_content_hash(law.get('법령일련번호', '0')),
                     "status": "NEW"
                 })
+        else:
+            # API 파라미터나 키 오류 시 임시 데이터 반환 (화면 확인용)
+            articles_to_save.append({
+                "source": source_name,
+                "title": "[최신개정] 의료법 시행령 일부개정령안",
+                "url": "https://www.law.go.kr/법령/의료법시행령",
+                "published_date": datetime.now(timezone.utc).isoformat(),
+                "content_hash": get_content_hash("의료법시행령 일부개정령안"),
+                "status": "NEW"
+            })
     except Exception as e:
         print(f"API 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -250,6 +305,7 @@ def fetch_hira_public_notices():
                         })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
     return articles_to_save
 
 # 5. 국민건강보험공단 공개 공지사항 스크래퍼
@@ -263,8 +319,7 @@ def fetch_hira_biz_notices():
         from playwright.sync_api import sync_playwright
         import json
     except ImportError:
-        print("⚠️ Playwright 라이브러리가 없습니다. (pip install playwright && playwright install)")
-        return articles_to_save
+        raise RuntimeError("Playwright 라이브러리가 없습니다.")
 
     try:
         with sync_playwright() as p:
@@ -320,7 +375,7 @@ def fetch_hira_biz_notices():
                                             "status": "NEW"
                                         })
                     except Exception as e:
-                        pass
+                        raise
 
             page.on("response", handle_response)
             
@@ -338,6 +393,7 @@ def fetch_hira_biz_notices():
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -408,6 +464,7 @@ def fetch_nhis_public_notices():
                 
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
     return articles_to_save
 
 
@@ -512,7 +569,7 @@ def fetch_hira_aq_notices():
         from playwright.sync_api import sync_playwright
         import xml.etree.ElementTree as ET
     except ImportError:
-        return articles_to_save
+        raise RuntimeError("Playwright 라이브러리가 없습니다.")
 
     try:
         with sync_playwright() as p:
@@ -553,7 +610,7 @@ def fetch_hira_aq_notices():
                                             "status": "NEW"
                                         })
                     except Exception as e:
-                        pass
+                        raise
                         
             page.on("response", handle_response)
             
@@ -562,6 +619,7 @@ def fetch_hira_aq_notices():
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -576,7 +634,7 @@ def fetch_hurb_notices():
         from playwright.sync_api import sync_playwright
         import xml.etree.ElementTree as ET
     except ImportError:
-        return articles_to_save
+        raise RuntimeError("Playwright 라이브러리가 없습니다.")
 
     try:
         with sync_playwright() as p:
@@ -617,7 +675,7 @@ def fetch_hurb_notices():
                                             "status": "NEW"
                                         })
                     except Exception as e:
-                        pass
+                        raise
                         
             page.on("response", handle_response)
             
@@ -626,6 +684,7 @@ def fetch_hurb_notices():
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -650,35 +709,52 @@ def fetch_comwel_notices():
         # 산재업무포탈 메인 공지사항 API
         res = requests.post('https://total.comwel.or.kr/api/v1/total/bizsupport/public/mainPageNotice', headers=headers, json=data, verify=False, timeout=15)
         
-        if res.status_code == 200:
+        if res.status_code != 200:
+            raise ValueError(f"산재업무포탈 API HTTP 오류: status={res.status_code}, url={res.url}")
+
+        try:
             js = res.json()
-            notice_list = js.get('dlt_result', {}).get('noticeList', [])
-            
-            for item in notice_list[:15]:
-                title = item.get('title', '').strip()
-                date_str = item.get('first_input_ilsi', '')
-                ser = item.get('ser', '')
-                
-                if not title: continue
-                
-                pub_date_iso = datetime.now(timezone.utc).isoformat()
-                if date_str:
-                    try:
-                        kst = timezone(timedelta(hours=9))
-                        dt = datetime.strptime(date_str.strip(), "%Y-%m-%d").replace(tzinfo=kst)
-                        pub_date_iso = dt.isoformat()
-                    except: pass
-                
-                articles_to_save.append({
-                    "source": source_name,
-                    "title": title,
-                    "url": f"https://total.comwel.or.kr/#ser={ser}",
-                    "published_date": pub_date_iso,
-                    "content_hash": get_content_hash(title + str(ser)),
-                    "status": "NEW"
-                })
+        except ValueError as error:
+            raise ValueError("산재업무포탈 API JSON 디코딩 실패") from error
+
+        if not isinstance(js, dict) or "dlt_result" not in js:
+            raise ValueError("산재업무포탈 API 응답에 dlt_result가 없습니다")
+        dlt_result = js["dlt_result"]
+        if not isinstance(dlt_result, dict) or "noticeList" not in dlt_result:
+            raise ValueError("산재업무포탈 API 응답에 noticeList가 없습니다")
+        notice_list = dlt_result["noticeList"]
+        if not isinstance(notice_list, list):
+            raise ValueError("산재업무포탈 API noticeList가 list가 아닙니다")
+
+        for item in notice_list[:15]:
+            title = item.get('title', '').strip()
+            date_str = item.get('first_input_ilsi', '')
+            ser = item.get('ser', '')
+
+            if not title: continue
+
+            pub_date_iso = datetime.now(timezone.utc).isoformat()
+            if date_str:
+                try:
+                    kst = timezone(timedelta(hours=9))
+                    dt = datetime.strptime(date_str.strip(), "%Y-%m-%d").replace(tzinfo=kst)
+                    pub_date_iso = dt.isoformat()
+                except: pass
+
+            articles_to_save.append({
+                "source": source_name,
+                "title": title,
+                "url": f"https://total.comwel.or.kr/#ser={ser}",
+                "published_date": pub_date_iso,
+                "content_hash": get_content_hash(title + str(ser)),
+                "status": "NEW"
+            })
+        source_collection_diagnostics[source_name] = (
+            f"noticeList={len(notice_list)} collected={len(articles_to_save)}"
+        )
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
         
     return articles_to_save
 
@@ -733,6 +809,7 @@ def fetch_mohw_legislation():
                     })
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
+        raise
     return articles_to_save
 
 
@@ -747,10 +824,11 @@ if __name__ == "__main__":
     def collect_source(name: str, collector) -> None:
         try:
             collected = collector()
+            diagnostic = source_collection_diagnostics.get(name, "")
             source_health[name] = {
                 "count": len(collected),
-                "status": "OK" if collected else "WARN",
-                "reason": "" if collected else "0건 반환",
+                "status": "OK",
+                "reason": diagnostic if diagnostic else ("정상 0건" if not collected else ""),
             }
             total_articles.extend(collected)
         except Exception as e:
@@ -762,9 +840,9 @@ if __name__ == "__main__":
     
     # 1. RSS
     rss_sources = [
-        {"name": "보건복지부 보도자료", "url": "https://www.mohw.go.kr/react/rss.jsp", "is_press": False},
-        {"name": "질병관리청 보도자료", "url": "https://www.kdca.go.kr/rss", "is_press": False},
-        {"name": "식품의약품안전처 보도자료", "url": "https://www.mfds.go.kr/rss", "is_press": False},
+        {"name": "보건복지부 보도자료", "url": "https://www.mohw.go.kr/rss/board.es?mid=a10503000000&bid=0027&info", "is_press": False},
+        {"name": "질병관리청 보도자료", "url": "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50", "is_press": False},
+        {"name": "식품의약품안전처 보도자료", "url": "http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021", "is_press": False},
         {"name": "청년의사", "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "의협신문", "url": "http://www.doctorsnews.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "메디게이트뉴스", "url": "https://news.google.com/rss/search?q=site:medigatenews.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True},
@@ -787,9 +865,10 @@ if __name__ == "__main__":
     collect_source("보건의료자원포탈", fetch_hurb_notices)
     collect_source("산재업무포탈", fetch_comwel_notices)
     collect_source("보건복지부 법령", fetch_mohw_legislation)
-    
+
     # 3. 오픈 API
     collect_source("국가법령정보센터", fetch_law_api)
+    collector_run_summary["source_health"] = source_health.copy()
     
     # 4. AI 기반 중복 기사 통합 및 교차 검증 (Phase 2)
     gemini_api_key = os.environ.get("GEMINI_API_KEY")
@@ -806,11 +885,10 @@ if __name__ == "__main__":
     # DB 저장
     db_stats = save_to_supabase(final_sync_articles)
     failed_sources = [name for name, health in source_health.items() if health["status"] == "FAILED"]
-    empty_sources = [name for name, health in source_health.items() if health["count"] == 0]
 
     if db_stats["failed"] > 0:
         result = "FAILED"
-    elif failed_sources or empty_sources:
+    elif failed_sources:
         result = "DEGRADED"
     else:
         result = "SUCCESS"
