@@ -4,5 +4,4 @@ beautifulsoup4
 feedparser
 python-dotenv
 jinja2
-google-genai
 playwright

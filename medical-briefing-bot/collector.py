@@ -583,10 +583,20 @@ def track_states(new_articles: list, supabase: Client):
             final_articles_to_upsert.append(new_art)
         else:
             old_art = db_dict[url]
+            category_changed = (
+                'category' in new_art
+                and old_art.get('category') != new_art.get('category')
+            )
+            keywords_changed = (
+                'keywords' in new_art
+                and old_art.get('keywords') != new_art.get('keywords')
+            )
+            is_merged_changed = (
+                'is_merged' in new_art
+                and old_art.get('is_merged') != new_art.get('is_merged')
+            )
             if (old_art.get('content_hash') != new_art.get('content_hash')) or \
-               (old_art.get('is_merged') != new_art.get('is_merged', False)) or \
-               (old_art.get('category') != new_art.get('category')) or \
-               (old_art.get('keywords') != new_art.get('keywords')):
+               is_merged_changed or category_changed or keywords_changed:
                 new_art['status'] = 'UPDATE'
                 final_articles_to_upsert.append(new_art)
             else:
@@ -958,14 +968,7 @@ if __name__ == "__main__":
     collect_source("국가법령정보센터", fetch_law_api)
     collector_run_summary["source_health"] = source_health.copy()
     
-    # 4. AI 기반 중복 기사 통합 및 교차 검증 (Phase 2)
-    gemini_api_key = os.environ.get("GEMINI_API_KEY")
-    if gemini_api_key:
-        from ai_processor import process_articles_with_ai
-        processed_articles = process_articles_with_ai(total_articles, gemini_api_key)
-    else:
-        print("⚠️ GEMINI_API_KEY가 없어 AI 통합을 건너뜁니다.")
-        processed_articles = total_articles
+    processed_articles = total_articles
         
     # 5. 기존 DB와 비교하여 상태 감지 (NEW, UPDATE, DELETED)
     final_sync_articles = track_states(processed_articles, supabase)
