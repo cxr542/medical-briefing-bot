@@ -23,6 +23,48 @@ supabase: Client = create_client(url, key)
 source_collection_diagnostics = {}
 
 
+def _response_text(response, *, allow_unknown_content_type=False):
+    content_type = (response.headers.get("content-type") or "").lower()
+    textual_type = (
+        content_type.startswith("text/")
+        or content_type.startswith("application/xml")
+        or content_type.startswith("application/json")
+        or "+xml" in content_type
+        or "+json" in content_type
+    )
+    body = response.body()
+    if not textual_type and not allow_unknown_content_type:
+        return None
+    if not textual_type and not body.lstrip().startswith((b"<", b"SSV:", b"Dataset:")):
+        return None
+    try:
+        return body.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _wait_for_target_response(page, state, timeout_ms=15000):
+    deadline = time.monotonic() + timeout_ms / 1000
+    while time.monotonic() < deadline:
+        if state["error"]:
+            raise ValueError(state["error"])
+        if state["parsed"]:
+            return
+        page.wait_for_timeout(100)
+    if state["error"]:
+        raise ValueError(state["error"])
+    raise TimeoutError("target API response readiness timeout")
+
+
+def _goto_until_ready(page, url, state, timeout_ms=15000):
+    try:
+        page.goto(url, wait_until="domcontentloaded", timeout=timeout_ms)
+    except Exception as error:
+        if type(error).__name__ != "TimeoutError" or not state["parsed"]:
+            raise
+        print(f"navigation 완료 전 target response 확보: {type(error).__name__}")
+
+
 def get_with_transient_retry(
     url: str,
     *,
@@ -407,12 +449,15 @@ def fetch_hira_biz_notices():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            readiness = {"parsed": False, "error": None}
             
             # API 응답 가로채기
             def handle_response(response):
                 if 'biz.hira.or.kr' in response.url and '.ndo' in response.url:
                     try:
-                        text = response.text()
+                        text = _response_text(response)
+                        if text is None:
+                            return
                         # SSV 응답 포맷인 경우
                         if 'Dataset:dsBoard' in text:
                             # 1. dsBoard 데이터 블록 찾기
@@ -456,22 +501,22 @@ def fetch_hira_biz_notices():
                                             "content_hash": get_content_hash(title),
                                             "status": "NEW"
                                         })
+                                readiness["parsed"] = True
                     except Exception as e:
-                        raise
+                        readiness["error"] = f"{source_name} target response parse failed: {e}"
+                        print(f"응답 파싱 건너뜀 ({source_name}): {e}")
 
             page.on("response", handle_response)
             
             # 메인 접속 (공지사항 로드)
-            page.goto('https://biz.hira.or.kr/index.do', wait_until='networkidle')
-            page.wait_for_timeout(3000)
+            _goto_until_ready(page, 'https://biz.hira.or.kr/index.do', readiness)
             
             # 자보알림방 클릭
             try:
                 page.get_by_text('자보알림방', exact=True).first.click()
-                page.wait_for_timeout(3000)
             except Exception as e:
                 print(f"자보알림방 클릭 실패: {e}")
-                
+            _wait_for_target_response(page, readiness, timeout_ms=15000)
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
@@ -667,15 +712,20 @@ def fetch_hira_aq_notices():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            readiness = {"parsed": False, "error": None}
             
             def handle_response(response):
                 if 'selectPopupList.ndo' in response.url:
                     try:
-                        text = response.text()
+                        text = _response_text(response, allow_unknown_content_type=True)
+                        if text is None:
+                            return
                         if 'dsList' in text and '<?xml' in text:
                             root = ET.fromstring(text)
+                            found_dataset = False
                             for ds in root.findall('.//{http://www.nexacroplatform.com/platform/dataset}Dataset'):
                                 if ds.attrib.get('id') == 'dsList':
+                                    found_dataset = True
                                     for row in ds.findall('.//{http://www.nexacroplatform.com/platform/dataset}Row')[:15]:
                                         cols = {col.attrib.get('id'): col.text for col in row.findall('.//{http://www.nexacroplatform.com/platform/dataset}Col')}
                                         
@@ -701,13 +751,15 @@ def fetch_hira_aq_notices():
                                             "content_hash": get_content_hash(title),
                                             "status": "NEW"
                                         })
+                            if found_dataset:
+                                readiness["parsed"] = True
                     except Exception as e:
-                        raise
+                        readiness["error"] = f"{source_name} target response parse failed: {e}"
                         
             page.on("response", handle_response)
             
-            page.goto('https://aq.hira.or.kr/hira_aq/index.jsp', wait_until='networkidle', timeout=30000)
-            page.wait_for_timeout(3000)
+            _goto_until_ready(page, 'https://aq.hira.or.kr/hira_aq/index.jsp', readiness)
+            _wait_for_target_response(page, readiness, timeout_ms=15000)
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
@@ -732,15 +784,20 @@ def fetch_hurb_notices():
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page()
+            readiness = {"parsed": False, "error": None}
             
             def handle_response(response):
                 if 'selectPopupList.ndo' in response.url:
                     try:
-                        text = response.text()
+                        text = _response_text(response, allow_unknown_content_type=True)
+                        if text is None:
+                            return
                         if 'dsResult' in text and '<?xml' in text:
                             root = ET.fromstring(text)
+                            found_dataset = False
                             for ds in root.findall('.//{http://www.nexacroplatform.com/platform/dataset}Dataset'):
                                 if ds.attrib.get('id') == 'dsResult':
+                                    found_dataset = True
                                     for row in ds.findall('.//{http://www.nexacroplatform.com/platform/dataset}Row')[:15]:
                                         cols = {col.attrib.get('id'): col.text for col in row.findall('.//{http://www.nexacroplatform.com/platform/dataset}Col')}
                                         
@@ -766,13 +823,15 @@ def fetch_hurb_notices():
                                             "content_hash": get_content_hash(title),
                                             "status": "NEW"
                                         })
+                            if found_dataset:
+                                readiness["parsed"] = True
                     except Exception as e:
-                        raise
+                        readiness["error"] = f"{source_name} target response parse failed: {e}"
                         
             page.on("response", handle_response)
             
-            page.goto('https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok', wait_until='networkidle', timeout=30000)
-            page.wait_for_timeout(3000)
+            _goto_until_ready(page, 'https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok', readiness)
+            _wait_for_target_response(page, readiness, timeout_ms=15000)
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
