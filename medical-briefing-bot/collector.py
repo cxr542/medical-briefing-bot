@@ -2,6 +2,7 @@ from datetime import datetime, timezone, timedelta
 import atexit
 import os
 import hashlib
+import time
 from urllib.parse import urljoin, urlparse
 import re
 
@@ -20,6 +21,42 @@ law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용�
 supabase: Client = create_client(url, key)
 
 source_collection_diagnostics = {}
+
+
+def get_with_transient_retry(
+    url: str,
+    *,
+    source_name: str,
+    timeout: int,
+    headers=None,
+    verify: bool = True,
+    allow_redirects: bool = True,
+    sleep_fn=time.sleep,
+):
+    backoffs = (2, 5)
+    for attempt in range(1, 4):
+        try:
+            response = requests.get(
+                url,
+                headers=headers,
+                timeout=timeout,
+                verify=verify,
+                allow_redirects=allow_redirects,
+            )
+            if attempt > 1:
+                print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/3")
+            return response
+        except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as error:
+            if attempt == 3:
+                raise
+            delay = backoffs[attempt - 1]
+            print(
+                f"⚠️ Transient network error: source={source_name} "
+                f"attempt={attempt}/3 retry_in={delay}s "
+                f"error={type(error).__name__}"
+            )
+            sleep_fn(delay)
+    raise RuntimeError("unreachable")
 
 
 def validate_feed_redirects(response, rss_url: str) -> None:
@@ -113,8 +150,9 @@ def is_valid_press_article(title: str) -> bool:
 # 1. RSS 파서 (복지부, 질병청, 식약처, 언론사)
 def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
     print(f"🔄 RSS 수집: {source_name}")
-    response = requests.get(
+    response = get_with_transient_retry(
         rss_url,
+        source_name=source_name,
         headers={"User-Agent": "Mozilla/5.0"},
         timeout=20,
         allow_redirects=True,
@@ -204,7 +242,9 @@ def fetch_kha_notices():
             headers = {'User-Agent': 'Mozilla/5.0'}
             # SSL 인증서 오류 방지를 위해 verify=False 설정 (InsecureRequestWarning 무시)
             requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
-            response = requests.get(url, headers=headers, timeout=10, verify=False)
+            response = get_with_transient_retry(
+                url, source_name=source_name, headers=headers, timeout=10, verify=False
+            )
             soup = BeautifulSoup(response.text, 'html.parser')
             
             rows = soup.select('div.tr')
@@ -262,7 +302,9 @@ def fetch_law_api():
         # 최근 제정/개정된 의료법 등을 검색
         url = f"https://www.law.go.kr/DRF/lawSearch.do?OC={law_api_key}&target=law&type=JSON&query=의료법"
         headers = {'Referer': 'https://medical-briefing-bot.vercel.app'} # Referer 검증 통과용
-        response = requests.get(url, headers=headers, timeout=10)
+        response = get_with_transient_retry(
+            url, source_name=source_name, headers=headers, timeout=10
+        )
         if response.status_code != 200:
             raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
         data = response.json()
@@ -307,7 +349,13 @@ def fetch_hira_public_notices():
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
         for page in [1, 2, 3]:
-            res = requests.get(f'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100&pageIndex={page}', headers=headers, verify=False, timeout=10)
+            res = get_with_transient_retry(
+                f'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100&pageIndex={page}',
+                source_name=source_name,
+                headers=headers,
+                verify=False,
+                timeout=10,
+            )
             soup = BeautifulSoup(res.text, 'html.parser')
             
             for tr in soup.select('table tbody tr'):
@@ -804,7 +852,13 @@ def fetch_mohw_legislation():
         urllib3.disable_warnings()
         
         headers = {'User-Agent': 'Mozilla/5.0'}
-        res = requests.get('https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026', headers=headers, verify=False, timeout=10)
+        res = get_with_transient_retry(
+            'https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026',
+            source_name=source_name,
+            headers=headers,
+            verify=False,
+            timeout=10,
+        )
         soup = BeautifulSoup(res.text, 'html.parser')
         
         for tr in soup.select('tbody tr')[:15]:
