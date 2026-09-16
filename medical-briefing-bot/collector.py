@@ -2,7 +2,8 @@ from datetime import datetime, timezone, timedelta
 import atexit
 import os
 import hashlib
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
+import re
 
 import feedparser
 import requests
@@ -85,6 +86,25 @@ BLACK_LIST = ["인사", "부음", "홍보", "광고", "동정", "출시", "프�
 def get_content_hash(text: str) -> str:
     return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
+
+def normalize_rss_entry(entry, feed_url: str):
+    raw_title = entry.get("title")
+    raw_link = entry.get("link")
+    if not isinstance(raw_title, str) or not isinstance(raw_link, str):
+        return None
+    title = raw_title.strip()
+    raw_link = raw_link.strip()
+    if not title or not raw_link:
+        return None
+    if re.search(r"unsupportable\s+rss|rss\s+not\s+supported", title, re.IGNORECASE):
+        return None
+
+    link = urljoin(feed_url, raw_link)
+    parsed_link = urlparse(link)
+    if parsed_link.scheme not in {"http", "https"} or not parsed_link.netloc:
+        return None
+    return title, link
+
 def is_valid_press_article(title: str) -> bool:
     if any(black in title for black in BLACK_LIST): return False
     if any(white in title for white in WHITE_LIST): return True
@@ -125,9 +145,15 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
     recent_count = 0
     filtered_count = 0
 
+    valid_entry_count = 0
+    invalid_entry_count = 0
     for entry in feed.entries:
-        title = entry.title
-        link = entry.link
+        normalized_entry = normalize_rss_entry(entry, response.url)
+        if normalized_entry is None:
+            invalid_entry_count += 1
+            continue
+        valid_entry_count += 1
+        title, link = normalized_entry
 
         pub_date = datetime.now(timezone.utc)
         if hasattr(entry, 'published_parsed') and entry.published_parsed:
@@ -150,6 +176,14 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
             "content_hash": get_content_hash(title + link),
             "status": "NEW"
         })
+
+    if feed.entries and valid_entry_count == 0:
+        raise ValueError(
+            f"RSS 유효 article entry가 없습니다: url={response.url}, "
+            f"raw_entries={len(feed.entries)}, invalid_entries={invalid_entry_count}"
+        )
+    if invalid_entry_count:
+        print(f"⚠️ RSS invalid entries skipped ({source_name}): {invalid_entry_count}")
 
     if is_press:
         source_collection_diagnostics[source_name] = (
