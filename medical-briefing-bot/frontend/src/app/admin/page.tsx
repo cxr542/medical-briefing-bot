@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
+import { getCollectionServiceStatus, userSourceStatusLabel } from '@/lib/collectionStatus';
 
 type SourceHealth = Record<string, { count: number; status: 'OK' | 'WARN' | 'FAILED'; reason: string }>;
 
@@ -80,6 +81,7 @@ export default function AdminPage() {
   };
 
   const latestRun = collectorRuns[0];
+  const userServiceStatus = getCollectionServiceStatus(latestRun);
   const resultLabel = { SUCCESS: '정상', DEGRADED: '주의', FAILED: '실패' } as const;
   const resultClass = {
     SUCCESS: 'bg-green-100 text-green-700',
@@ -208,6 +210,23 @@ export default function AdminPage() {
               <div className="py-8 text-center text-gray-500">저장된 collector 실행 이력이 없습니다.</div>
             ) : null}
           </div>
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50">
+            <h2 className="font-bold text-gray-800 flex items-center gap-2"><Activity className="w-5 h-5 text-[#C05A12]" /> 사용자 서비스 상태</h2>
+            <p className="text-xs text-gray-500 mt-1">사용자 메인 화면에 표시되는 상태를 공통 판정 기준으로 확인합니다.</p>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="rounded-lg bg-gray-50 p-4"><p className="text-xs text-gray-500">상태</p><p className="mt-1 font-bold text-gray-800">{userServiceStatus.message}</p></div>
+            <div className={`rounded-lg p-4 ${userServiceStatus.showBanner ? 'bg-yellow-50' : 'bg-green-50'}`}><p className="text-xs text-gray-500">사용자 화면</p><p className="mt-1 font-bold text-gray-800">{userServiceStatus.showBanner ? '경고 배너 표시 중' : '경고 없음'}</p></div>
+            <div className="rounded-lg bg-blue-50 p-4"><p className="text-xs text-blue-600">영향 소스</p><p className="mt-1 text-xl font-black text-blue-800">{userServiceStatus.affectedCount}개</p></div>
+            <div className="rounded-lg bg-purple-50 p-4"><p className="text-xs text-purple-600">Collector / Stale</p><p className="mt-1 font-bold text-purple-800">{latestRun?.result || '확인 불가'} / {userServiceStatus.stale ? '예' : '아니오'}</p></div>
+          </div>
+          <div className="px-6 pb-6 text-sm text-gray-600">마지막 확인: {userServiceStatus.finishedAt ? new Date(userServiceStatus.finishedAt).toLocaleString('ko-KR') : '확인 불가'}</div>
+          {userServiceStatus.affectedSources.length > 0 && (
+            <div className="px-6 pb-6"><ul className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">{userServiceStatus.affectedSources.map(source => <li key={source.name} className="flex justify-between rounded-lg border border-gray-100 px-3 py-2"><span>{source.name}</span><span className="font-semibold text-gray-600">{userSourceStatusLabel[source.status]}</span></li>)}</ul></div>
+          )}
         </section>
 
         <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
