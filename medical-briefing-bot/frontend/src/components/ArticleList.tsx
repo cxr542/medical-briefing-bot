@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { COLLECTION_SCHEDULE_KST, getLatestCollectionTime } from '@/lib/collectionStatus';
 
-import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Home, Search } from 'lucide-react';
+import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Search } from 'lucide-react';
 
 interface RelatedLink {
   title: string;
@@ -245,7 +245,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     else if (source.includes('국가법령')) theme = { border: 'border-slate-300', text: 'text-slate-600', bullet: 'text-slate-500', buttonBorder: 'border-slate-200', buttonHover: 'hover:bg-slate-50 hover:text-slate-600', groupHoverText: 'group-hover:text-slate-600' };
 
     return (
-      <div className={`bg-white rounded-xl shadow-sm border ${theme.border} flex flex-col h-full overflow-hidden transition-all duration-300 hover:shadow-md`}>
+      <div className={`bg-white rounded-3xl shadow-[0_10px_30px_rgba(25,25,25,0.06)] border ${theme.border} flex flex-col h-full overflow-hidden transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(25,25,25,0.1)]`}>
         <div className={`px-4 pt-5 pb-2 font-bold text-lg flex items-center gap-2 ${theme.text}`}>
           {isPress ? <FileText className="w-5 h-5" /> : <Building2 className="w-5 h-5" />}
           {source}
@@ -384,10 +384,10 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     <div className="space-y-6 animate-in fade-in duration-500">
       
       {/* 날짜 선택 패널 */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 print:hidden flex justify-between items-center">
+      <div className="bg-white rounded-3xl shadow-[0_10px_30px_rgba(25,25,25,0.05)] border border-slate-200 p-4 print:hidden flex flex-col lg:flex-row gap-4 justify-between items-stretch lg:items-center">
         <div className="flex items-center gap-3">
-          <Calendar className="w-5 h-5 text-[#C05A12]" />
-          <h3 className="font-bold text-[#5C2D0C]">브리핑 날짜</h3>
+          <Calendar className="w-5 h-5 text-[#1D4ED8]" />
+          <h3 className="font-bold text-[#191919]">브리핑 날짜</h3>
         </div>
         <div className="flex items-center gap-2">
           <button onClick={handlePrevDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="이전 날짜">
@@ -397,19 +397,19 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             type="date" 
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
+            className="border border-slate-200 rounded-full px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-100 cursor-pointer"
           />
           <select 
             value={selectedTime}
             onChange={(e) => setSelectedTime(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
+            className="border border-slate-200 rounded-full px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-100 cursor-pointer"
           >
             {COLLECTION_SCHEDULE_KST.map(time => <option key={time} value={time}>{time}</option>)}
           </select>
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />
           </button>
-          <button onClick={handleToday} className="ml-2 px-3 py-1.5 bg-[#F5EFE6] hover:bg-[#E8DCCB] text-[#5C2D0C] text-sm font-bold rounded-lg transition-colors shadow-sm">
+          <button onClick={handleToday} className="ml-2 px-4 py-2 bg-[#FEE500] hover:bg-yellow-300 text-[#191919] text-sm font-bold rounded-full transition-colors shadow-sm">
             오늘
           </button>
         </div>
@@ -430,10 +430,10 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
       </div>
 
       {/* 상단 컨트롤 패널 (필터 및 액션) */}
-      <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] p-4 print:hidden flex flex-col gap-4">
+      <div className="bg-white rounded-3xl shadow-[0_10px_30px_rgba(25,25,25,0.05)] border border-slate-200 p-5 print:hidden flex flex-col gap-4">
         <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-          <h3 className="font-bold text-[#5C2D0C] flex items-center gap-2">
-            <Layers className="w-5 h-5 text-[#C05A12]" /> 수집 출처 필터링
+          <h3 className="font-bold text-[#191919] flex items-center gap-2">
+            <Layers className="w-5 h-5 text-[#1D4ED8]" /> 수집 출처 필터링
           </h3>
           <div className="flex gap-2">
             <button onClick={handleDownloadCsv} className="flex items-center gap-1.5 bg-white border border-[#E8DCCB] text-[#5C2D0C] text-sm font-semibold py-1.5 px-3 rounded-lg hover:bg-[#F5EFE6] shadow-sm transition-colors">
@@ -448,7 +448,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
         <div className="flex flex-wrap gap-2 items-center">
           <button 
             onClick={handleAllToggle}
-            className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors shadow-sm ${selectedSources.length === allSources.length - 1 && allSources.length > 0 ? 'bg-[#5C2D0C] text-white border-[#5C2D0C]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+            className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors shadow-sm ${selectedSources.length === allSources.length - 1 && allSources.length > 0 ? 'bg-[#FEE500] text-[#191919] border-[#FEE500]' : 'bg-white text-gray-600 border-slate-200 hover:bg-blue-50'}`}
           >
             기본 선택
           </button>
@@ -457,7 +457,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             <button
               key={source}
               onClick={() => handleSourceToggle(source)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors shadow-sm ${selectedSources.includes(source) ? 'bg-[#C05A12] text-white border-[#C05A12]' : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50'}`}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-colors shadow-sm ${selectedSources.includes(source) ? 'bg-[#1D4ED8] text-white border-[#1D4ED8]' : 'bg-white text-gray-600 border-slate-200 hover:bg-blue-50'}`}
             >
               {source}
             </button>
@@ -483,7 +483,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
               className={`p-4 rounded-xl border text-left transition-all duration-300 relative overflow-hidden group
                 ${isSelected 
                   ? 'bg-blue-600 border-blue-600 shadow-md transform -translate-y-1 ring-4 ring-blue-100' 
-                  : 'bg-white border-gray-200 hover:border-blue-300 hover:shadow hover:-translate-y-0.5'
+                : 'bg-white border-slate-200 hover:border-[#1D4ED8]/40 hover:shadow-[0_10px_24px_rgba(29,78,216,0.1)] hover:-translate-y-0.5'
                 }`}
             >
               <div className={`flex justify-between items-start mb-2 ${isSelected ? 'text-blue-200' : 'text-gray-400'}`}>
@@ -507,7 +507,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
       <div className="space-y-8">
         
         {filteredInitialArticles.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-xl shadow-sm border border-[#E8DCCB]/50 print:hidden">
+          <div className="text-center py-20 bg-white rounded-3xl shadow-[0_10px_30px_rgba(25,25,25,0.05)] border border-slate-200 print:hidden">
             <p className="text-lg text-gray-500">
               선택된 출처가 없습니다. 상단 메뉴에서 출처를 선택해주세요.
             </p>
@@ -532,7 +532,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             {/* 1. 7일 이내 주요 공지 */}
             {/* 1. 7일 이내 주요 공지 */}
             {topNotices.length > 0 && (
-              <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden print:shadow-none print:border-none">
+              <section className="bg-white rounded-3xl shadow-[0_12px_36px_rgba(25,25,25,0.06)] border border-slate-200 overflow-hidden print:shadow-none print:border-none">
                 <div className="px-5 py-4 flex justify-between items-center bg-white border-b border-gray-200">
                   <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
                     <Star className="w-6 h-6 text-[#3B82F6] fill-[#3B82F6]" /> 

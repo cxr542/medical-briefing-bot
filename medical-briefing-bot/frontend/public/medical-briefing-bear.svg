@@ -1,0 +1,17 @@
+<svg width="280" height="250" viewBox="0 0 280 250" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Medical Briefing mascot</title>
+  <desc id="desc">A friendly brown bear holding a yellow briefing card.</desc>
+  <circle cx="140" cy="130" r="108" fill="#FFF6C7"/>
+  <circle cx="79" cy="64" r="32" fill="#A8653F"/>
+  <circle cx="201" cy="64" r="32" fill="#A8653F"/>
+  <circle cx="79" cy="64" r="16" fill="#F4C5A4"/>
+  <circle cx="201" cy="64" r="16" fill="#F4C5A4"/>
+  <ellipse cx="140" cy="137" rx="87" ry="80" fill="#B8734F"/>
+  <ellipse cx="140" cy="163" rx="49" ry="38" fill="#F4C5A4"/>
+  <circle cx="108" cy="128" r="7" fill="#191919"/>
+  <circle cx="172" cy="128" r="7" fill="#191919"/>
+  <ellipse cx="140" cy="151" rx="12" ry="9" fill="#191919"/>
+  <path d="M140 159C132 170 121 169 116 164M140 159C148 170 159 169 164 164" stroke="#191919" stroke-width="4" stroke-linecap="round"/>
+  <rect x="91" y="180" width="98" height="48" rx="12" fill="#FEE500" stroke="#191919" stroke-width="4"/>
+  <path d="M112 196H168M112 208H151" stroke="#1D4ED8" stroke-width="5" stroke-linecap="round"/>
+</svg>
