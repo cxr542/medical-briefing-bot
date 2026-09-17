@@ -139,7 +139,8 @@ jobs:
                   parsed = feedparser.parse(body)
                   result["feed_entries"] = len(parsed.entries)
                   result["bozo"] = bool(parsed.bozo)
-                  result["bozo_exception"] = clean(str(parsed.bozo_exception)) if parsed.bozo_exception else ""
+                  bozo_exception = getattr(parsed, "bozo_exception", None)
+                  result["bozo_exception"] = clean(str(bozo_exception)) if bozo_exception else ""
                   try:
                       root = ET.fromstring(body)
                       result["root"] = local_name(root.tag)
