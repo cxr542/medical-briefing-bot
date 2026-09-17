@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { COLLECTION_SCHEDULE_KST, getLatestCollectionTime } from '@/lib/collectionStatus';
 
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Home, Search } from 'lucide-react';
 
@@ -54,15 +55,8 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 5;
 
-  // 가장 최근 수집 시간 계산 (06, 09, 12, 15)
   const getLatestScheduleTime = () => {
-    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    const h = kstDate.getHours();
-    if (h < 6) return '15:00'; // 어제 15시
-    if (h < 9) return '06:00';
-    if (h < 12) return '09:00';
-    if (h < 15) return '12:00';
-    return '15:00';
+    return getLatestCollectionTime();
   };
 
   // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 6시 이전이면 어제)
@@ -72,7 +66,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
     return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
   });
 
-  const [selectedTime, setSelectedTime] = useState(getLatestScheduleTime());
+  const [selectedTime, setSelectedTime] = useState<string>(getLatestScheduleTime());
 
   const handlePrevDay = () => {
     const d = new Date(selectedDate);
@@ -410,10 +404,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             onChange={(e) => setSelectedTime(e.target.value)}
             className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm font-semibold text-gray-700 outline-none focus:border-[#C05A12] focus:ring-1 focus:ring-[#C05A12] cursor-pointer"
           >
-            <option value="06:00">오전 06:00</option>
-            <option value="09:00">오전 09:00</option>
-            <option value="12:00">오후 12:00</option>
-            <option value="15:00">오후 03:00</option>
+            {COLLECTION_SCHEDULE_KST.map(time => <option key={time} value={time}>{time}</option>)}
           </select>
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />

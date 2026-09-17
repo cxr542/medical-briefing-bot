@@ -33,7 +33,6 @@ export default async function Dashboard() {
     return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;
   }
 
-  // 데이터 수집 스케줄 (KST 09:00, 12:00, 15:00) 기준 최근 업데이트 시점 계산
   const now = new Date();
   const kstDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
   const hours = kstDate.getHours();
