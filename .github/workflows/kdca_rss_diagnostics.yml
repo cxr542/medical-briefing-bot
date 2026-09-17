@@ -1,0 +1,185 @@
+name: KDCA RSS Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install diagnostic parser
+        run: python3 -m pip install --disable-pip-version-check feedparser
+
+      - name: Inspect KDCA RSS profiles
+        shell: bash
+        run: |
+          set -u
+          python3 - <<'PY'
+          import datetime as dt
+          import html
+          import json
+          import os
+          import re
+          import socket
+          import subprocess
+          import tempfile
+          import xml.etree.ElementTree as ET
+
+          import feedparser
+
+          URL = "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50"
+          PROFILES = [
+              ("Current Collector", "Mozilla/5.0", None),
+              ("Browser-like", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36", "application/rss+xml, application/xml, text/xml, */*"),
+          ]
+
+          def clean(value, limit=500):
+              value = re.sub(r"[\x00-\x1f\x7f]+", " ", value or "")
+              return " ".join(value.split())[:limit]
+
+          def local_name(tag):
+              return tag.rsplit("}", 1)[-1].lower()
+
+          def run(command, timeout=35):
+              try:
+                  result = subprocess.run(command, capture_output=True, text=True, timeout=timeout)
+                  return result.returncode, result.stdout.strip(), result.stderr.strip()
+              except Exception as error:
+                  return 99, "", type(error).__name__ + ": " + str(error)
+
+          def dns(host):
+              ipv4, ipv6 = set(), set()
+              try:
+                  infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+                  for family, _, _, _, address in infos:
+                      (ipv6 if family == socket.AF_INET6 else ipv4).add(address[0])
+                  return sorted(ipv4), sorted(ipv6), "DNS_OK"
+              except Exception as error:
+                  return sorted(ipv4), sorted(ipv6), "DNS_FAILED: " + type(error).__name__
+
+          def inspect_profile(name, user_agent, accept):
+              host = URL.split("/", 3)[2]
+              ipv4, ipv6, dns_status = dns(host)
+              result = {
+                  "profile": name, "dns": dns_status, "ipv4": ipv4, "ipv6": ipv6,
+                  "tcp": "NOT_REACHED", "tls": "NOT_REACHED", "http": "NO_HTTP_RESPONSE",
+                  "status": "", "remote_ip": "", "remote_port": "", "final_url": URL,
+                  "redirects": "", "content_type": "", "content_length": "",
+                  "body_size": 0, "lookup": "", "connect": "", "appconnect": "",
+                  "ttfb": "", "total": "", "root": "", "channel": False,
+                  "items": 0, "first_title": "", "first_link": "", "feed_entries": 0,
+                  "bozo": "", "bozo_exception": "", "error_message_detected": False,
+                  "classification": "CONNECTIVITY_FAILED", "reason": "", "snippet": "",
+              }
+              with tempfile.TemporaryDirectory(prefix="kdca-rss-") as temp_dir:
+                  body_path = os.path.join(temp_dir, "body")
+                  headers_path = os.path.join(temp_dir, "headers")
+                  command = [
+                      "curl", "-sS", "-L", "--connect-timeout", "10", "--max-time", "25",
+                      "-A", user_agent, "-D", headers_path, "-o", body_path,
+                      "-w", "%{http_code}|%{remote_ip}|%{remote_port}|%{url_effective}|%{num_redirects}|%{content_type}|%{size_download}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}",
+                  ]
+                  if accept:
+                      command.extend(["-H", "Accept: " + accept])
+                  command.append(URL)
+                  exit_code, stdout, stderr = run(command, timeout=35)
+                  values = stdout.split("|", 11) if stdout else []
+                  if len(values) == 12:
+                      (result["status"], result["remote_ip"], result["remote_port"], result["final_url"],
+                       result["redirects"], result["content_type"], result["body_size"], result["lookup"],
+                       result["connect"], result["appconnect"], result["ttfb"], result["total"]) = values
+                  body = b""
+                  try:
+                      with open(body_path, "rb") as body_file:
+                          body = body_file.read()
+                  except OSError:
+                      pass
+                  result["body_size"] = len(body)
+                  try:
+                      header_blocks = open(headers_path, encoding="iso-8859-1").read().split("\r\n\r\n")
+                      final_headers = header_blocks[-2] if len(header_blocks) > 1 else header_blocks[-1]
+                      for header in final_headers.splitlines():
+                          key, _, value = header.partition(":")
+                          if key.lower() == "content-length":
+                              result["content_length"] = value.strip()
+                          elif key.lower() == "content-type" and not result["content_type"]:
+                              result["content_type"] = value.strip()
+                  except OSError:
+                      pass
+                  http_ok = exit_code == 0 and result["status"].isdigit() and 200 <= int(result["status"]) < 300
+                  if exit_code != 0 or result["status"] in ("", "000"):
+                      result["reason"] = clean(stderr)
+                      result["tcp"] = "TCP_FAILED"
+                      result["tls"] = "TLS_NOT_REACHED"
+                      result["classification"] = "CONNECTIVITY_FAILED"
+                      return result
+                  result["tcp"] = "TCP_OK"
+                  result["tls"] = "TLS_OK" if result["appconnect"] not in ("", "0.000000") else "TLS_NOT_REACHED"
+                  result["http"] = "HTTP_RESPONSE"
+                  if not http_ok:
+                      result["classification"] = "HTTP_FAILED"
+                      result["reason"] = "HTTP status " + result["status"]
+                      return result
+                  textual = result["content_type"].lower().startswith(("text/", "application/xml", "application/rss+xml"))
+                  binary = b"\x00" in body[:4096] or body[:4] in (b"\x89PNG", b"\xff\xd8\xff\xe0")
+                  if not textual or binary:
+                      result["classification"] = "PARSING_FAILED"
+                      result["reason"] = "non-textual or binary response"
+                      return result
+                  try:
+                      text = body.decode("utf-8")
+                  except UnicodeDecodeError:
+                      result["classification"] = "PARSING_FAILED"
+                      result["reason"] = "UTF-8 decode failed"
+                      return result
+                  result["error_message_detected"] = bool(re.search(r"unsupportable\s+RSS", text, re.IGNORECASE))
+                  parsed = feedparser.parse(body)
+                  result["feed_entries"] = len(parsed.entries)
+                  result["bozo"] = bool(parsed.bozo)
+                  result["bozo_exception"] = clean(str(parsed.bozo_exception)) if parsed.bozo_exception else ""
+                  try:
+                      root = ET.fromstring(body)
+                      result["root"] = local_name(root.tag)
+                      channel = next((element for element in root.iter() if local_name(element.tag) == "channel"), None)
+                      result["channel"] = channel is not None
+                      items = [element for element in root.iter() if local_name(element.tag) == "item"]
+                      result["items"] = len(items)
+                      if items:
+                          children = {local_name(child.tag): clean(child.text or "") for child in items[0]}
+                          result["first_title"] = children.get("title", "")
+                          result["first_link"] = children.get("link", "")
+                  except ET.ParseError as error:
+                      result["reason"] = clean(str(error))
+                  if result["error_message_detected"]:
+                      result["classification"] = "INVALID_RSS_APPLICATION_RESPONSE"
+                      result["snippet"] = clean(text)
+                  elif result["channel"] and result["items"] >= 0 and not parsed.bozo:
+                      result["classification"] = "VALID_RSS"
+                      result["reason"] = "valid RSS with zero items" if result["items"] == 0 else "valid RSS"
+                  else:
+                      result["classification"] = "PARSING_FAILED"
+                      result["snippet"] = clean(text)
+              return result
+
+          results = [inspect_profile(*profile) for profile in PROFILES]
+          print("=== KDCA RSS Diagnostics ===")
+          print("UTC:", dt.datetime.now(dt.timezone.utc).isoformat())
+          for result in results:
+              print(json.dumps(result, ensure_ascii=False))
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as summary:
+                  summary.write("## KDCA RSS Diagnostics\n\n")
+                  summary.write("| Profile | DNS | TCP | TLS | HTTP | Remote IP | Content-Type | Content-Length | Body Size | XML Root | Items | Feed Entries | Error Message | Classification | Final URL | Total Time |\n")
+                  summary.write("|---|---|---|---|---|---|---|---:|---:|---|---:|---:|---|---|---|---:|\n")
+                  for result in results:
+                      summary.write("| {profile} | {dns} | {tcp} | {tls} | {http} {status} | `{ip}` | `{ctype}` | {content_length} | {size} | `{root}` | {items} | {entries} | {error} | {classification} | `{url}` | {total} |\n".format(
+                          profile=result["profile"], dns=result["dns"], tcp=result["tcp"], tls=result["tls"], http=result["http"], status=result["status"],
+                          ip=result["remote_ip"], ctype=result["content_type"], content_length=result["content_length"], size=result["body_size"], root=result["root"], items=result["items"],
+                          entries=result["feed_entries"], error=result["error_message_detected"], classification=result["classification"], final=result["final_url"], total=result["total"]))
+                  summary.write("\nOnly diagnostic metadata and bounded textual snippets are reported; response bodies are not uploaded.\n")
+          PY
