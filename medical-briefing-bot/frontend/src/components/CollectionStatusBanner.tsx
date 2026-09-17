@@ -19,7 +19,7 @@ export default function CollectionStatusBanner({ status }: { status: CollectionS
       : 'border-amber-200 bg-amber-50 text-amber-900';
 
   return (
-    <section className={`mb-6 rounded-xl border px-4 py-3 shadow-sm ${colors}`} aria-label="수집 상태 안내">
+    <section className={`mb-6 rounded-3xl border px-5 py-4 shadow-[0_12px_30px_rgba(25,25,25,0.06)] ${colors}`} aria-label="수집 상태 안내">
       <div className="flex items-start gap-3">
         <Icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
         <div className="min-w-0 flex-1">
