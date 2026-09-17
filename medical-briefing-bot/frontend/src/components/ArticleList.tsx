@@ -389,7 +389,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
           <Calendar className="w-5 h-5 text-[#1D4ED8]" />
           <h3 className="font-bold text-[#191919]">브리핑 날짜</h3>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <button onClick={handlePrevDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="이전 날짜">
             <ChevronLeft className="w-5 h-5" />
           </button>
