@@ -3,6 +3,8 @@ import { Calendar, Home } from 'lucide-react';
 import Link from "next/link";
 
 import ArticleList from '@/components/ArticleList';
+import CollectionStatusBanner from '@/components/CollectionStatusBanner';
+import { getCollectionServiceStatus } from '@/lib/collectionStatus';
 
 export const revalidate = 60; // 60초 단위 캐시 갱신 (ISR)
 
@@ -11,12 +13,20 @@ export default async function Dashboard() {
   // 14일치 데이터를 가져와 넉넉하게 풀을 확보 (limit 대신 날짜 기반 필터링)
   const fourteenDaysAgo = new Date();
   fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
-  const { data: articles, error } = await supabase
-    .from('articles')
-    .select('*')
-    .gte('published_date', fourteenDaysAgo.toISOString())
-    .order('published_date', { ascending: false })
-    .limit(500);
+  const [{ data: articles, error }, { data: latestRun }] = await Promise.all([
+    supabase
+      .from('articles')
+      .select('*')
+      .gte('published_date', fourteenDaysAgo.toISOString())
+      .order('published_date', { ascending: false })
+      .limit(500),
+    supabase
+      .from('collector_runs')
+      .select('started_at,finished_at,result,collected_count,ai_output_count,db_attempted,db_succeeded,db_failed,source_health')
+      .order('finished_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (error) {
     console.error(error);
@@ -76,6 +86,7 @@ export default async function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-[1600px] w-full px-4 md:px-8 xl:px-12 mx-auto mt-6 md:mt-8">
+        <CollectionStatusBanner status={getCollectionServiceStatus(latestRun)} />
         {/* 클라이언트 컴포넌트(검색 및 렌더링)에 데이터 전달 */}
         <ArticleList initialArticles={articles || []} />
       </main>
