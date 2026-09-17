@@ -32,11 +32,11 @@ export default function CollectionStatusBanner({ status }: { status: CollectionS
           </div>
           {status.affectedSources.length > 0 && (
             <>
-              <button type="button" onClick={() => setExpanded(value => !value)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-2">
+              <button type="button" aria-expanded={expanded} aria-controls="collection-status-sources" onClick={() => setExpanded(value => !value)} className="mt-2 inline-flex items-center gap-1 text-xs font-semibold underline underline-offset-2">
                 영향 기관 {expanded ? '접기' : '보기'} <ChevronDown className={`h-3.5 w-3.5 transition-transform ${expanded ? 'rotate-180' : ''}`} aria-hidden="true" />
               </button>
               {expanded && (
-                <ul className="mt-2 space-y-1 text-xs" aria-label="영향 기관 목록">
+                <ul id="collection-status-sources" className="mt-2 space-y-1 text-xs" aria-label="영향 기관 목록">
                   {status.affectedSources.map(source => <li key={source.name} className="flex justify-between gap-4"><span>{source.name}</span><span className="font-semibold">{userSourceStatusLabel[source.status]}</span></li>)}
                 </ul>
               )}
