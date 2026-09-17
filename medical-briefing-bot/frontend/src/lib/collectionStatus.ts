@@ -30,15 +30,34 @@ export type CollectionServiceStatus = {
 
 const getUserSourceStatus = (health: SourceHealth[string]): CollectionServiceStatus['affectedSources'][number]['status'] => {
   const reason = String(health.reason || '').toLowerCase();
-  if (reason.includes('invalid') || reason.includes('rss')) return 'INVALID_RESPONSE';
+  if (reason.includes('invalid') || reason.includes('unsupportable')) return 'INVALID_RESPONSE';
   if (reason.includes('http') || reason.includes('api')) return 'EXTERNAL_ERROR';
   return 'DELAYED';
 };
 
+const isSourceHealth = (value: unknown): value is SourceHealth[string] => {
+  if (!value || typeof value !== 'object') return false;
+  const health = value as Partial<SourceHealth[string]>;
+  return typeof health.count === 'number'
+    && (health.status === 'OK' || health.status === 'WARN' || health.status === 'FAILED');
+};
+
+const parseCollectorRun = (value: unknown): CollectorRun | null => {
+  if (!value || typeof value !== 'object') return null;
+  const run = value as Partial<CollectorRun>;
+  if (run.result !== 'SUCCESS' && run.result !== 'DEGRADED' && run.result !== 'FAILED') return null;
+  if (typeof run.finished_at !== 'string' || !run.source_health || typeof run.source_health !== 'object') return null;
+  const sourceHealth = Object.fromEntries(
+    Object.entries(run.source_health).filter(([, health]) => isSourceHealth(health)),
+  ) as SourceHealth;
+  return { ...run, source_health: sourceHealth } as CollectorRun;
+};
+
 export function getCollectionServiceStatus(
-  run: CollectorRun | null | undefined,
+  value: unknown,
   now = Date.now(),
 ): CollectionServiceStatus {
+  const run = parseCollectorRun(value);
   if (!run) {
     return {
       state: 'STALE',
@@ -54,7 +73,7 @@ export function getCollectionServiceStatus(
   const finishedAtMs = new Date(run.finished_at).getTime();
   const stale = Number.isNaN(finishedAtMs) || now - finishedAtMs > COLLECTION_STATUS_STALE_MS;
   const failedSources = Object.entries(run.source_health || {})
-    .filter(([, health]) => health.status === 'FAILED')
+    .filter(([, health]) => health.status !== 'OK')
     .map(([name, health]) => ({ name, status: getUserSourceStatus(health) }));
 
   if (stale) {

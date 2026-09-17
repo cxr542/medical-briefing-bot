@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import ArticleList from '@/components/ArticleList';
 import CollectionStatusBanner from '@/components/CollectionStatusBanner';
-import { CollectorRun, getCollectionServiceStatus } from '@/lib/collectionStatus';
+import { getCollectionServiceStatus } from '@/lib/collectionStatus';
 
 export const revalidate = 60; // 60초 단위 캐시 갱신 (ISR)
 
@@ -86,7 +86,7 @@ export default async function Dashboard() {
 
       {/* Main Content */}
       <main className="max-w-[1600px] w-full px-4 md:px-8 xl:px-12 mx-auto mt-6 md:mt-8">
-        <CollectionStatusBanner status={getCollectionServiceStatus(latestRun as CollectorRun | null)} />
+        <CollectionStatusBanner status={getCollectionServiceStatus(latestRun)} />
         {/* 클라이언트 컴포넌트(검색 및 렌더링)에 데이터 전달 */}
         <ArticleList initialArticles={articles || []} />
       </main>
