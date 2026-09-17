@@ -80,8 +80,8 @@ export function getCollectionServiceStatus(
     return {
       state: 'STALE',
       message: '현재 최신 수집 상태를 확인할 수 없습니다.',
-      affectedSources: failedSources,
-      affectedCount: failedSources.length,
+      affectedSources: [],
+      affectedCount: 0,
       finishedAt: run.finished_at,
       stale: true,
       showBanner: true,

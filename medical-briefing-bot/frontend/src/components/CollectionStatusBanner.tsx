@@ -25,7 +25,7 @@ export default function CollectionStatusBanner({ status }: { status: CollectionS
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{status.message}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
-            {!isStale && <span>{status.affectedCount}개 기관 영향</span>}
+            <span>{isStale ? '영향 기관 확인 불가' : `${status.affectedCount}개 기관 영향`}</span>
             {status.finishedAt && (
               <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />마지막 확인 {new Date(status.finishedAt).toLocaleString('ko-KR')}</span>
             )}
