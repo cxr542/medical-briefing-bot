@@ -1,0 +1,109 @@
+name: Government Connectivity Diagnostics
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Collect DNS and HTTP/TLS timings
+        shell: bash
+        run: |
+          set -u
+          python3 - <<'PY'
+          import datetime as dt
+          import json
+          import os
+          import socket
+          import subprocess
+
+          endpoints = [
+              ("보건복지부 보도자료", "https://www.mohw.go.kr/rss/board.es?mid=a10503000000&bid=0027&info"),
+              ("질병관리청 보도자료", "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50"),
+              ("식품의약품안전처 보도자료", "http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021"),
+              ("보건복지부 법령", "https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026"),
+              ("국가법령정보센터", "https://www.law.go.kr/DRF/lawSearch.do?target=law&type=JSON&query=%EC%9D%98%EB%A3%8C%EB%B2%95"),
+          ]
+
+          def run(command):
+              try:
+                  result = subprocess.run(command, capture_output=True, text=True, timeout=35)
+                  return result.returncode, result.stdout.strip(), result.stderr.strip()
+              except Exception as error:
+                  return 99, "", type(error).__name__ + ": " + str(error)
+
+          def dns(host):
+              addresses = {socket.AF_INET: set(), socket.AF_INET6: set()}
+              try:
+                  infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+                  for family, _, _, _, address in infos:
+                      addresses.setdefault(family, set()).add(address[0])
+              except Exception as error:
+                  return [], [], "DNS_FAILED: " + type(error).__name__
+              return sorted(addresses[socket.AF_INET]), sorted(addresses[socket.AF_INET6]), "DNS_OK"
+
+          def curl(url, family):
+              command = [
+                  "curl", family, "-L", "--connect-timeout", "10", "--max-time", "25",
+                  "-A", "Mozilla/5.0", "-o", "/dev/null",
+                  "-w", "%{http_code}|%{remote_ip}|%{remote_port}|%{url_effective}|%{time_namelookup}|%{time_connect}|%{time_appconnect}|%{time_starttransfer}|%{time_total}",
+                  url,
+              ]
+              code, stdout, stderr = run(command)
+              values = stdout.split("|", 8) if stdout else []
+              if len(values) != 9:
+                  return {"status": "FAILED", "detail": stderr[-240:]}
+              http_code, remote_ip, remote_port, final_url, lookup, connect, appconnect, ttfb, total = values
+              ok = code == 0 and http_code not in ("000", "")
+              return {
+                  "status": "OK" if ok else "FAILED",
+                  "http": http_code,
+                  "remote_ip": remote_ip,
+                  "remote_port": remote_port,
+                  "final_url": final_url,
+                  "lookup": lookup,
+                  "connect": connect,
+                  "appconnect": appconnect,
+                  "ttfb": ttfb,
+                  "total": total,
+                  "detail": "" if ok else stderr[-240:],
+              }
+
+          rows = []
+          print("=== Government Connectivity Diagnostics ===")
+          print("UTC:", dt.datetime.now(dt.timezone.utc).isoformat())
+          print("Runner:", os.environ.get("RUNNER_OS", "unknown"))
+          print("Kernel:", run(["uname", "-a"])[1])
+          print("Python:", run(["python3", "--version"])[1])
+          print("Curl:", run(["curl", "--version"])[1].splitlines()[0])
+
+          for source, url in endpoints:
+              host = url.split("/", 3)[2].split(":", 1)[0]
+              ipv4, ipv6, dns_status = dns(host)
+              getent = run(["getent", "hosts", host])[1]
+              v4 = curl(url, "--ipv4")
+              v6 = curl(url, "--ipv6") if ipv6 else {"status": "NOT_AVAILABLE"}
+              tls = "NOT_APPLICABLE" if url.startswith("http://") else ("TLS_OK" if v4.get("appconnect", "0") not in ("", "0.000000") else "TLS_FAILED")
+              row = {"source": source, "host": host, "url": url, "dns": dns_status, "ipv4": ipv4, "ipv6": ipv6, "getent": getent, "v4": v4, "v6": v6, "tls": tls}
+              rows.append(row)
+              print(json.dumps(row, ensure_ascii=False))
+
+          summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
+          if summary_path:
+              with open(summary_path, "a", encoding="utf-8") as summary:
+                  summary.write("## Government Connectivity Diagnostics\n\n")
+                  summary.write("| Source | Host | DNS | IPv4 | Remote IP | Connect | TLS | TTFB | Total | IPv6 | HTTP | Final URL |\n")
+                  summary.write("|---|---|---|---|---|---:|---|---:|---:|---|---:|---|\n")
+                  for row in rows:
+                      v4 = row["v4"]
+                      v6 = row["v6"]
+                      summary.write("| {source} | `{host}` | {dns} | {status} | `{ip}` | {connect} | {tls} | {ttfb} | {total} | {v6status} | {http} | `{final}` |\n".format(
+                          source=row["source"], host=row["host"], dns=row["dns"], status=v4.get("status"), ip=v4.get("remote_ip", ""),
+                          connect=v4.get("connect", ""), tls=row["tls"], ttfb=v4.get("ttfb", ""), total=v4.get("total", ""),
+                          v6status=v6.get("status"), http=v4.get("http", ""), final=v4.get("final_url", "")))
+                  summary.write("\nEndpoint failures are diagnostic results; this step does not fail the job for DNS, connection, TLS, or HTTP failures.\n")
+          PY
