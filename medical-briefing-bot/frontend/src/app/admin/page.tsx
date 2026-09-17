@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { getCollectionServiceStatus, userSourceStatusLabel } from '@/lib/collectionStatus';
+import { COLLECTION_SCHEDULE_KST, getCollectionServiceStatus, getNextCollectionTime, userSourceStatusLabel } from '@/lib/collectionStatus';
 
 type SourceHealth = Record<string, { count: number; status: 'OK' | 'WARN' | 'FAILED'; reason: string }>;
 
@@ -82,6 +82,7 @@ export default function AdminPage() {
 
   const latestRun = collectorRuns[0];
   const userServiceStatus = getCollectionServiceStatus(latestRun);
+  const nextCollectionTime = getNextCollectionTime();
   const resultLabel = { SUCCESS: '정상', DEGRADED: '주의', FAILED: '실패' } as const;
   const resultClass = {
     SUCCESS: 'bg-green-100 text-green-700',
@@ -209,6 +210,17 @@ export default function AdminPage() {
             ) : !isLoading && !collectorRunsError ? (
               <div className="py-8 text-center text-gray-500">저장된 collector 실행 이력이 없습니다.</div>
             ) : null}
+          </div>
+        </section>
+
+        <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
+          <div className="px-6 py-5 border-b border-gray-100 bg-gray-50">
+            <h2 className="font-bold text-gray-800">수집 일정</h2>
+            <p className="text-xs text-gray-500 mt-1">한국시간(KST) 기준 Daily Collector 실행 일정</p>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="rounded-lg bg-blue-50 p-4"><p className="text-xs text-blue-600">매일 실행</p><p className="mt-1 text-lg font-black text-blue-800">{COLLECTION_SCHEDULE_KST.join(' · ')}</p></div>
+            <div className="rounded-lg bg-purple-50 p-4"><p className="text-xs text-purple-600">다음 수집 예정</p><p className="mt-1 text-lg font-black text-purple-800">{nextCollectionTime}</p></div>
           </div>
         </section>
 

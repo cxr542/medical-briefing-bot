@@ -1,4 +1,5 @@
 export const COLLECTION_STATUS_STALE_MS = 12 * 60 * 60 * 1000;
+export const COLLECTION_SCHEDULE_KST = ['06:00', '08:30', '12:00', '15:00'] as const;
 
 export type SourceHealth = Record<string, {
   count: number;
@@ -128,3 +129,26 @@ export const userSourceStatusLabel = {
   EXTERNAL_ERROR: '외부 서비스 오류',
   INVALID_RESPONSE: '잘못된 응답 차단',
 } as const;
+
+const toKstMinutes = (now: Date): number => {
+  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  return kst.getHours() * 60 + kst.getMinutes();
+};
+
+export const getLatestCollectionTime = (now = new Date()): (typeof COLLECTION_SCHEDULE_KST)[number] => {
+  const currentMinutes = toKstMinutes(now);
+  const latest = [...COLLECTION_SCHEDULE_KST].reverse().find(time => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes <= currentMinutes;
+  });
+  return latest || COLLECTION_SCHEDULE_KST[COLLECTION_SCHEDULE_KST.length - 1];
+};
+
+export const getNextCollectionTime = (now = new Date()): (typeof COLLECTION_SCHEDULE_KST)[number] => {
+  const currentMinutes = toKstMinutes(now);
+  const next = COLLECTION_SCHEDULE_KST.find(time => {
+    const [hours, minutes] = time.split(':').map(Number);
+    return hours * 60 + minutes > currentMinutes;
+  });
+  return next || COLLECTION_SCHEDULE_KST[0];
+};
