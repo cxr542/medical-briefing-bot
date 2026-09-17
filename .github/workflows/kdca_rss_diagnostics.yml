@@ -178,7 +178,7 @@ jobs:
                   summary.write("| Profile | DNS | TCP | TLS | HTTP | Remote IP | Content-Type | Content-Length | Body Size | XML Root | Items | Feed Entries | Error Message | Classification | Final URL | Total Time |\n")
                   summary.write("|---|---|---|---|---|---|---|---:|---:|---|---:|---:|---|---|---|---:|\n")
                   for result in results:
-                      summary.write("| {profile} | {dns} | {tcp} | {tls} | {http} {status} | `{ip}` | `{ctype}` | {content_length} | {size} | `{root}` | {items} | {entries} | {error} | {classification} | `{url}` | {total} |\n".format(
+                      summary.write("| {profile} | {dns} | {tcp} | {tls} | {http} {status} | `{ip}` | `{ctype}` | {content_length} | {size} | `{root}` | {items} | {entries} | {error} | {classification} | `{final}` | {total} |\n".format(
                           profile=result["profile"], dns=result["dns"], tcp=result["tcp"], tls=result["tls"], http=result["http"], status=result["status"],
                           ip=result["remote_ip"], ctype=result["content_type"], content_length=result["content_length"], size=result["body_size"], root=result["root"], items=result["items"],
                           entries=result["feed_entries"], error=result["error_message_detected"], classification=result["classification"], final=result["final_url"], total=result["total"]))
