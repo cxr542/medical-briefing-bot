@@ -11,10 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
-from collector_sources.comwel import (
-    fetch_comwel_notices,
-    source_collection_diagnostics,
-)
+from collector_sources.comwel import source_collection_diagnostics
 
 load_dotenv()
 
@@ -952,7 +949,6 @@ if __name__ == "__main__":
     collect_source("심평원 e-평가", fetch_hira_biz_notices)
     collect_source("심평원 e-평가 (평가알림방)", fetch_hira_aq_notices)
     collect_source("보건의료자원포탈", fetch_hurb_notices)
-    collect_source("산재업무포탈", fetch_comwel_notices)
     collect_source("보건복지부 법령", fetch_mohw_legislation)
 
     # 3. 오픈 API
