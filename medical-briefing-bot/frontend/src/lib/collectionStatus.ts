@@ -1,5 +1,5 @@
 export const COLLECTION_STATUS_STALE_MS = 12 * 60 * 60 * 1000;
-export const COLLECTION_SCHEDULE_KST = ['06:00', '08:30', '12:00', '15:00'] as const;
+export const COLLECTION_SCHEDULE_KST = ['06:07', '08:30', '12:07', '15:07'] as const;
 
 export type SourceHealth = Record<string, {
   count: number;
