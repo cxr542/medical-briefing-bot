@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { COLLECTION_SCHEDULE_KST, getLatestCollectionTime } from '@/lib/collectionStatus';
+import { COLLECTION_DISPLAY_SCHEDULE_KST, COLLECTION_RUNTIME_SCHEDULE_KST, getLatestCollectionTime, isBeforeFirstCollectionTime } from '@/lib/collectionStatus';
 
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Search } from 'lucide-react';
 
@@ -62,7 +62,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 6시 이전이면 어제)
   const [selectedDate, setSelectedDate] = useState(() => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    if (isBeforeFirstCollectionTime()) kstDate.setDate(kstDate.getDate() - 1);
     return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
   });
 
@@ -82,7 +82,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
 
   const handleToday = () => {
     const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (kstDate.getHours() < 6) kstDate.setDate(kstDate.getDate() - 1);
+    if (isBeforeFirstCollectionTime()) kstDate.setDate(kstDate.getDate() - 1);
     setSelectedDate(`${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`);
     setSelectedTime(getLatestScheduleTime());
   };
@@ -98,8 +98,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
          query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
          query = query.limit(500);
       } else {
-         const [hh] = selectedTime.split(':');
-         const targetEndKst = new Date(`${selectedDate}T${hh}:59:59+09:00`);
+         const targetEndKst = new Date(`${selectedDate}T${selectedTime}:59+09:00`);
          query = query.lte('published_date', targetEndKst.toISOString());
          query = query.limit(500);
       }
@@ -404,7 +403,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             onChange={(e) => setSelectedTime(e.target.value)}
             className="border border-slate-200 rounded-full px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-100 cursor-pointer"
           >
-            {COLLECTION_SCHEDULE_KST.map(time => <option key={time} value={time}>{time}</option>)}
+            {COLLECTION_RUNTIME_SCHEDULE_KST.map((time, index) => <option key={time} value={time}>{COLLECTION_DISPLAY_SCHEDULE_KST[index]}</option>)}
           </select>
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />
