@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
-import { COLLECTION_SCHEDULE_KST, getCollectionServiceStatus, getNextCollectionTime, userSourceStatusLabel } from '@/lib/collectionStatus';
+import { COLLECTION_DISPLAY_SCHEDULE_KST, getCollectionServiceStatus, getNextCollectionTime, userSourceStatusLabel } from '@/lib/collectionStatus';
 
 type SourceHealth = Record<string, { count: number; status: 'OK' | 'WARN' | 'FAILED'; reason: string }>;
 
@@ -219,7 +219,7 @@ export default function AdminPage() {
             <p className="text-xs text-gray-500 mt-1">한국시간(KST) 기준 Daily Collector 실행 일정</p>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="rounded-lg bg-blue-50 p-4"><p className="text-xs text-blue-600">매일 실행</p><p className="mt-1 text-lg font-black text-blue-800">{COLLECTION_SCHEDULE_KST.join(' · ')}</p></div>
+            <div className="rounded-lg bg-blue-50 p-4"><p className="text-xs text-blue-600">매일 실행</p><p className="mt-1 text-lg font-black text-blue-800">{COLLECTION_DISPLAY_SCHEDULE_KST.join(' · ')}</p></div>
             <div className="rounded-lg bg-purple-50 p-4"><p className="text-xs text-purple-600">다음 수집 예정</p><p className="mt-1 text-lg font-black text-purple-800">{nextCollectionTime}</p></div>
           </div>
         </section>
