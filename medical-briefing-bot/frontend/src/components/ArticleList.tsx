@@ -98,7 +98,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
          query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
          query = query.limit(500);
       } else {
-         const targetEndKst = new Date(`T:59+09:00`);
+         const targetEndKst = new Date(`${selectedDate}T${selectedTime}:59+09:00`);
          query = query.lte('published_date', targetEndKst.toISOString());
          query = query.limit(500);
       }
@@ -403,7 +403,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
             onChange={(e) => setSelectedTime(e.target.value)}
             className="border border-slate-200 rounded-full px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-[#1D4ED8] focus:ring-2 focus:ring-blue-100 cursor-pointer"
           >
-            {COLLECTION_RUNTIME_SCHEDULE_KST.map((time, index) => <option key={time} value={time}>{COLLECTION_DISPLAY_SCHEDULE_KST[index]}</option>}
+            {COLLECTION_RUNTIME_SCHEDULE_KST.map((time, index) => <option key={time} value={time}>{COLLECTION_DISPLAY_SCHEDULE_KST[index]}</option>)}
           </select>
           <button onClick={handleNextDay} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors" title="다음 날짜">
             <ChevronRight className="w-5 h-5" />
