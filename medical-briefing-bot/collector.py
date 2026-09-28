@@ -1,9 +1,8 @@
 from datetime import datetime, timezone, timedelta
 import atexit
 import os
-import hashlib
 import time
-from urllib.parse import quote, urljoin, urlparse
+from urllib.parse import urlparse
 import re
 
 import feedparser
@@ -12,6 +11,15 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from collector_sources.comwel import source_collection_diagnostics
+from collector_parsers import (
+    get_content_hash,
+    has_hira_target_board,
+    is_valid_article_record,
+    normalize_rss_entry,
+    parse_hira_ssv_response,
+    parse_kdca_press_release_html,
+    parse_rss_entries,
+)
 
 load_dotenv()
 
@@ -162,45 +170,10 @@ WHITE_LIST = [
 ]
 BLACK_LIST = ["인사", "부음", "홍보", "광고", "동정", "출시", "프로모션"]
 
-def get_content_hash(text: str) -> str:
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()
-
-
-def normalize_rss_entry(entry, feed_url: str):
-    raw_title = entry.get("title")
-    raw_link = entry.get("link")
-    if not isinstance(raw_title, str) or not isinstance(raw_link, str):
-        return None
-    title = raw_title.strip()
-    raw_link = raw_link.strip()
-    if not title or not raw_link:
-        return None
-    if re.search(r"unsupportable\s+rss|rss\s+not\s+supported", title, re.IGNORECASE):
-        return None
-
-    link = urljoin(feed_url, raw_link)
-    parsed_link = urlparse(link)
-    if parsed_link.scheme not in {"http", "https"} or not parsed_link.netloc:
-        return None
-    return title, link
-
 def is_valid_press_article(title: str) -> bool:
     if any(black in title for black in BLACK_LIST): return False
     if any(white in title for white in WHITE_LIST): return True
     return False
-
-def is_valid_article_record(article: dict) -> bool:
-    """운영 UI에 노출하면 안 되는 오류/placeholder 레코드를 최종 저장 직전에 차단합니다."""
-    title = str(article.get("title") or "").strip()
-    url = str(article.get("url") or "").strip()
-    if not title or not url:
-        return False
-    if re.search(r"unsupportable\s+rss|rss\s+not\s+supported", title, re.IGNORECASE):
-        return False
-    parsed_url = urlparse(url)
-    return parsed_url.scheme in {"http", "https"} and bool(parsed_url.netloc)
-
-
 
 # 1. RSS 파서 (복지부, 질병청, 식약처, 언론사)
 def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
@@ -233,56 +206,22 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
     if feed.bozo:
         print(f"⚠️ RSS 파싱 경고 ({source_name}): {feed.bozo_exception}")
 
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    articles_to_save = []
-    recent_count = 0
-    filtered_count = 0
-
-    valid_entry_count = 0
-    invalid_entry_count = 0
-    for entry in feed.entries:
-        normalized_entry = normalize_rss_entry(entry, response.url)
-        if normalized_entry is None:
-            invalid_entry_count += 1
-            continue
-        valid_entry_count += 1
-        title, link = normalized_entry
-
-        pub_date = datetime.now(timezone.utc)
-        if hasattr(entry, 'published_parsed') and entry.published_parsed:
-            pub_date = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-            
-        if pub_date < seven_days_ago:
-            continue
-
-        recent_count += 1
-        if is_press and not is_valid_press_article(title):
-            continue
-
-        filtered_count += 1
-            
-        articles_to_save.append({
-            "source": source_name,
-            "title": title,
-            "url": link,
-            "published_date": pub_date.isoformat(),
-            "content_hash": get_content_hash(title + link),
-            "status": "NEW"
-        })
-
-    if feed.entries and valid_entry_count == 0:
-        raise ValueError(
-            f"RSS 유효 article entry가 없습니다: url={response.url}, "
-            f"raw_entries={len(feed.entries)}, invalid_entries={invalid_entry_count}"
-        )
-    if invalid_entry_count:
-        print(f"⚠️ RSS invalid entries skipped ({source_name}): {invalid_entry_count}")
+    parsed = parse_rss_entries(
+        feed.entries,
+        response.url,
+        source_name,
+        is_press=is_press,
+        press_filter=is_valid_press_article,
+    )
+    if parsed["invalid_entries"]:
+        print(f"⚠️ RSS invalid entries skipped ({source_name}): {parsed['invalid_entries']}")
 
     if is_press:
         source_collection_diagnostics[source_name] = (
-            f"feed={len(feed.entries)} recent={recent_count} filtered={filtered_count}"
+            f"feed={parsed['raw_entries']} recent={parsed['recent_entries']} "
+            f"filtered={parsed['filtered_entries']}"
         )
-    return articles_to_save
+    return parsed["articles"]
 
 def fetch_kdca_press_releases():
     """KDCA RSS 장애 시 공식 보도자료 목록을 fallback으로 수집합니다."""
@@ -305,64 +244,15 @@ def fetch_kdca_press_releases():
         allow_redirects=True,
     )
     response.raise_for_status()
-    soup = BeautifulSoup(response.text, "html.parser")
-    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
-    articles = []
-
-    # KDCA K2Web의 번호/제목/담당부서/작성일 표를 직접 파싱합니다.
-    rows = soup.select("tbody tr")
-    print(f"KDCA fallback DOM: tbody_rows={len(rows)} all_tr={len(soup.select('tr'))} links={len(soup.select('a'))}")
-    if not rows:
-        rows = [row for row in soup.select("tr") if re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row.get_text(" ", strip=True))]
-
-    for row in rows:
-        cells = row.select("td")
-        row_text = row.get_text(" ", strip=True)
-        date_match = re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row_text)
-        if not date_match:
-            continue
-        title_link = None
-        for candidate in row.select("a"):
-            candidate_text = candidate.get_text(" ", strip=True)
-            if candidate_text and candidate_text not in {"첨부파일", "새글"}:
-                title_link = candidate
-                break
-        title = title_link.get_text(" ", strip=True) if title_link else ""
-        if not title and len(cells) >= 2:
-            title = cells[1].get_text(" ", strip=True)
-        title = re.sub(r"\s*새글\s*$", "", title).strip()
-        if not title:
-            continue
-
-        href = (title_link.get("href") or "").strip() if title_link else ""
-        onclick = (title_link.get("onclick") or "").strip() if title_link else ""
-        id_match = re.search(r"/42/(\d+)/artclView\.do", href)
-        if not id_match:
-            id_match = re.search(r"(?:artclSeq|artclNo|articleNo)[^0-9]*(\d+)", href + " " + onclick, re.I)
-        if not id_match:
-            id_match = re.search(r"['\"](\d{4,})['\"]", onclick)
-        if id_match:
-            url = f"https://www.kdca.go.kr/bbs/kdca/42/{id_match.group(1)}/artclView.do"
-        elif href and not href.lower().startswith(("javascript", "#")):
-            url = urljoin(list_url, href)
-        else:
-            seq_text = cells[0].get_text(" ", strip=True) if cells else ""
-            if not re.fullmatch(r"\d+", seq_text):
-                continue
-            url = f"{list_url}?page=1&srchColumn=title&srchWrd={quote(title)}"
-
-        try:
-            dt = datetime.strptime(date_match.group(0).replace(".", "-"), "%Y-%m-%d")
-            pub_date = dt.replace(tzinfo=timezone(timedelta(hours=9))).astimezone(timezone.utc)
-        except ValueError:
-            continue
-        if pub_date < seven_days_ago:
-            continue
-        article = {"source": source_name, "title": title, "url": url, "published_date": pub_date.isoformat(), "content_hash": get_content_hash(title + url), "status": "NEW"}
-        if is_valid_article_record(article):
-            articles.append(article)
-
-    source_collection_diagnostics[source_name] = f"fallback_rows={len(rows)} valid_recent={len(articles)}"
+    parsed = parse_kdca_press_release_html(response.text, list_url)
+    articles = parsed["articles"]
+    print(
+        f"KDCA fallback DOM: tbody_rows={parsed['rows']} "
+        f"all_tr={parsed['all_rows']} links={parsed['links']}"
+    )
+    source_collection_diagnostics[source_name] = (
+        f"fallback_rows={parsed['rows']} valid_recent={len(articles)}"
+    )
 
     if not articles:
         raise ValueError(
@@ -559,50 +449,9 @@ def fetch_hira_biz_notices():
                         text = _response_text(response)
                         if text is None:
                             return
-                        # SSV 응답 포맷인 경우
-                        if 'Dataset:dsBoard' in text:
-                            # 1. dsBoard 데이터 블록 찾기
-                            start_idx = text.find('Dataset:dsBoard')
-                            if start_idx != -1:
-                                ds_board_text = text[start_idx:]
-                                # 2. 다음 Dataset이 있으면 거기까지만
-                                next_ds_idx = ds_board_text.find('Dataset:', 10)
-                                if next_ds_idx != -1:
-                                    ds_board_text = ds_board_text[:next_ds_idx]
-                                
-                                # 3. SSV 행 구분자는 보통 , 열 구분자는 
-                                rows = ds_board_text.split('\x1e')
-                                for row in rows:
-                                    cols = row.split('\x1f')
-                                    if len(cols) >= 6 and 'BBSMSTR' in cols[1]:
-                                        item_id = cols[2].strip()
-                                        title = cols[3].strip()
-                                        date_str = cols[5].strip()[:8] # YYYYMMDD
-                                        
-                                        # 날짜 파싱
-                                        pub_date_iso = datetime.now(timezone.utc).isoformat()
-                                        if len(date_str) == 8:
-                                            
-                                            kst = timezone(timedelta(hours=9))
-                                            dt = datetime.strptime(date_str, "%Y%m%d").replace(tzinfo=kst)
-                                            pub_date_iso = dt.isoformat()
-                                        
-                                        # 게시판에 따라 출처명 세분화 (선택사항)
-                                        board_type = source_name
-                                        if '00000663' in cols[1]:
-                                            board_type = f"{source_name} (자보알림방)"
-                                        else:
-                                            board_type = f"{source_name} (공지사항)"
-                                            
-                                        articles_to_save.append({
-                                            "source": board_type,
-                                            "title": title,
-                                            "url": f"http://biz.hira.or.kr/indexS.ndo?PROGRAM_ID=MP00000616&PROGRAM_PARAM=nttId=={item_id}",
-                                            "published_date": pub_date_iso,
-                                            "content_hash": get_content_hash(title),
-                                            "status": "NEW"
-                                        })
-                                readiness["parsed"] = True
+                        parsed_articles, has_board_dataset = parse_hira_ssv_response(text)
+                        articles_to_save.extend(parsed_articles)
+                        readiness["parsed"] = has_board_dataset
                     except Exception as e:
                         readiness["error"] = f"{source_name} target response parse failed: {e}"
                         print(f"응답 파싱 건너뜀 ({source_name}): {e}")
@@ -631,10 +480,7 @@ def fetch_hira_biz_notices():
             while time.monotonic() < deadline:
                 if readiness["error"]:
                     raise ValueError(readiness["error"])
-                if any(
-                    article["source"] == f"{source_name} (자보알림방)"
-                    for article in articles_to_save[before_count:]
-                ):
+                if has_hira_target_board(articles_to_save[before_count:]):
                     break
                 page.wait_for_timeout(100)
             else:
