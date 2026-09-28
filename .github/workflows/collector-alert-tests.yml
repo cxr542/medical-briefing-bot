@@ -1,0 +1,28 @@
+name: Collector alert engine tests
+
+on:
+  pull_request:
+    paths:
+      - 'medical-briefing-bot/frontend/src/lib/collectorHealthEngine.mjs'
+      - 'medical-briefing-bot/frontend/src/lib/collectorAlertEngine.mjs'
+      - 'medical-briefing-bot/tests/test_collector_alert_engine.mjs'
+      - '.github/workflows/collector-alert-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  alert-transitions:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Run offline alert transition tests
+        working-directory: medical-briefing-bot
+        run: node --test tests/test_collector_alert_engine.mjs
