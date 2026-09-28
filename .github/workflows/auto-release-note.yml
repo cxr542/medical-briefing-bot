@@ -1,0 +1,78 @@
+name: Auto release note
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  append-release-note:
+    if: >
+      github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release-note')
+    runs-on: ubuntu-latest
+    concurrency:
+      group: release-notes-main
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Append release note
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          MERGED_AT: ${{ github.event.pull_request.merged_at }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          body = os.environ.get("PR_BODY", "")
+          match = re.search(r"^## Release Note\s*$([\s\S]*?)(?=^## |\Z)", body, re.M)
+          if not match:
+              raise SystemExit("Release Note section not found")
+          section = match.group(1).strip()
+          category = re.search(r"^Category:\s*(.+)$", section, re.M)
+          title = re.search(r"^Title:\s*(.+)$", section, re.M)
+          if not category or not title:
+              raise SystemExit("Category/Title missing")
+          bullets = [re.sub(r"^-\s*", "", line).strip() for line in section.splitlines() if line.strip().startswith("- ")]
+          date = os.environ["MERGED_AT"][:10].replace("-", ".")
+          pr = int(os.environ["PR_NUMBER"])
+          item = {
+              "id": f"{date.replace('.', '-')}-pr-{pr}",
+              "date": date,
+              "category": category.group(1).strip(),
+              "title": title.group(1).strip(),
+              "summary": f"PR #{pr} merge로 반영된 변경입니다.",
+              "issues": [],
+              "changes": bullets or ["PR의 Release Note 메타데이터로 자동 등록"],
+              "verification": ["PR merge 완료"],
+              "links": [{"label": f"PR #{pr}", "url": os.environ["PR_URL"]}],
+          }
+          out = Path("medical-briefing-bot/frontend/src/data/generatedReleaseNotes.json")
+          existing = json.loads(out.read_text()) if out.exists() else []
+          if any(x.get("id") == item["id"] for x in existing):
+              print("already exists")
+              raise SystemExit(0)
+          existing.insert(0, item)
+          out.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n")
+          PY
+
+      - name: Commit generated release note
+        run: |
+          if git diff --quiet; then
+            echo "No release note changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add medical-briefing-bot/frontend/src/data/generatedReleaseNotes.json
+          git commit -m "docs: add release note for PR #${{ github.event.pull_request.number }}"
+          git pull --rebase origin main
+          git push origin HEAD:main
