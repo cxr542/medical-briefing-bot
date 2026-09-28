@@ -135,7 +135,7 @@ def persist_collector_run() -> None:
         name: {
             "count": health.get("count", 0),
             "status": health.get("status", "FAILED"),
-            "reason": "수집기 예외" if health.get("status") == "FAILED" else health.get("reason", ""),
+            "reason": health.get("reason", ""),
         }
         for name, health in collector_run_summary["source_health"].items()
     }
@@ -506,14 +506,20 @@ def fetch_hira_biz_notices():
 
             page.on("response", handle_response)
             
-            # 메인 접속 (공지사항 로드)
+            # 메인 접속 후 최초 공지사항 응답이 실제로 파싱될 때까지 기다립니다.
+            # 자보알림방 클릭 전에 readiness를 초기화하지 않으면 메인 응답의
+            # parsed=True가 남아 있어 클릭 이후 응답을 기다리지 않고 브라우저가
+            # 종료될 수 있습니다.
             _goto_until_ready(page, 'https://biz.hira.or.kr/index.do', readiness)
-            
-            # 자보알림방 클릭
+            _wait_for_target_response(page, readiness, timeout_ms=15000)
+
+            # 자보알림방은 별도의 네트워크 응답이므로 새 readiness로 기다립니다.
+            readiness["parsed"] = False
+            readiness["error"] = None
             try:
                 page.get_by_text('자보알림방', exact=True).first.click()
             except Exception as e:
-                print(f"자보알림방 클릭 실패: {e}")
+                raise RuntimeError(f"자보알림방 클릭 실패: {e}") from e
             _wait_for_target_response(page, readiness, timeout_ms=15000)
             browser.close()
     except Exception as e:
