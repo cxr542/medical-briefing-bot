@@ -73,8 +73,10 @@ def get_with_transient_retry(
     allow_redirects: bool = True,
     sleep_fn=time.sleep,
 ):
-    backoffs = (2, 5)
-    for attempt in range(1, 4):
+    # 정부기관 사이트는 GitHub Actions 구간에서 일시적인 connect timeout이 종종 발생합니다.
+    # 짧은 3회 재시도보다 충분한 간격을 둔 4회 시도가 실제 장애와 일시 장애를 더 잘 구분합니다.
+    backoffs = (3, 8, 15)
+    for attempt in range(1, 5):
         try:
             response = requests.get(
                 url,
@@ -84,15 +86,15 @@ def get_with_transient_retry(
                 allow_redirects=allow_redirects,
             )
             if attempt > 1:
-                print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/3")
+                print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/4")
             return response
         except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as error:
-            if attempt == 3:
+            if attempt == 4:
                 raise
             delay = backoffs[attempt - 1]
             print(
                 f"⚠️ Transient network error: source={source_name} "
-                f"attempt={attempt}/3 retry_in={delay}s "
+                f"attempt={attempt}/4 retry_in={delay}s "
                 f"error={type(error).__name__}"
             )
             sleep_fn(delay)
@@ -623,7 +625,32 @@ def fetch_nhis_public_notices():
         from datetime import datetime, timezone, timedelta
         urllib3.disable_warnings()
         
-        res = requests.post('https://medicare.nhis.or.kr/portal/main/getNoticeList.do', json={}, verify=False, timeout=10)
+        # NHIS POST도 GET 수집기와 동일한 transient retry 정책을 적용합니다.
+        backoffs = (3, 8, 15)
+        last_error = None
+        for attempt in range(1, 5):
+            try:
+                res = requests.post(
+                    'https://medicare.nhis.or.kr/portal/main/getNoticeList.do',
+                    json={},
+                    verify=False,
+                    timeout=20,
+                    headers={'User-Agent': 'Mozilla/5.0'},
+                )
+                res.raise_for_status()
+                if attempt > 1:
+                    print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/4")
+                break
+            except (requests.exceptions.ConnectTimeout, requests.exceptions.ReadTimeout, requests.exceptions.ConnectionError) as error:
+                last_error = error
+                if attempt == 4:
+                    raise
+                delay = backoffs[attempt - 1]
+                print(
+                    f"⚠️ Transient network error: source={source_name} "
+                    f"attempt={attempt}/4 retry_in={delay}s error={type(error).__name__}"
+                )
+                time.sleep(delay)
         data = res.json()
         
         if 'data1' in data:
