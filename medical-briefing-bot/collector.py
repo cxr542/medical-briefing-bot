@@ -187,6 +187,19 @@ def is_valid_press_article(title: str) -> bool:
     if any(white in title for white in WHITE_LIST): return True
     return False
 
+def is_valid_article_record(article: dict) -> bool:
+    """운영 UI에 노출하면 안 되는 오류/placeholder 레코드를 최종 저장 직전에 차단합니다."""
+    title = str(article.get("title") or "").strip()
+    url = str(article.get("url") or "").strip()
+    if not title or not url:
+        return False
+    if re.search(r"unsupportable\s+rss|rss\s+not\s+supported", title, re.IGNORECASE):
+        return False
+    parsed_url = urlparse(url)
+    return parsed_url.scheme in {"http", "https"} and bool(parsed_url.netloc)
+
+
+
 # 1. RSS 파서 (복지부, 질병청, 식약처, 언론사)
 def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
     print(f"🔄 RSS 수집: {source_name}")
@@ -966,7 +979,12 @@ if __name__ == "__main__":
     collect_source("국가법령정보센터", fetch_law_api)
     collector_run_summary["source_health"] = source_health.copy()
     
-    processed_articles = total_articles
+    # 최종 저장 경계에서도 오류/placeholder 레코드를 차단합니다.
+    # 개별 수집기의 검증이 누락되더라도 운영 UI까지 오염되지 않게 하는 2차 방어선입니다.
+    rejected_articles = [a for a in total_articles if not is_valid_article_record(a)]
+    if rejected_articles:
+        print(f"⚠️ Invalid article records rejected before DB sync: {len(rejected_articles)}")
+    processed_articles = [a for a in total_articles if is_valid_article_record(a)]
         
     # 5. 기존 DB와 비교하여 상태 감지 (NEW, UPDATE, DELETED)
     final_sync_articles = track_states(processed_articles, supabase)
