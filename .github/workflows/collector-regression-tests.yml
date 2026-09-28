@@ -2,11 +2,6 @@ name: Collector regression tests
 
 on:
   pull_request:
-    paths:
-      - 'medical-briefing-bot/collector.py'
-      - 'medical-briefing-bot/collector_parsers.py'
-      - 'medical-briefing-bot/tests/**'
-      - '.github/workflows/collector-regression-tests.yml'
 
 permissions:
   contents: read
