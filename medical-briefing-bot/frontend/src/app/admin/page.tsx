@@ -407,6 +407,9 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-          </>\n        )}\n      </main>\n    </div>
+          </>
+        )}
+      </main>
+    </div>
   );
 }
