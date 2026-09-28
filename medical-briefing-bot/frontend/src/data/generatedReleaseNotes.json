@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-09-28-pr-39",
+    "date": "2026.09.28",
+    "category": "개선",
+    "title": "Collector source health 이력 강화",
+    "summary": "PR #39 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Admin에서 source별 장애 지속 횟수와 마지막 정상 수집 시각을 확인합니다.",
+      "Stale 판단은 실제 runtime schedule 다음 슬롯에 2시간 유예를 둡니다.",
+      "Existing SUCCESS/DEGRADED/FAILED policy와 collector_runs schema를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #39",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/39"
+      }
+    ]
+  },
+  {
     "id": "2026-09-28-pr-37",
     "date": "2026.09.28",
     "category": "버그 수정",
