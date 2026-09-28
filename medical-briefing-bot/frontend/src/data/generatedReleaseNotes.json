@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-09-28-pr-40",
+    "date": "2026.09.28",
+    "category": "개선",
+    "title": "Collector 파서 회귀 테스트 강화",
+    "summary": "PR #40 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "KDCA/RSS/HIRA 파서 동작을 오프라인 fixture로 검증합니다.",
+      "PR 단계에서 외부 사이트 호출 없이 회귀를 차단합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #40",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/40"
+      }
+    ]
+  },
+  {
     "id": "2026-09-28-pr-39",
     "date": "2026.09.28",
     "category": "개선",
