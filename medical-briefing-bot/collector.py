@@ -3,7 +3,7 @@ import atexit
 import os
 import hashlib
 import time
-from urllib.parse import urljoin, urlparse
+from urllib.parse import quote, urljoin, urlparse
 import re
 
 import feedparser
@@ -309,29 +309,48 @@ def fetch_kdca_press_releases():
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
     articles = []
 
-    # K2Web markup 차이를 피하기 위해 행 단위로 제목/날짜/게시물 ID를 읽습니다.
-    for row in soup.select("tbody tr"):
+    # KDCA K2Web의 번호/제목/담당부서/작성일 표를 직접 파싱합니다.
+    rows = soup.select("tbody tr")
+    print(f"KDCA fallback DOM: tbody_rows={len(rows)} all_tr={len(soup.select('tr'))} links={len(soup.select('a'))}")
+    if not rows:
+        rows = [row for row in soup.select("tr") if re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row.get_text(" ", strip=True))]
+
+    for row in rows:
+        cells = row.select("td")
         row_text = row.get_text(" ", strip=True)
         date_match = re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row_text)
         if not date_match:
             continue
-        link_el = row.select_one("a")
-        if link_el is None:
-            continue
-        title = re.sub(r"\s*새글\s*$", "", link_el.get_text(" ", strip=True)).strip()
+        title_link = None
+        for candidate in row.select("a"):
+            candidate_text = candidate.get_text(" ", strip=True)
+            if candidate_text and candidate_text not in {"첨부파일", "새글"}:
+                title_link = candidate
+                break
+        title = title_link.get_text(" ", strip=True) if title_link else ""
+        if not title and len(cells) >= 2:
+            title = cells[1].get_text(" ", strip=True)
+        title = re.sub(r"\s*새글\s*$", "", title).strip()
         if not title:
             continue
-        href = (link_el.get("href") or "").strip()
-        onclick = (link_el.get("onclick") or "").strip()
+
+        href = (title_link.get("href") or "").strip() if title_link else ""
+        onclick = (title_link.get("onclick") or "").strip() if title_link else ""
         id_match = re.search(r"/42/(\d+)/artclView\.do", href)
+        if not id_match:
+            id_match = re.search(r"(?:artclSeq|artclNo|articleNo)[^0-9]*(\d+)", href + " " + onclick, re.I)
         if not id_match:
             id_match = re.search(r"['\"](\d{4,})['\"]", onclick)
         if id_match:
             url = f"https://www.kdca.go.kr/bbs/kdca/42/{id_match.group(1)}/artclView.do"
-        elif href and not href.lower().startswith("javascript"):
+        elif href and not href.lower().startswith(("javascript", "#")):
             url = urljoin(list_url, href)
         else:
-            continue
+            seq_text = cells[0].get_text(" ", strip=True) if cells else ""
+            if not re.fullmatch(r"\d+", seq_text):
+                continue
+            url = f"{list_url}?page=1&srchColumn=title&srchWrd={quote(title)}"
+
         try:
             dt = datetime.strptime(date_match.group(0).replace(".", "-"), "%Y-%m-%d")
             pub_date = dt.replace(tzinfo=timezone(timedelta(hours=9))).astimezone(timezone.utc)
@@ -339,13 +358,11 @@ def fetch_kdca_press_releases():
             continue
         if pub_date < seven_days_ago:
             continue
-        article = {
-            "source": source_name, "title": title, "url": url,
-            "published_date": pub_date.isoformat(),
-            "content_hash": get_content_hash(title + url), "status": "NEW",
-        }
+        article = {"source": source_name, "title": title, "url": url, "published_date": pub_date.isoformat(), "content_hash": get_content_hash(title + url), "status": "NEW"}
         if is_valid_article_record(article):
             articles.append(article)
+
+    source_collection_diagnostics[source_name] = f"fallback_rows={len(rows)} valid_recent={len(articles)}"
 
     if not articles:
         raise ValueError(
