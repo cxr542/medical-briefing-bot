@@ -6,6 +6,8 @@ import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle
 import { releaseNotes } from '@/data/releaseNotes';
 import Link from 'next/link';
 import { COLLECTION_DISPLAY_SCHEDULE_KST, getCollectionServiceStatus, getNextCollectionTime, userSourceStatusLabel } from '@/lib/collectionStatus';
+import { COLLECTION_HEALTH_HISTORY_LIMIT, getCollectorHealth } from '@/lib/collectorHealthEngine.mjs';
+import type { CollectorHealthState } from '@/lib/collectorHealthEngine.mjs';
 
 type SourceHealth = Record<string, { count: number; status: 'OK' | 'WARN' | 'FAILED'; reason: string }>;
 
@@ -51,7 +53,7 @@ export default function AdminPage() {
     setIsLoading(true);
     const [articleResponse, runResponse] = await Promise.all([
       supabase.from('articles').select('source', { count: 'exact' }).limit(1000),
-      supabase.from('collector_runs').select('id,started_at,finished_at,result,collected_count,ai_output_count,db_attempted,db_succeeded,db_failed,source_health').order('finished_at', { ascending: false }).limit(10),
+      supabase.from('collector_runs').select('id,started_at,finished_at,result,collected_count,ai_output_count,db_attempted,db_succeeded,db_failed,source_health').order('finished_at', { ascending: false }).limit(COLLECTION_HEALTH_HISTORY_LIMIT),
     ]);
 
     const { data, count } = articleResponse;
@@ -83,6 +85,7 @@ export default function AdminPage() {
   };
 
   const latestRun = collectorRuns[0];
+  const collectorHealth = getCollectorHealth(collectorRuns);
   const userServiceStatus = getCollectionServiceStatus(latestRun);
   const nextCollectionTime = getNextCollectionTime();
   const resultLabel = { SUCCESS: '정상', DEGRADED: '주의', FAILED: '실패' } as const;
@@ -96,6 +99,26 @@ export default function AdminPage() {
     DEGRADED: <AlertTriangle className="w-4 h-4" />,
     FAILED: <XCircle className="w-4 h-4" />,
   } as const;
+  const healthStateLabel: Record<CollectorHealthState, string> = {
+    NORMAL: '정상',
+    DEGRADED: '일부 지연',
+    FAILED: '수집 실패',
+    STALE: '최신 상태 지연',
+  };
+  const healthStateClass: Record<CollectorHealthState, string> = {
+    NORMAL: 'bg-green-100 text-green-700',
+    DEGRADED: 'bg-yellow-100 text-yellow-700',
+    FAILED: 'bg-red-100 text-red-700',
+    STALE: 'bg-gray-200 text-gray-700',
+  };
+  const recentStatusClass = {
+    OK: 'bg-green-100 text-green-700',
+    WARN: 'bg-yellow-100 text-yellow-700',
+    FAILED: 'bg-red-100 text-red-700',
+  } as const;
+  const formatRunTime = (value: string | null) => (
+    value ? new Date(value).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }) : '기록 없음'
+  );
 
   if (!isAuthenticated) {
     return (
@@ -219,22 +242,68 @@ export default function AdminPage() {
                   <div className="rounded-lg bg-red-50 p-3"><p className="text-xs text-red-600">DB failed</p><p className="mt-1 text-xl font-black text-red-800">{latestRun.db_failed}</p></div>
                 </div>
 
+                <section className="mt-6 rounded-xl border border-[#E8DCCB] bg-[#FDFBF7] p-4 md:p-5" aria-labelledby="collector-health-heading">
+                  <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                    <div>
+                      <h3 id="collector-health-heading" className="font-bold text-gray-800">Collector Health Engine</h3>
+                      <p className="mt-1 text-xs text-gray-500">최근 {COLLECTION_HEALTH_HISTORY_LIMIT}회 source 이력을 추적하며 runtime 다음 수집 시각 + 2시간 유예로 stale을 판단합니다.</p>
+                    </div>
+                    <span className={`inline-flex w-fit items-center rounded-full px-3 py-1 text-sm font-bold ${healthStateClass[collectorHealth.state]}`}>
+                      {healthStateLabel[collectorHealth.state]}
+                    </span>
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <div className="rounded-lg bg-white p-3"><dt className="text-xs text-gray-500">연속 DEGRADED</dt><dd className="mt-1 text-lg font-black text-gray-800">{collectorHealth.consecutiveDegradedRuns}회</dd></div>
+                    <div className="rounded-lg bg-white p-3"><dt className="text-xs text-gray-500">영향 source</dt><dd className="mt-1 text-lg font-black text-gray-800">{collectorHealth.sources.filter(source => source.currentStatus !== 'OK').length}개</dd></div>
+                    <div className="rounded-lg bg-white p-3"><dt className="text-xs text-gray-500">마지막 실행</dt><dd className="mt-1 text-sm font-bold text-gray-800">{formatRunTime(collectorHealth.latestRunAt)}</dd></div>
+                    <div className="rounded-lg bg-white p-3"><dt className="text-xs text-gray-500">STALE 감지 시각</dt><dd className="mt-1 text-sm font-bold text-gray-800">{formatRunTime(collectorHealth.staleAt)}</dd></div>
+                  </dl>
+                </section>
+
                 <div className="mt-6">
-                  <h3 className="font-bold text-gray-800 mb-3">기관별 최근 수집 상태</h3>
+                  <h3 className="font-bold text-gray-800 mb-3">기관별 수집 이력 상태</h3>
                   <div className="overflow-x-auto">
-                    <table className="w-full min-w-[640px] text-sm text-left">
+                    <table className="w-full min-w-[1240px] text-sm text-left">
+                      <caption className="sr-only">최근 {COLLECTION_HEALTH_HISTORY_LIMIT}회 source별 수집 및 복구 이력</caption>
                       <thead className="text-xs uppercase text-gray-500 bg-gray-50">
-                        <tr><th className="px-4 py-3">기관/출처</th><th className="px-4 py-3">수집 건수</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">사유</th></tr>
+                        <tr>
+                          <th scope="col" className="px-4 py-3">기관/출처</th>
+                          <th scope="col" className="px-4 py-3">최근 건수</th>
+                          <th scope="col" className="px-4 py-3">현재 상태</th>
+                          <th scope="col" className="px-4 py-3">최근 실행 사유</th>
+                          <th scope="col" className="px-4 py-3">마지막 정상 수집</th>
+                          <th scope="col" className="px-4 py-3">연속 실패</th>
+                          <th scope="col" className="px-4 py-3">최근 실패 원인</th>
+                          <th scope="col" className="px-4 py-3">마지막 시도</th>
+                          <th scope="col" className="px-4 py-3">마지막 복구</th>
+                          <th scope="col" className="px-4 py-3">최근 상태</th>
+                        </tr>
                       </thead>
                       <tbody>
-                        {Object.entries(latestRun.source_health || {}).map(([source, health]) => (
-                          <tr key={source} className="border-b border-gray-100 last:border-0">
-                            <td className="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">{source}</td>
-                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{health.count}</td>
-                            <td className="px-4 py-3 whitespace-nowrap"><span className={`px-2 py-1 rounded-full text-xs font-bold ${health.status === 'OK' ? 'bg-green-100 text-green-700' : health.status === 'WARN' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>{health.status === 'OK' ? '정상' : health.status === 'WARN' ? '주의' : '실패'}</span></td>
-                            <td className="px-4 py-3 text-gray-500 min-w-32">{health.reason || '-'}</td>
+                        {collectorHealth.sources.map(source => (
+                          <tr key={source.name} className="border-b border-gray-100 last:border-0 align-top">
+                            <td className="px-4 py-3 font-semibold text-gray-700 whitespace-nowrap">{source.name}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{source.count}</td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className={`rounded-full px-2 py-1 text-xs font-bold ${healthStateClass[source.state]}`}>{healthStateLabel[source.state]}</span>
+                              <span className="ml-2 text-xs text-gray-500">{source.currentStatus}</span>
+                            </td>
+                            <td className="max-w-72 px-4 py-3 text-gray-500">{source.reason || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatRunTime(source.lastSuccessAt)}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{source.consecutiveFailures}회</td>
+                            <td className="max-w-72 px-4 py-3 text-gray-500">{source.latestFailureReason || '-'}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatRunTime(source.latestAttemptAt)}</td>
+                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{formatRunTime(source.lastRecoveryAt)}</td>
+                            <td className="px-4 py-3"><div className="flex flex-wrap gap-1">
+                              {source.recentStatuses.map((entry, index) => (
+                                <span key={`${entry.finishedAt}-${index}`} className={`rounded-full px-2 py-1 text-xs font-bold ${recentStatusClass[entry.status]}`}>{entry.status}</span>
+                              ))}
+                            </div></td>
                           </tr>
                         ))}
+                        {collectorHealth.sources.length === 0 && (
+                          <tr><td colSpan={10} className="px-4 py-6 text-center text-sm text-gray-500">{collectorRunsError || 'source health 이력이 없습니다.'}</td></tr>
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -283,7 +352,7 @@ export default function AdminPage() {
             <table className="w-full min-w-[720px] text-sm text-left">
               <thead className="text-xs text-gray-500 bg-gray-50"><tr><th className="px-6 py-3 whitespace-nowrap">실행 시각</th><th className="px-6 py-3 whitespace-nowrap">결과</th><th className="px-6 py-3 whitespace-nowrap">수집 건수</th><th className="px-6 py-3 whitespace-nowrap">DB 성공</th><th className="px-6 py-3 whitespace-nowrap">DB 실패</th><th className="px-6 py-3 whitespace-nowrap">실행 시간</th></tr></thead>
               <tbody>
-                {collectorRuns.map(run => (
+                {collectorRuns.slice(0, 10).map(run => (
                   <tr key={run.id} className="border-t border-gray-100">
                     <td className="px-6 py-3 text-gray-700 whitespace-nowrap">{new Date(run.finished_at).toLocaleString('ko-KR')}</td>
                     <td className="px-6 py-3 whitespace-nowrap"><span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-bold ${resultClass[run.result]}`}>{resultIcon[run.result]} {resultLabel[run.result]}</span></td>
