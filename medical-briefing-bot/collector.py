@@ -471,7 +471,7 @@ def fetch_hira_biz_notices():
                                 rows = ds_board_text.split('\x1e')
                                 for row in rows:
                                     cols = row.split('\x1f')
-                                    if len(cols) >= 5 and 'BBSMSTR' in cols[1]:
+                                    if len(cols) >= 6 and 'BBSMSTR' in cols[1]:
                                         item_id = cols[2].strip()
                                         title = cols[3].strip()
                                         date_str = cols[5].strip()[:8] # YYYYMMDD
@@ -521,6 +521,11 @@ def fetch_hira_biz_notices():
             except Exception as e:
                 raise RuntimeError(f"자보알림방 클릭 실패: {e}") from e
             _wait_for_target_response(page, readiness, timeout_ms=15000)
+
+            # 구조 변경/잘못된 응답을 "정상 수집"으로 오판하지 않도록
+            # 기대한 자보알림방 레코드가 실제로 포함됐는지 검증합니다.
+            if not any(article["source"] == f"{source_name} (자보알림방)" for article in articles_to_save):
+                raise RuntimeError("자보알림방 응답은 수신했지만 기대한 게시판 데이터가 없습니다.")
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
