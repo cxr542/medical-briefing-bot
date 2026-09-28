@@ -1,3 +1,5 @@
+import generatedReleaseNotes from './generatedReleaseNotes.json';
+
 export type ReleaseNote = {
   id: string;
   date: string;
@@ -10,7 +12,7 @@ export type ReleaseNote = {
   links: { label: string; url: string }[];
 };
 
-export const releaseNotes: ReleaseNote[] = [
+const curatedReleaseNotes: ReleaseNote[] = [
   {
     id: '2026-09-28-collector-stability',
     date: '2026.09.28',
@@ -42,3 +44,8 @@ export const releaseNotes: ReleaseNote[] = [
     ],
   },
 ];
+
+
+const allowedCategories = new Set<ReleaseNote['category']>(['기능', '개선', '버그 수정', '운영']);
+const generated = (generatedReleaseNotes as ReleaseNote[]).filter(note => allowedCategories.has(note.category));
+export const releaseNotes: ReleaseNote[] = [...generated, ...curatedReleaseNotes];
