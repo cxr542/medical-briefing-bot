@@ -1,1 +1,23 @@
-[]
+[
+  {
+    "id": "2026-09-28-pr-34",
+    "date": "2026.09.28",
+    "category": "개선",
+    "title": "릴리즈 노트 자동화 E2E 검증",
+    "summary": "PR #34 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "PR merge 이벤트에서 릴리즈 노트 자동 생성 검증",
+      "generatedReleaseNotes.json bot commit 경로 검증"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #34",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/34"
+      }
+    ]
+  }
+]
