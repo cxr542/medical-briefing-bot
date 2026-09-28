@@ -91,7 +91,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
-      let query = supabase.from('articles').select('*').order('published_date', { ascending: false });
+      let query = supabase.from('articles').select('*').neq('status', 'DELETED').order('published_date', { ascending: false });
       
       if (searchTerm.trim()) {
          const term = searchTerm.trim();
@@ -117,7 +117,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   }, [selectedDate, selectedTime, searchTerm]);
 
   // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
-  const timeFilteredArticles = articles;
+  const timeFilteredArticles = articles.filter(a => a.status !== 'DELETED');
 
   const allSources = useMemo(() => {
     const dbSources = Array.from(new Set(articles.map(a => a.source)));
