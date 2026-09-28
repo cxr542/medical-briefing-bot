@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
+import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle, NotebookTabs } from 'lucide-react';
+import { releaseNotes } from '@/data/releaseNotes';
 import Link from 'next/link';
 import { COLLECTION_DISPLAY_SCHEDULE_KST, getCollectionServiceStatus, getNextCollectionTime, userSourceStatusLabel } from '@/lib/collectionStatus';
 
@@ -33,6 +34,7 @@ export default function AdminPage() {
   const [collectorRunsError, setCollectorRunsError] = useState('');
   const [statsError, setStatsError] = useState('');
   const [statsLoaded, setStatsLoaded] = useState(false);
+  const [adminView, setAdminView] = useState<'monitoring' | 'releases'>('monitoring');
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +160,37 @@ export default function AdminPage() {
       </header>
 
       <main className="max-w-6xl w-full px-6 mx-auto mt-8">
+        <nav className="mb-6 flex flex-wrap gap-2" aria-label="관리자 메뉴">
+          <button onClick={() => setAdminView('monitoring')} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${adminView === 'monitoring' ? 'bg-[#5C2D0C] text-white' : 'bg-white text-gray-600 border border-[#E8DCCB] hover:bg-gray-50'}`}><Activity className="w-4 h-4" /> Monitoring</button>
+          <button onClick={() => setAdminView('releases')} className={`inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-bold transition-colors ${adminView === 'releases' ? 'bg-[#5C2D0C] text-white' : 'bg-white text-gray-600 border border-[#E8DCCB] hover:bg-gray-50'}`}><NotebookTabs className="w-4 h-4" /> 릴리즈 노트</button>
+        </nav>
+
+        {adminView === 'releases' ? (
+          <section className="space-y-5">
+            <div className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] px-6 py-5">
+              <h2 className="text-xl font-black text-gray-800 flex items-center gap-2"><NotebookTabs className="w-5 h-5 text-[#C05A12]" /> 릴리즈 노트</h2>
+              <p className="text-sm text-gray-500 mt-1">Medical Briefing Bot의 주요 변경, 장애 복구 및 운영 검증 이력입니다.</p>
+            </div>
+            {releaseNotes.map(note => (
+              <article key={note.id} className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden">
+                <div className="px-6 py-5 border-b border-gray-100 bg-gray-50">
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500"><time>{note.date}</time><span className="rounded-full bg-orange-100 px-2 py-1 font-bold text-orange-700">{note.category}</span></div>
+                  <h3 className="mt-2 text-lg font-black text-gray-800">{note.title}</h3>
+                  <p className="mt-1 text-sm text-gray-600">{note.summary}</p>
+                </div>
+                <div className="p-6 grid gap-6 lg:grid-cols-3">
+                  <div><h4 className="font-bold text-gray-800 mb-2">해결된 문제</h4><ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">{note.issues.map(item => <li key={item}>{item}</li>)}</ul></div>
+                  <div><h4 className="font-bold text-gray-800 mb-2">주요 변경</h4><ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">{note.changes.map(item => <li key={item}>{item}</li>)}</ul></div>
+                  <div><h4 className="font-bold text-gray-800 mb-2">검증 결과</h4><ul className="space-y-2 text-sm text-gray-600 list-disc pl-5">{note.verification.map(item => <li key={item}>{item}</li>)}</ul></div>
+                </div>
+                <div className="px-6 pb-6 flex flex-wrap gap-2">
+                  {note.links.map(link => <a key={link.url} href={link.url} target="_blank" rel="noreferrer" className="text-xs font-bold rounded-lg border border-gray-200 px-3 py-2 text-gray-600 hover:bg-gray-50">{link.label}</a>)}
+                </div>
+              </article>
+            ))}
+          </section>
+        ) : (
+          <>
 
         <section className="bg-white rounded-xl shadow-sm border border-[#E8DCCB] overflow-hidden mb-8">
           <div className="px-6 py-5 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
@@ -374,7 +407,6 @@ export default function AdminPage() {
             </div>
           </div>
         </div>
-      </main>
-    </div>
+          </>\n        )}\n      </main>\n    </div>
   );
 }
