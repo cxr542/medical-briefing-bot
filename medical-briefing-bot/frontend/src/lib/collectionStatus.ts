@@ -141,13 +141,16 @@ export const isBeforeFirstCollectionTime = (now = new Date()): boolean => {
   return toKstMinutes(now) < hours * 60 + minutes;
 };
 
-export const getLatestCollectionTime = (now = new Date()): (typeof COLLECTION_RUNTIME_SCHEDULE_KST)[number] => {
+export const getLatestCollectionTime = (now = new Date()): (typeof COLLECTION_DISPLAY_SCHEDULE_KST)[number] => {
   const currentMinutes = toKstMinutes(now);
-  const latest = [...COLLECTION_RUNTIME_SCHEDULE_KST].reverse().find(time => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes <= currentMinutes;
-  });
-  return latest || COLLECTION_RUNTIME_SCHEDULE_KST[COLLECTION_RUNTIME_SCHEDULE_KST.length - 1];
+  let latestIndex = -1;
+  for (let index = 0; index < COLLECTION_RUNTIME_SCHEDULE_KST.length; index += 1) {
+    const [hours, minutes] = COLLECTION_RUNTIME_SCHEDULE_KST[index].split(':').map(Number);
+    if (hours * 60 + minutes <= currentMinutes) latestIndex = index;
+  }
+  return latestIndex >= 0
+    ? COLLECTION_DISPLAY_SCHEDULE_KST[latestIndex]
+    : COLLECTION_DISPLAY_SCHEDULE_KST[COLLECTION_DISPLAY_SCHEDULE_KST.length - 1];
 };
 
 export const getNextCollectionTime = (now = new Date()): (typeof COLLECTION_RUNTIME_SCHEDULE_KST)[number] => {
