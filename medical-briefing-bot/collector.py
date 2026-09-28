@@ -309,18 +309,28 @@ def fetch_kdca_press_releases():
     seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
     articles = []
 
-    # K2Web 게시판의 상세보기 링크를 기준으로 목록 행을 식별합니다.
-    for link_el in soup.select('a[href*="artclView.do"]'):
-        title = link_el.get_text(" ", strip=True)
-        href = (link_el.get("href") or "").strip()
-        if not title or not href:
-            continue
-        row = link_el.find_parent("tr")
-        if row is None:
-            continue
+    # K2Web markup 차이를 피하기 위해 행 단위로 제목/날짜/게시물 ID를 읽습니다.
+    for row in soup.select("tbody tr"):
         row_text = row.get_text(" ", strip=True)
         date_match = re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row_text)
         if not date_match:
+            continue
+        link_el = row.select_one("a")
+        if link_el is None:
+            continue
+        title = re.sub(r"\s*새글\s*$", "", link_el.get_text(" ", strip=True)).strip()
+        if not title:
+            continue
+        href = (link_el.get("href") or "").strip()
+        onclick = (link_el.get("onclick") or "").strip()
+        id_match = re.search(r"/42/(\d+)/artclView\.do", href)
+        if not id_match:
+            id_match = re.search(r"['\"](\d{4,})['\"]", onclick)
+        if id_match:
+            url = f"https://www.kdca.go.kr/bbs/kdca/42/{id_match.group(1)}/artclView.do"
+        elif href and not href.lower().startswith("javascript"):
+            url = urljoin(list_url, href)
+        else:
             continue
         try:
             dt = datetime.strptime(date_match.group(0).replace(".", "-"), "%Y-%m-%d")
@@ -329,14 +339,10 @@ def fetch_kdca_press_releases():
             continue
         if pub_date < seven_days_ago:
             continue
-        url = urljoin(list_url, href)
         article = {
-            "source": source_name,
-            "title": title,
-            "url": url,
+            "source": source_name, "title": title, "url": url,
             "published_date": pub_date.isoformat(),
-            "content_hash": get_content_hash(title + url),
-            "status": "NEW",
+            "content_hash": get_content_hash(title + url), "status": "NEW",
         }
         if is_valid_article_record(article):
             articles.append(article)
@@ -596,16 +602,27 @@ def fetch_hira_biz_notices():
             # 자보알림방은 별도의 네트워크 응답이므로 새 readiness로 기다립니다.
             readiness["parsed"] = False
             readiness["error"] = None
+            before_count = len(articles_to_save)
             try:
                 page.get_by_text('자보알림방', exact=True).first.click()
             except Exception as e:
                 raise RuntimeError(f"자보알림방 클릭 실패: {e}") from e
-            _wait_for_target_response(page, readiness, timeout_ms=15000)
 
-            # 구조 변경/잘못된 응답을 "정상 수집"으로 오판하지 않도록
-            # 기대한 자보알림방 레코드가 실제로 포함됐는지 검증합니다.
-            if not any(article["source"] == f"{source_name} (자보알림방)" for article in articles_to_save):
+            # 클릭 뒤 첫 dsBoard 응답이 공지사항일 수 있으므로, 실제 자보알림방
+            # BBSMSTR(00000663) 레코드가 들어올 때까지 기다립니다.
+            deadline = time.monotonic() + 20
+            while time.monotonic() < deadline:
+                if readiness["error"]:
+                    raise ValueError(readiness["error"])
+                if any(
+                    article["source"] == f"{source_name} (자보알림방)"
+                    for article in articles_to_save[before_count:]
+                ):
+                    break
+                page.wait_for_timeout(100)
+            else:
                 raise RuntimeError("자보알림방 응답은 수신했지만 기대한 게시판 데이터가 없습니다.")
+
             browser.close()
     except Exception as e:
         print(f"크롤링 에러 ({source_name}): {e}")
