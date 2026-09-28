@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-09-28-pr-36",
+    "date": "2026.09.28",
+    "category": "개선",
+    "title": "자동 릴리즈 노트 E2E 2차 검증",
+    "summary": "PR #36 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "merge 후 Auto release note workflow 실행 검증",
+      "generatedReleaseNotes.json 자동 commit 검증"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #36",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/36"
+      }
+    ]
+  },
+  {
     "id": "2026-09-28-pr-35",
     "date": "2026.09.28",
     "category": "버그 수정",
