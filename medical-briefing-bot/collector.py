@@ -282,6 +282,71 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
         )
     return articles_to_save
 
+def fetch_kdca_press_releases():
+    """KDCA RSS 장애 시 공식 보도자료 목록을 fallback으로 수집합니다."""
+    source_name = "질병관리청 보도자료"
+    list_url = "https://www.kdca.go.kr/bbs/kdca/42/artclList.do"
+    try:
+        return fetch_rss_feed(
+            source_name,
+            "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50",
+            False,
+        )
+    except Exception as rss_error:
+        print(f"⚠️ KDCA RSS 실패, 공식 목록 fallback 사용: {rss_error}")
+
+    response = get_with_transient_retry(
+        list_url,
+        source_name=source_name,
+        headers={"User-Agent": "Mozilla/5.0"},
+        timeout=20,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    soup = BeautifulSoup(response.text, "html.parser")
+    seven_days_ago = datetime.now(timezone.utc) - timedelta(days=7)
+    articles = []
+
+    # K2Web 게시판의 상세보기 링크를 기준으로 목록 행을 식별합니다.
+    for link_el in soup.select('a[href*="artclView.do"]'):
+        title = link_el.get_text(" ", strip=True)
+        href = (link_el.get("href") or "").strip()
+        if not title or not href:
+            continue
+        row = link_el.find_parent("tr")
+        if row is None:
+            continue
+        row_text = row.get_text(" ", strip=True)
+        date_match = re.search(r"20\d{2}[.-]\d{2}[.-]\d{2}", row_text)
+        if not date_match:
+            continue
+        try:
+            dt = datetime.strptime(date_match.group(0).replace(".", "-"), "%Y-%m-%d")
+            pub_date = dt.replace(tzinfo=timezone(timedelta(hours=9))).astimezone(timezone.utc)
+        except ValueError:
+            continue
+        if pub_date < seven_days_ago:
+            continue
+        url = urljoin(list_url, href)
+        article = {
+            "source": source_name,
+            "title": title,
+            "url": url,
+            "published_date": pub_date.isoformat(),
+            "content_hash": get_content_hash(title + url),
+            "status": "NEW",
+        }
+        if is_valid_article_record(article):
+            articles.append(article)
+
+    if not articles:
+        raise ValueError(
+            f"KDCA RSS 실패 후 공식 보도자료 fallback도 유효 article 0건: url={list_url}"
+        )
+    print(f"✅ KDCA 공식 목록 fallback 수집: {len(articles)}건")
+    return articles
+
+
 # 2. 대한병원협회 웹 스크래퍼 (BeautifulSoup)
 def fetch_kha_notices():
     source_name = "대한병원협회 공지사항"
@@ -951,7 +1016,6 @@ if __name__ == "__main__":
     # 1. RSS
     rss_sources = [
         {"name": "보건복지부 보도자료", "url": "https://www.mohw.go.kr/rss/board.es?mid=a10503000000&bid=0027&info", "is_press": False},
-        {"name": "질병관리청 보도자료", "url": "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50", "is_press": False},
         {"name": "식품의약품안전처 보도자료", "url": "http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021", "is_press": False},
         {"name": "청년의사", "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "의협신문", "url": "http://www.doctorsnews.co.kr/rss/allArticle.xml", "is_press": True},
@@ -967,6 +1031,7 @@ if __name__ == "__main__":
         )
         
     # 2. 크롤러
+    collect_source("질병관리청 보도자료", fetch_kdca_press_releases)
     collect_source("대한병원협회 공지사항", fetch_kha_notices)
     collect_source("심사평가원 공지사항", fetch_hira_public_notices)
     collect_source("국민건강보험공단 공지사항", fetch_nhis_public_notices)
