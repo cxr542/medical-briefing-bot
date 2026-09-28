@@ -1,5 +1,11 @@
-export const COLLECTION_STATUS_STALE_MS = 12 * 60 * 60 * 1000;
-export const COLLECTION_RUNTIME_SCHEDULE_KST = ['06:07', '08:30', '12:07', '15:07'] as const;
+import {
+  COLLECTION_RUNTIME_SCHEDULE_KST,
+  COLLECTION_STALE_GRACE_MS,
+  isCollectorRunStale,
+} from './collectorHealthEngine.mjs';
+
+export { COLLECTION_RUNTIME_SCHEDULE_KST };
+export const COLLECTION_STATUS_STALE_GRACE_MS = COLLECTION_STALE_GRACE_MS;
 export const COLLECTION_DISPLAY_SCHEDULE_KST = ['06:00', '08:30', '12:00', '15:00'] as const;
 
 export type SourceHealth = Record<string, {
@@ -72,8 +78,7 @@ export function getCollectionServiceStatus(
     };
   }
 
-  const finishedAtMs = new Date(run.finished_at).getTime();
-  const stale = Number.isNaN(finishedAtMs) || now - finishedAtMs > COLLECTION_STATUS_STALE_MS;
+  const stale = isCollectorRunStale(run.finished_at, now);
   const failedSources = Object.entries(run.source_health || {})
     .filter(([, health]) => health.status !== 'OK')
     .map(([name, health]) => ({ name, status: getUserSourceStatus(health) }));
