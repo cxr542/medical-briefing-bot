@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-09-28-pr-37",
+    "date": "2026.09.28",
+    "category": "버그 수정",
+    "title": "마지막 확인 시간 표시 정규화",
+    "summary": "PR #37 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "06:07 → 06:00, 08:30 → 08:30, 12:07 → 12:00, 15:07 → 15:00 표시",
+      "실제 Collector 실행 판정은 기존 runtime schedule 유지"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #37",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/37"
+      }
+    ]
+  },
+  {
     "id": "2026-09-28-pr-36",
     "date": "2026.09.28",
     "category": "개선",
