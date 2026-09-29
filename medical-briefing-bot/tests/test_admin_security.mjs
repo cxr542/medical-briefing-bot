@@ -71,13 +71,13 @@ test('monitoring authorization rejects missing cookies and accepts a valid signe
   const originalPassword = process.env.ADMIN_PASSWORD;
   process.env.ADMIN_PASSWORD = TEST_PASSWORD;
   try {
-  assert.equal(isAdminRequestAuthorized(noSession, NOW), false);
-  assert.equal(isAdminRequestAuthorized(validSession, NOW), true);
-  const signature = token.split('.').at(-1) || '';
-  const tamperedSignature = `${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
-  assert.equal(isAdminRequestAuthorized(new Request(validSession.url, {
-    headers: { cookie: `${ADMIN_SESSION_COOKIE_NAME}=${token.replace(signature, tamperedSignature)}` },
-  }), NOW), false);
+    assert.equal(isAdminRequestAuthorized(noSession, NOW), false);
+    assert.equal(isAdminRequestAuthorized(validSession, NOW), true);
+    const signature = token.split('.').at(-1) || '';
+    const tamperedSignature = `${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
+    assert.equal(isAdminRequestAuthorized(new Request(validSession.url, {
+      headers: { cookie: `${ADMIN_SESSION_COOKIE_NAME}=${token.replace(signature, tamperedSignature)}` },
+    }), NOW), false);
   } finally {
     if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
     else process.env.ADMIN_PASSWORD = originalPassword;
