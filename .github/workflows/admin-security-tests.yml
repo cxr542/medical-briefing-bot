@@ -1,0 +1,65 @@
+name: Admin security and UI checks
+
+on:
+  pull_request:
+    paths:
+      - 'medical-briefing-bot/frontend/**'
+      - 'medical-briefing-bot/tests/test_admin_security.mjs'
+      - 'medical-briefing-bot/tests/test_admin_routes_integration.mjs'
+      - '.github/workflows/admin-security-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  admin-security:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: medical-briefing-bot/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: medical-briefing-bot/frontend
+        run: npm ci
+
+      - name: Authentication, timezone and source summary tests
+        working-directory: medical-briefing-bot
+        run: node --test tests/test_admin_security.mjs
+
+      - name: Generate Next.js route types
+        working-directory: medical-briefing-bot/frontend
+        run: npx next typegen
+
+      - name: TypeScript
+        working-directory: medical-briefing-bot/frontend
+        run: npx tsc --noEmit
+
+      - name: ESLint
+        working-directory: medical-briefing-bot/frontend
+        run: npm run lint
+
+      - name: Build with public placeholder config only
+        working-directory: medical-briefing-bot/frontend
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://build-placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: build-only-placeholder-anon-key
+        run: npm run build
+
+      - name: Verify no server-only names ship in client bundles
+        working-directory: medical-briefing-bot/frontend
+        run: |
+          if rg -n 'ADMIN_PASSWORD|SUPABASE_SERVICE_ROLE_KEY' .next/static; then
+            echo 'Server-only environment variable name found in client assets.'
+            exit 1
+          fi
+
+      - name: Authenticated and unauthenticated route integration tests
+        working-directory: medical-briefing-bot
+        run: node --test tests/test_admin_routes_integration.mjs

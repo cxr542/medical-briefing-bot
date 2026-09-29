@@ -20,8 +20,8 @@ ALTER TABLE public.collector_runs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "collector service can insert runs" ON public.collector_runs
     FOR INSERT TO service_role WITH CHECK (true);
 
-CREATE POLICY "collector runs are readable" ON public.collector_runs
-    FOR SELECT USING (true);
+CREATE POLICY "collector service can read runs" ON public.collector_runs
+    FOR SELECT TO service_role USING (true);
 
-GRANT SELECT ON public.collector_runs TO anon, authenticated;
-GRANT INSERT ON public.collector_runs TO service_role;
+REVOKE SELECT ON public.collector_runs FROM PUBLIC, anon, authenticated;
+GRANT SELECT, INSERT ON public.collector_runs TO service_role;
