@@ -33,6 +33,10 @@ jobs:
         working-directory: medical-briefing-bot
         run: node --test tests/test_admin_security.mjs
 
+      - name: Generate Next.js route types
+        working-directory: medical-briefing-bot/frontend
+        run: npx next typegen
+
       - name: TypeScript
         working-directory: medical-briefing-bot/frontend
         run: npx tsc --noEmit
