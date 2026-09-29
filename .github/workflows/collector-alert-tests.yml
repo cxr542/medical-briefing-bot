@@ -5,6 +5,17 @@ on:
     paths:
       - 'medical-briefing-bot/frontend/src/lib/collectorHealthEngine.mjs'
       - 'medical-briefing-bot/frontend/src/lib/collectorAlertEngine.mjs'
+      - 'medical-briefing-bot/frontend/src/lib/adminAuth.mjs'
+      - 'medical-briefing-bot/frontend/src/lib/adminMonitoringFormatters.mjs'
+      - 'medical-briefing-bot/frontend/src/lib/adminSupabase.ts'
+      - 'medical-briefing-bot/frontend/src/app/admin/**'
+      - 'medical-briefing-bot/frontend/src/app/api/admin/**'
+      - 'medical-briefing-bot/frontend/src/app/api/collection-status/**'
+      - 'medical-briefing-bot/frontend/src/components/CollectionStatusBanner.tsx'
+      - 'medical-briefing-bot/frontend/src/app/page.tsx'
+      - 'medical-briefing-bot/collector_runs.sql'
+      - 'supabase/migrations/*collector_runs_admin_only.sql'
+      - 'medical-briefing-bot/tests/test_admin_security.mjs'
       - 'medical-briefing-bot/tests/test_collector_alert_engine.mjs'
       - '.github/workflows/collector-alert-tests.yml'
 
@@ -26,3 +37,7 @@ jobs:
       - name: Run offline alert transition tests
         working-directory: medical-briefing-bot
         run: node --test tests/test_collector_alert_engine.mjs
+
+      - name: Run Admin auth and Monitoring regression tests
+        working-directory: medical-briefing-bot
+        run: node --test tests/test_admin_security.mjs

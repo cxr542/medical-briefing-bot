@@ -1,13 +1,29 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, Clock, XCircle } from 'lucide-react';
-import { CollectionServiceStatus, userSourceStatusLabel } from '@/lib/collectionStatus';
+import { getCollectionServiceStatus, userSourceStatusLabel, type CollectionServiceStatus } from '@/lib/collectionStatus';
+import { formatKstTimestamp } from '@/lib/adminMonitoringFormatters.mjs';
 
-export default function CollectionStatusBanner({ status }: { status: CollectionServiceStatus }) {
+export default function CollectionStatusBanner() {
+  const [status, setStatus] = useState<CollectionServiceStatus | null>(null);
   const [expanded, setExpanded] = useState(false);
 
-  if (!status.showBanner) return null;
+  useEffect(() => {
+    const controller = new AbortController();
+    void fetch('/api/collection-status', { cache: 'no-store', signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('status unavailable');
+        setStatus(await response.json() as CollectionServiceStatus);
+      })
+      .catch(() => {
+        if (!controller.signal.aborted) setStatus(getCollectionServiceStatus(null));
+      });
+
+    return () => controller.abort();
+  }, []);
+
+  if (!status?.showBanner) return null;
 
   const isStale = status.state === 'STALE';
   const isFailed = status.state === 'FAILED';
@@ -27,7 +43,7 @@ export default function CollectionStatusBanner({ status }: { status: CollectionS
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
             <span>{isStale ? '영향 기관 확인 불가' : `${status.affectedCount}개 기관 영향`}</span>
             {status.finishedAt && (
-              <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />마지막 확인 {new Date(status.finishedAt).toLocaleString('ko-KR')}</span>
+              <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />마지막 확인 {formatKstTimestamp(status.finishedAt)}</span>
             )}
           </div>
           {status.affectedSources.length > 0 && (
