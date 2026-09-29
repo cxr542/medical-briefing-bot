@@ -1,9 +1,10 @@
 import {
+  ADMIN_AUTH_FAILURE_REASON,
   createAdminSessionToken,
   hasSameOrigin,
-  isAdminCredentialConfigured,
+  inspectAdminCredential,
+  logPreviewAdminAuthDiagnostic,
   serializeAdminSessionCookie,
-  verifyAdminCredential,
 } from '@/lib/adminAuth.mjs';
 
 export const runtime = 'nodejs';
@@ -68,15 +69,40 @@ export async function POST(request: Request) {
   const password = body && typeof body === 'object' && 'password' in body
     ? body.password
     : null;
-  if (typeof password !== 'string' || password.length > 512) {
-    return json({ error: '인증 정보가 올바르지 않습니다.' }, 401);
-  }
-  if (!isAdminCredentialConfigured() || !verifyAdminCredential(password)) {
+  const diagnostic = inspectAdminCredential(password);
+  if (diagnostic.failureReason !== null) {
+    logPreviewAdminAuthDiagnostic(diagnostic);
     return json({ error: '인증 정보가 올바르지 않습니다.' }, 401);
   }
 
-  const token = createAdminSessionToken();
-  if (!token) return json({ error: '인증할 수 없습니다.' }, 503);
+  let token: string | null;
+  try {
+    token = createAdminSessionToken();
+  } catch {
+    logPreviewAdminAuthDiagnostic({
+      ...diagnostic,
+      failureReason: ADMIN_AUTH_FAILURE_REASON.SESSION_CREATION_FAILED,
+    });
+    return json({ error: '인증할 수 없습니다.' }, 503);
+  }
+  if (!token) {
+    logPreviewAdminAuthDiagnostic({
+      ...diagnostic,
+      failureReason: ADMIN_AUTH_FAILURE_REASON.SESSION_CREATION_FAILED,
+    });
+    return json({ error: '인증할 수 없습니다.' }, 503);
+  }
 
-  return json({ ok: true }, 200, serializeAdminSessionCookie(token));
+  let cookie: string;
+  try {
+    cookie = serializeAdminSessionCookie(token);
+  } catch {
+    logPreviewAdminAuthDiagnostic({
+      ...diagnostic,
+      failureReason: ADMIN_AUTH_FAILURE_REASON.SESSION_CREATION_FAILED,
+    });
+    return json({ error: '인증할 수 없습니다.' }, 503);
+  }
+
+  return json({ ok: true }, 200, cookie);
 }

@@ -2,14 +2,17 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  ADMIN_AUTH_FAILURE_REASON,
   ADMIN_PASSWORD_MIN_BYTES,
   ADMIN_SESSION_COOKIE_NAME,
   ADMIN_SESSION_TTL_SECONDS,
   createAdminSessionToken,
   getAdminSessionToken,
   hasSameOrigin,
+  inspectAdminCredential,
   isAdminCredentialConfigured,
   isAdminRequestAuthorized,
+  logPreviewAdminAuthDiagnostic,
   serializeAdminSessionCookie,
   serializeClearedAdminSessionCookie,
   verifyAdminCredential,
@@ -27,12 +30,75 @@ test('missing or short Admin credential fails closed', () => {
   assert.equal(isAdminCredentialConfigured(''), false);
   assert.equal(isAdminCredentialConfigured('short'), false);
   assert.equal(verifyAdminCredential(TEST_PASSWORD, undefined), false);
+  assert.equal(
+    inspectAdminCredential(TEST_PASSWORD, undefined).failureReason,
+    ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_MISSING,
+  );
+  assert.equal(
+    inspectAdminCredential('short', 'short').failureReason,
+    ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_TOO_SHORT,
+  );
 });
 
 test('wrong credential fails and correct credential creates a signed session', () => {
   assert.equal(isAdminCredentialConfigured(TEST_PASSWORD), true);
   assert.equal(verifyAdminCredential('wrong-password', TEST_PASSWORD), false);
   assert.equal(verifyAdminCredential(TEST_PASSWORD, TEST_PASSWORD), true);
+
+  const lengthMismatch = inspectAdminCredential('wrong-password', TEST_PASSWORD);
+  assert.equal(lengthMismatch.failureReason, ADMIN_AUTH_FAILURE_REASON.PASSWORD_LENGTH_MISMATCH);
+  assert.equal(lengthMismatch.lengthMatch, false);
+  assert.equal(lengthMismatch.comparisonResult, false);
+  assert.equal(
+    inspectAdminCredential(`${TEST_PASSWORD} `, TEST_PASSWORD).failureReason,
+    ADMIN_AUTH_FAILURE_REASON.PASSWORD_LENGTH_MISMATCH,
+  );
+
+  const utf8Password = '한'.repeat(11);
+  const utf8Diagnostic = inspectAdminCredential(utf8Password, utf8Password);
+  assert.equal(utf8Diagnostic.configuredByteLength, 33);
+  assert.equal(utf8Diagnostic.requestByteLength, 33);
+  assert.equal(utf8Diagnostic.failureReason, null);
+
+  const sameLengthWrongPassword = 'z'.repeat(Buffer.byteLength(TEST_PASSWORD, 'utf8'));
+  const mismatch = inspectAdminCredential(sameLengthWrongPassword, TEST_PASSWORD);
+  assert.equal(mismatch.failureReason, ADMIN_AUTH_FAILURE_REASON.PASSWORD_MISMATCH);
+  assert.equal(mismatch.lengthMatch, true);
+  assert.equal(mismatch.comparisonResult, false);
+
+  const invalidRequest = inspectAdminCredential(null, TEST_PASSWORD);
+  assert.equal(invalidRequest.failureReason, ADMIN_AUTH_FAILURE_REASON.REQUEST_PASSWORD_INVALID);
+  assert.equal(invalidRequest.requestPasswordType, 'other');
+  assert.equal(invalidRequest.requestByteLength, null);
+
+  const originalVercelEnvironment = process.env.VERCEL_ENV;
+  const originalConsoleInfo = console.info;
+  const diagnosticLogs = [];
+  console.info = (...args) => diagnosticLogs.push(args);
+  try {
+    process.env.VERCEL_ENV = 'preview';
+    logPreviewAdminAuthDiagnostic({ ...mismatch, password: TEST_PASSWORD, serviceRoleKey: TEST_PASSWORD });
+    assert.equal(diagnosticLogs.length, 1);
+    assert.match(JSON.stringify(diagnosticLogs), /PASSWORD_MISMATCH/);
+    assert.doesNotMatch(JSON.stringify(diagnosticLogs), new RegExp(TEST_PASSWORD));
+
+    process.env.VERCEL_ENV = 'production';
+    logPreviewAdminAuthDiagnostic(mismatch);
+    assert.equal(diagnosticLogs.length, 1);
+
+    process.env.VERCEL_ENV = 'preview';
+    logPreviewAdminAuthDiagnostic({
+      ...mismatch,
+      failureReason: ADMIN_AUTH_FAILURE_REASON.SESSION_CREATION_FAILED,
+    });
+    assert.equal(diagnosticLogs.length, 2);
+    assert.match(JSON.stringify(diagnosticLogs), /SESSION_CREATION_FAILED/);
+    assert.doesNotMatch(JSON.stringify(diagnosticLogs), new RegExp(TEST_PASSWORD));
+  } finally {
+    console.info = originalConsoleInfo;
+    if (originalVercelEnvironment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = originalVercelEnvironment;
+  }
 
   const token = createAdminSessionToken(TEST_PASSWORD, NOW);
   assert.equal(typeof token, 'string');
