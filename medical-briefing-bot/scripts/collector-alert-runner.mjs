@@ -44,7 +44,10 @@ const request = async (url, options = {}) => {
     }
     throw new Error(`Supabase REST request failed with HTTP ${response.status}.`);
   }
-  if (response.status === 204) return null;
+  if (
+    response.status === 204
+    || options.headers?.Prefer?.includes('return=minimal')
+  ) return null;
   return response.json();
 };
 
