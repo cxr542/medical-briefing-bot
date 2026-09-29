@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-09-29-pr-42",
+    "date": "2026.09.29",
+    "category": "개선",
+    "title": "Admin 인증 및 운영 모니터링 보안 강화",
+    "summary": "PR #42 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Admin 인증을 server-side validation과 HttpOnly session으로 변경합니다.",
+      "Admin 운영 데이터 조회를 인증된 server-side Supabase 경로로 제한합니다.",
+      "Monitoring UI에 Collector History 지표와 KST 시각을 보완합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #42",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/42"
+      }
+    ]
+  },
+  {
     "id": "2026-09-28-pr-41",
     "date": "2026.09.28",
     "category": "개선",
