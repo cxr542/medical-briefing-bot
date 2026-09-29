@@ -6,16 +6,7 @@ import {
 
 export const ADMIN_SESSION_COOKIE_NAME = 'medical_briefing_admin_session';
 export const ADMIN_SESSION_TTL_SECONDS = 8 * 60 * 60;
-export const ADMIN_PASSWORD_MIN_BYTES = 32;
-export const ADMIN_AUTH_FAILURE_REASON = Object.freeze({
-  PASSWORD_ENV_MISSING: 'PASSWORD_ENV_MISSING',
-  PASSWORD_ENV_TOO_SHORT: 'PASSWORD_ENV_TOO_SHORT',
-  REQUEST_PASSWORD_INVALID: 'REQUEST_PASSWORD_INVALID',
-  PASSWORD_LENGTH_MISMATCH: 'PASSWORD_LENGTH_MISMATCH',
-  PASSWORD_MISMATCH: 'PASSWORD_MISMATCH',
-  SESSION_CREATION_FAILED: 'SESSION_CREATION_FAILED',
-  OTHER: 'OTHER',
-});
+export const ADMIN_PASSWORD_MIN_BYTES = 16;
 
 const SESSION_VERSION = 'v1';
 const SESSION_KEY_CONTEXT = 'medical-briefing-admin-session-signing-key-v1';
@@ -36,75 +27,21 @@ export function isAdminCredentialConfigured(password = process.env.ADMIN_PASSWOR
   return getSigningKey(password) !== null;
 }
 
-export function inspectAdminCredential(candidate, configuredPassword = process.env.ADMIN_PASSWORD) {
-  const envPresent = typeof configuredPassword === 'string';
-  const configured = envPresent ? configuredPassword : '';
-  const requestPasswordType = typeof candidate === 'string' ? 'string' : 'other';
-  const submitted = typeof candidate === 'string' ? candidate : '';
-  const configuredByteLength = Buffer.byteLength(configured, 'utf8');
-  const requestByteLength = requestPasswordType === 'string'
-    ? Buffer.byteLength(submitted, 'utf8')
-    : null;
-  const configuredDigest = createHmac('sha256', 'admin-password-comparison-v1')
-    .update(configured)
-    .digest();
-  const submittedDigest = createHmac('sha256', 'admin-password-comparison-v1')
-    .update(submitted)
-    .digest();
-  const comparisonResult = safeEqual(submittedDigest, configuredDigest);
-  const lengthMatch = envPresent
-    && requestByteLength !== null
-    && configuredByteLength === requestByteLength;
-
-  let failureReason = null;
-  if (!envPresent) {
-    failureReason = ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_MISSING;
-  } else if (configuredByteLength < ADMIN_PASSWORD_MIN_BYTES) {
-    failureReason = ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_TOO_SHORT;
-  } else if (typeof candidate !== 'string' || candidate.length > 512) {
-    failureReason = ADMIN_AUTH_FAILURE_REASON.REQUEST_PASSWORD_INVALID;
-  } else if (!lengthMatch) {
-    failureReason = ADMIN_AUTH_FAILURE_REASON.PASSWORD_LENGTH_MISMATCH;
-  } else if (!comparisonResult) {
-    failureReason = ADMIN_AUTH_FAILURE_REASON.PASSWORD_MISMATCH;
+export function verifyAdminCredential(candidate, configuredPassword = process.env.ADMIN_PASSWORD) {
+  if (typeof configuredPassword !== 'string'
+    || Buffer.byteLength(configuredPassword, 'utf8') < ADMIN_PASSWORD_MIN_BYTES
+    || typeof candidate !== 'string'
+    || candidate.length > 512) {
+    return false;
   }
 
-  return {
-    envPresent,
-    configuredByteLength,
-    requestPasswordType,
-    requestByteLength,
-    lengthMatch,
-    comparisonResult,
-    failureReason,
-  };
-}
-
-export function logPreviewAdminAuthDiagnostic(diagnostic) {
-  if (process.env.VERCEL_ENV !== 'preview') return;
-
-  const failureReason = Object.values(ADMIN_AUTH_FAILURE_REASON).includes(diagnostic.failureReason)
-    ? diagnostic.failureReason
-    : ADMIN_AUTH_FAILURE_REASON.OTHER;
-  const safeDiagnostic = {
-    envPresent: diagnostic.envPresent === true,
-    configuredByteLength: Number.isSafeInteger(diagnostic.configuredByteLength)
-      ? diagnostic.configuredByteLength
-      : 0,
-    requestPasswordType: diagnostic.requestPasswordType === 'string' ? 'string' : 'other',
-    ...(Number.isSafeInteger(diagnostic.requestByteLength)
-      ? { requestByteLength: diagnostic.requestByteLength }
-      : {}),
-    lengthMatch: diagnostic.lengthMatch === true,
-    comparisonResult: diagnostic.comparisonResult === true,
-    failureReason,
-  };
-
-  console.info('[admin-auth-diagnostic]', safeDiagnostic);
-}
-
-export function verifyAdminCredential(candidate, configuredPassword = process.env.ADMIN_PASSWORD) {
-  return inspectAdminCredential(candidate, configuredPassword).failureReason === null;
+  const configuredDigest = createHmac('sha256', 'admin-password-comparison-v1')
+    .update(configuredPassword)
+    .digest();
+  const submittedDigest = createHmac('sha256', 'admin-password-comparison-v1')
+    .update(candidate)
+    .digest();
+  return safeEqual(submittedDigest, configuredDigest);
 }
 
 export function createAdminSessionToken(

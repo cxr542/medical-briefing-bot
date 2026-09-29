@@ -2,17 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
-  ADMIN_AUTH_FAILURE_REASON,
   ADMIN_PASSWORD_MIN_BYTES,
   ADMIN_SESSION_COOKIE_NAME,
   ADMIN_SESSION_TTL_SECONDS,
   createAdminSessionToken,
   getAdminSessionToken,
   hasSameOrigin,
-  inspectAdminCredential,
   isAdminCredentialConfigured,
   isAdminRequestAuthorized,
-  logPreviewAdminAuthDiagnostic,
   serializeAdminSessionCookie,
   serializeClearedAdminSessionCookie,
   verifyAdminCredential,
@@ -26,79 +23,31 @@ import {
 const TEST_PASSWORD = `test-only-${'x'.repeat(ADMIN_PASSWORD_MIN_BYTES)}`;
 const NOW = Date.parse('2026-09-28T00:00:00.000Z');
 
-test('missing or short Admin credential fails closed', () => {
+test('Admin credential enforces the 16-byte UTF-8 minimum', () => {
   assert.equal(isAdminCredentialConfigured(''), false);
-  assert.equal(isAdminCredentialConfigured('short'), false);
-  assert.equal(verifyAdminCredential(TEST_PASSWORD, undefined), false);
-  assert.equal(
-    inspectAdminCredential(TEST_PASSWORD, undefined).failureReason,
-    ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_MISSING,
-  );
-  assert.equal(
-    inspectAdminCredential('short', 'short').failureReason,
-    ADMIN_AUTH_FAILURE_REASON.PASSWORD_ENV_TOO_SHORT,
-  );
+  assert.equal(isAdminCredentialConfigured('x'.repeat(15)), false);
+  assert.equal(isAdminCredentialConfigured('x'.repeat(16)), true);
+  assert.equal(isAdminCredentialConfigured('x'.repeat(20)), true);
+  assert.equal(isAdminCredentialConfigured('한'.repeat(5)), false);
+  assert.equal(isAdminCredentialConfigured(`${'한'.repeat(5)}a`), true);
+  const originalPassword = process.env.ADMIN_PASSWORD;
+  delete process.env.ADMIN_PASSWORD;
+  try {
+    assert.equal(verifyAdminCredential(TEST_PASSWORD), false);
+  } finally {
+    if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
+    else process.env.ADMIN_PASSWORD = originalPassword;
+  }
+  assert.equal(verifyAdminCredential(TEST_PASSWORD, ''), false);
+  assert.equal(verifyAdminCredential('x'.repeat(20), 'x'.repeat(20)), true);
 });
 
 test('wrong credential fails and correct credential creates a signed session', () => {
   assert.equal(isAdminCredentialConfigured(TEST_PASSWORD), true);
   assert.equal(verifyAdminCredential('wrong-password', TEST_PASSWORD), false);
   assert.equal(verifyAdminCredential(TEST_PASSWORD, TEST_PASSWORD), true);
-
-  const lengthMismatch = inspectAdminCredential('wrong-password', TEST_PASSWORD);
-  assert.equal(lengthMismatch.failureReason, ADMIN_AUTH_FAILURE_REASON.PASSWORD_LENGTH_MISMATCH);
-  assert.equal(lengthMismatch.lengthMatch, false);
-  assert.equal(lengthMismatch.comparisonResult, false);
-  assert.equal(
-    inspectAdminCredential(`${TEST_PASSWORD} `, TEST_PASSWORD).failureReason,
-    ADMIN_AUTH_FAILURE_REASON.PASSWORD_LENGTH_MISMATCH,
-  );
-
-  const utf8Password = '한'.repeat(11);
-  const utf8Diagnostic = inspectAdminCredential(utf8Password, utf8Password);
-  assert.equal(utf8Diagnostic.configuredByteLength, 33);
-  assert.equal(utf8Diagnostic.requestByteLength, 33);
-  assert.equal(utf8Diagnostic.failureReason, null);
-
-  const sameLengthWrongPassword = 'z'.repeat(Buffer.byteLength(TEST_PASSWORD, 'utf8'));
-  const mismatch = inspectAdminCredential(sameLengthWrongPassword, TEST_PASSWORD);
-  assert.equal(mismatch.failureReason, ADMIN_AUTH_FAILURE_REASON.PASSWORD_MISMATCH);
-  assert.equal(mismatch.lengthMatch, true);
-  assert.equal(mismatch.comparisonResult, false);
-
-  const invalidRequest = inspectAdminCredential(null, TEST_PASSWORD);
-  assert.equal(invalidRequest.failureReason, ADMIN_AUTH_FAILURE_REASON.REQUEST_PASSWORD_INVALID);
-  assert.equal(invalidRequest.requestPasswordType, 'other');
-  assert.equal(invalidRequest.requestByteLength, null);
-
-  const originalVercelEnvironment = process.env.VERCEL_ENV;
-  const originalConsoleInfo = console.info;
-  const diagnosticLogs = [];
-  console.info = (...args) => diagnosticLogs.push(args);
-  try {
-    process.env.VERCEL_ENV = 'preview';
-    logPreviewAdminAuthDiagnostic({ ...mismatch, password: TEST_PASSWORD, serviceRoleKey: TEST_PASSWORD });
-    assert.equal(diagnosticLogs.length, 1);
-    assert.match(JSON.stringify(diagnosticLogs), /PASSWORD_MISMATCH/);
-    assert.doesNotMatch(JSON.stringify(diagnosticLogs), new RegExp(TEST_PASSWORD));
-
-    process.env.VERCEL_ENV = 'production';
-    logPreviewAdminAuthDiagnostic(mismatch);
-    assert.equal(diagnosticLogs.length, 1);
-
-    process.env.VERCEL_ENV = 'preview';
-    logPreviewAdminAuthDiagnostic({
-      ...mismatch,
-      failureReason: ADMIN_AUTH_FAILURE_REASON.SESSION_CREATION_FAILED,
-    });
-    assert.equal(diagnosticLogs.length, 2);
-    assert.match(JSON.stringify(diagnosticLogs), /SESSION_CREATION_FAILED/);
-    assert.doesNotMatch(JSON.stringify(diagnosticLogs), new RegExp(TEST_PASSWORD));
-  } finally {
-    console.info = originalConsoleInfo;
-    if (originalVercelEnvironment === undefined) delete process.env.VERCEL_ENV;
-    else process.env.VERCEL_ENV = originalVercelEnvironment;
-  }
+  assert.equal(verifyAdminCredential(null, TEST_PASSWORD), false);
+  assert.equal(verifyAdminCredential('x'.repeat(513), TEST_PASSWORD), false);
 
   const token = createAdminSessionToken(TEST_PASSWORD, NOW);
   assert.equal(typeof token, 'string');
@@ -122,11 +71,13 @@ test('monitoring authorization rejects missing cookies and accepts a valid signe
   const originalPassword = process.env.ADMIN_PASSWORD;
   process.env.ADMIN_PASSWORD = TEST_PASSWORD;
   try {
-    assert.equal(isAdminRequestAuthorized(noSession, NOW), false);
-    assert.equal(isAdminRequestAuthorized(validSession, NOW), true);
-    assert.equal(isAdminRequestAuthorized(new Request(validSession.url, {
-      headers: { cookie: `${ADMIN_SESSION_COOKIE_NAME}=${token.slice(0, -1)}x` },
-    }), NOW), false);
+  assert.equal(isAdminRequestAuthorized(noSession, NOW), false);
+  assert.equal(isAdminRequestAuthorized(validSession, NOW), true);
+  const signature = token.split('.').at(-1) || '';
+  const tamperedSignature = `${signature.startsWith('A') ? 'B' : 'A'}${signature.slice(1)}`;
+  assert.equal(isAdminRequestAuthorized(new Request(validSession.url, {
+    headers: { cookie: `${ADMIN_SESSION_COOKIE_NAME}=${token.replace(signature, tamperedSignature)}` },
+  }), NOW), false);
   } finally {
     if (originalPassword === undefined) delete process.env.ADMIN_PASSWORD;
     else process.env.ADMIN_PASSWORD = originalPassword;
