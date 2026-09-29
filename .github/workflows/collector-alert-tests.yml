@@ -16,7 +16,10 @@ on:
       - 'medical-briefing-bot/collector_runs.sql'
       - 'supabase/migrations/*collector_runs_admin_only.sql'
       - 'medical-briefing-bot/tests/test_admin_security.mjs'
+      - 'medical-briefing-bot/tests/test_collector_alert_runner.mjs'
       - 'medical-briefing-bot/tests/test_collector_alert_engine.mjs'
+      - 'medical-briefing-bot/tests/fixtures/collector-alert-fetch-mock.mjs'
+      - 'medical-briefing-bot/scripts/collector-alert-runner.mjs'
       - '.github/workflows/collector-alert-tests.yml'
 
 permissions:
@@ -37,6 +40,10 @@ jobs:
       - name: Run offline alert transition tests
         working-directory: medical-briefing-bot
         run: node --test tests/test_collector_alert_engine.mjs
+
+      - name: Run Alert Engine runner response tests
+        working-directory: medical-briefing-bot
+        run: node --test tests/test_collector_alert_runner.mjs
 
       - name: Run Admin auth and Monitoring regression tests
         working-directory: medical-briefing-bot
