@@ -27,7 +27,7 @@ export type CollectorRun = {
 };
 
 export type CollectionServiceStatus = {
-  state: 'NORMAL' | 'DEGRADED' | 'FAILED' | 'STALE';
+  state: 'NORMAL' | 'DEGRADED' | 'FAILED' | 'STALE' | 'ERROR';
   message: string;
   affectedSources: Array<{ name: string; status: 'DELAYED' | 'EXTERNAL_ERROR' | 'INVALID_RESPONSE' }>;
   affectedCount: number;
@@ -65,17 +65,21 @@ export function getCollectionServiceStatus(
   value: unknown,
   now = Date.now(),
 ): CollectionServiceStatus {
-  const run = parseCollectorRun(value);
-  if (!run) {
+  if (value == null) {
     return {
       state: 'STALE',
-      message: '현재 최신 수집 상태를 확인할 수 없습니다.',
+      message: '아직 수집 기록이 없습니다.',
       affectedSources: [],
       affectedCount: 0,
       finishedAt: null,
       stale: true,
       showBanner: true,
     };
+  }
+
+  const run = parseCollectorRun(value);
+  if (!run) {
+    return getCollectionServiceErrorStatus();
   }
 
   const stale = isCollectorRunStale(run.finished_at, now);
@@ -86,7 +90,7 @@ export function getCollectionServiceStatus(
   if (stale) {
     return {
       state: 'STALE',
-      message: '현재 최신 수집 상태를 확인할 수 없습니다.',
+      message: '최근 수집 이후 다음 예정 실행 시간이 지났습니다.',
       affectedSources: [],
       affectedCount: 0,
       finishedAt: run.finished_at,
@@ -127,6 +131,18 @@ export function getCollectionServiceStatus(
     finishedAt: run.finished_at,
     stale: false,
     showBanner: false,
+  };
+}
+
+export function getCollectionServiceErrorStatus(): CollectionServiceStatus {
+  return {
+    state: 'ERROR',
+    message: '현재 최신 수집 상태를 확인할 수 없습니다.',
+    affectedSources: [],
+    affectedCount: 0,
+    finishedAt: null,
+    stale: false,
+    showBanner: true,
   };
 }
 

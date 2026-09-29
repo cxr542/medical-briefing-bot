@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertTriangle, ChevronDown, Clock, XCircle } from 'lucide-react';
-import { getCollectionServiceStatus, userSourceStatusLabel, type CollectionServiceStatus } from '@/lib/collectionStatus';
+import { getCollectionServiceErrorStatus, userSourceStatusLabel, type CollectionServiceStatus } from '@/lib/collectionStatus';
 import { formatKstTimestamp } from '@/lib/adminMonitoringFormatters.mjs';
 
 export default function CollectionStatusBanner() {
@@ -17,7 +17,7 @@ export default function CollectionStatusBanner() {
         setStatus(await response.json() as CollectionServiceStatus);
       })
       .catch(() => {
-        if (!controller.signal.aborted) setStatus(getCollectionServiceStatus(null));
+        if (!controller.signal.aborted) setStatus(getCollectionServiceErrorStatus());
       });
 
     return () => controller.abort();
@@ -27,8 +27,9 @@ export default function CollectionStatusBanner() {
 
   const isStale = status.state === 'STALE';
   const isFailed = status.state === 'FAILED';
-  const Icon = isFailed ? XCircle : AlertTriangle;
-  const colors = isFailed
+  const isError = status.state === 'ERROR';
+  const Icon = isFailed || isError ? XCircle : AlertTriangle;
+  const colors = isFailed || isError
     ? 'border-red-200 bg-red-50 text-red-900'
     : isStale
       ? 'border-slate-200 bg-slate-50 text-slate-800'
@@ -41,7 +42,7 @@ export default function CollectionStatusBanner() {
         <div className="min-w-0 flex-1">
           <p className="font-semibold">{status.message}</p>
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs opacity-80">
-            <span>{isStale ? '영향 기관 확인 불가' : `${status.affectedCount}개 기관 영향`}</span>
+            <span>{isStale ? '영향 기관 확인 불가' : isError ? '상태 조회 실패' : `${status.affectedCount}개 기관 영향`}</span>
             {status.finishedAt && (
               <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden="true" />마지막 확인 {formatKstTimestamp(status.finishedAt)}</span>
             )}

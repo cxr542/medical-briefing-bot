@@ -37,6 +37,10 @@ let appServer;
 let appOrigin;
 let databaseRequests = 0;
 let sawServiceRoleKey = false;
+let sawCollectorRunsServiceRole = false;
+let sawCollectorRunsAnon = false;
+let collectorRunsResponse = RUNS;
+let collectorRunsHttpStatus = 200;
 
 const getAvailablePort = async () => {
   const server = createNetServer();
@@ -75,7 +79,18 @@ before(async () => {
       return;
     }
     if (request.url?.startsWith('/rest/v1/collector_runs')) {
-      response.end(JSON.stringify(RUNS));
+      if (request.headers.apikey === TEST_SERVICE_ROLE_KEY) {
+        sawCollectorRunsServiceRole = true;
+      } else {
+        sawCollectorRunsAnon = true;
+        response.statusCode = 401;
+        response.end(JSON.stringify({ code: '42501', message: 'permission denied for test role' }));
+        return;
+      }
+      response.statusCode = collectorRunsHttpStatus;
+      response.end(collectorRunsHttpStatus === 200
+        ? JSON.stringify(collectorRunsResponse)
+        : JSON.stringify({ code: 'test_database_error', message: 'internal test failure detail' }));
       return;
     }
     response.statusCode = 404;
@@ -173,6 +188,59 @@ test('public collection status returns friendly status only, never operational f
   assert.equal(payload.state, 'DEGRADED');
   assert.equal(payload.affectedSources[0].name, '장애기관');
   assert.equal(JSON.stringify(payload).includes(SOURCE_REASON), false);
+});
+
+test('public collection status returns NORMAL for a recent successful run using service-role access', async () => {
+  sawCollectorRunsServiceRole = false;
+  sawCollectorRunsAnon = false;
+  collectorRunsResponse = [{
+    ...RUNS[0],
+    result: 'SUCCESS',
+    finished_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(),
+    source_health: { 정상기관: { count: 1, status: 'OK', reason: '' } },
+  }];
+  collectorRunsHttpStatus = 200;
+
+  const response = await fetch(`${appOrigin}/api/collection-status`);
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.state, 'NORMAL');
+  assert.equal(payload.showBanner, false);
+  assert.equal(sawCollectorRunsServiceRole, true);
+  assert.equal(sawCollectorRunsAnon, false);
+});
+
+test('public collection status identifies an old run as STALE, not unavailable', async () => {
+  const finishedAt = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  collectorRunsResponse = [{
+    ...RUNS[0],
+    result: 'SUCCESS',
+    finished_at: finishedAt,
+    source_health: { 정상기관: { count: 1, status: 'OK', reason: '' } },
+  }];
+  collectorRunsHttpStatus = 200;
+
+  const response = await fetch(`${appOrigin}/api/collection-status`);
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.state, 'STALE');
+  assert.equal(payload.message, '최근 수집 이후 다음 예정 실행 시간이 지났습니다.');
+  assert.equal(payload.finishedAt, finishedAt);
+  assert.equal(payload.stale, true);
+});
+
+test('public collection status sanitizes database failures as ERROR, not STALE', async () => {
+  collectorRunsHttpStatus = 500;
+
+  const response = await fetch(`${appOrigin}/api/collection-status`);
+  const payload = await response.json();
+  const serialized = JSON.stringify(payload);
+  assert.equal(response.status, 503);
+  assert.equal(payload.state, 'ERROR');
+  assert.equal(payload.message, '현재 최신 수집 상태를 확인할 수 없습니다.');
+  assert.equal(payload.stale, false);
+  assert.equal(serialized.includes('test_database_error'), false);
+  assert.equal(serialized.includes('internal test failure detail'), false);
 });
 
 test('logout clears the HttpOnly session cookie', async () => {
