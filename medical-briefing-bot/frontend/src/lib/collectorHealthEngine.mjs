@@ -1,9 +1,6 @@
-export const COLLECTION_RUNTIME_SCHEDULE_KST = Object.freeze([
-  '06:07',
-  '08:30',
-  '12:07',
-  '15:07',
-]);
+import { COLLECTION_RUNTIME_SCHEDULE_KST } from './collectionSchedule.mjs';
+
+export { COLLECTION_RUNTIME_SCHEDULE_KST } from './collectionSchedule.mjs';
 
 export const COLLECTION_STALE_GRACE_MS = 2 * 60 * 60 * 1000;
 export const COLLECTION_HEALTH_HISTORY_LIMIT = 60;
