@@ -35,8 +35,8 @@ test('medical press group contains the six configured sources', () => {
 });
 
 test('the established runtime schedule and user display schedule remain separate', () => {
-  assert.deepEqual(COLLECTION_RUNTIME_SCHEDULE_KST, ['06:07', '08:30', '12:07', '15:07']);
-  assert.deepEqual(COLLECTION_DISPLAY_SCHEDULE_KST, ['06:00', '08:30', '12:00', '15:00']);
+  assert.deepEqual(COLLECTION_RUNTIME_SCHEDULE_KST, ['08:30', '12:07', '15:07', '17:07']);
+  assert.deepEqual(COLLECTION_DISPLAY_SCHEDULE_KST, ['08:30', '12:00', '15:00', '17:00']);
   const noonKst = new Date('2026-09-30T03:00:00.000Z');
   assert.equal(getLatestCollectionTime(noonKst), '08:30');
   assert.equal(getNextCollectionTime(noonKst), '12:07');
