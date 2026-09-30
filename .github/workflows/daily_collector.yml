@@ -1,4 +1,5 @@
 name: Daily Medical Briefing Collector
+run-name: Daily Medical Briefing Collector${{ inputs.recovery_slot && format(' recovery_slot={0}', inputs.recovery_slot) || '' }}
 
 on:
   schedule:
@@ -6,7 +7,17 @@ on:
     - cron: '7 3,6,8 * * *'
     # 한국 시간(KST) 오전 8시 30분 = UTC 시간 기준 전날 23시 30분
     - cron: '30 23 * * *'
-  workflow_dispatch: # 수동으로도 실행할 수 있도록 허용
+  workflow_dispatch:
+    inputs:
+      recovery_slot:
+        description: Missed KST collection slot recovered by the alert engine
+        required: false
+        type: string
+        default: ''
+
+concurrency:
+  group: daily-medical-briefing-collector
+  cancel-in-progress: false
 
 permissions:
   contents: read

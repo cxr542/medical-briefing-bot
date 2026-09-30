@@ -108,7 +108,9 @@ test('Health Engine uses the next day first run and two-hour stale grace', () =>
   };
   const staleAt = Date.parse('2026-09-30T10:07:00.000Z');
   assert.equal(getCollectorHealth([run], staleAt).state, 'NORMAL');
-  assert.equal(getCollectorHealth([run], staleAt + 1).state, 'STALE');
+  const staleHealth = getCollectorHealth([run], staleAt + 1);
+  assert.equal(staleHealth.state, 'STALE');
+  assert.equal(staleHealth.nextCollectionDueAt, '2026-09-30T08:07:00.000Z');
 });
 
 test('one KDCA failure is recorded without notification', () => {
