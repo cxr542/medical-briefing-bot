@@ -1,13 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { AlertTriangle, ChevronDown, Clock, XCircle } from 'lucide-react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { AlertTriangle, Calendar, ChevronDown, Clock, XCircle } from 'lucide-react';
 import { getCollectionServiceErrorStatus, userSourceStatusLabel, type CollectionServiceStatus } from '@/lib/collectionStatus';
 import { formatKstTimestamp } from '@/lib/adminMonitoringFormatters.mjs';
 
-export default function CollectionStatusBanner() {
+const CollectionStatusContext = createContext<CollectionServiceStatus | null>(null);
+
+export function CollectionStatusProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<CollectionServiceStatus | null>(null);
-  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -22,6 +23,29 @@ export default function CollectionStatusBanner() {
 
     return () => controller.abort();
   }, []);
+
+  return <CollectionStatusContext.Provider value={status}>{children}</CollectionStatusContext.Provider>;
+}
+
+export function CollectionLastCheck() {
+  const status = useContext(CollectionStatusContext);
+  const value = status === null
+    ? '확인 중'
+    : status.finishedAt
+      ? formatKstTimestamp(status.finishedAt)
+      : '기록 없음';
+
+  return (
+    <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 shadow-sm md:px-4">
+      <Calendar className="h-4 w-4 text-[#1D4ED8]" aria-hidden="true" />
+      <span aria-live="polite">마지막 수집 확인 {value}</span>
+    </div>
+  );
+}
+
+export default function CollectionStatusBanner() {
+  const status = useContext(CollectionStatusContext);
+  const [expanded, setExpanded] = useState(false);
 
   if (!status?.showBanner) return null;
 

@@ -184,6 +184,7 @@ test('wrong credential fails generically and correct credential issues a protect
 test('public collection status returns friendly status only, never operational failure reasons', async () => {
   const response = await fetch(`${appOrigin}/api/collection-status`);
   assert.equal(response.status, 200);
+  assert.equal(response.headers.get('cache-control'), 'no-store');
   const payload = await response.json();
   assert.equal(payload.state, 'DEGRADED');
   assert.equal(payload.affectedSources[0].name, '장애기관');

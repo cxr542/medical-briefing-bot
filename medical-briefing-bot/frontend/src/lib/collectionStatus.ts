@@ -1,12 +1,26 @@
 import {
-  COLLECTION_RUNTIME_SCHEDULE_KST,
   COLLECTION_STALE_GRACE_MS,
   isCollectorRunStale,
 } from './collectorHealthEngine.mjs';
+import {
+  COLLECTION_DISPLAY_SCHEDULE_KST,
+  getCollectionCutoffIso,
+  getKstDateKey,
+  getLatestCollectionDisplayTime,
+  getLatestCollectionRuntimeTime,
+  getNextCollectionRuntimeTime,
+  shiftKstDate,
+} from './collectionSchedule.mjs';
 
-export { COLLECTION_RUNTIME_SCHEDULE_KST };
+export {
+  COLLECTION_DISPLAY_SCHEDULE_KST,
+  getCollectionCutoffIso,
+  getKstDateKey,
+  getLatestCollectionRuntimeTime,
+  shiftKstDate,
+};
+export { COLLECTION_RUNTIME_SCHEDULE_KST } from './collectorHealthEngine.mjs';
 export const COLLECTION_STATUS_STALE_GRACE_MS = COLLECTION_STALE_GRACE_MS;
-export const COLLECTION_DISPLAY_SCHEDULE_KST = ['06:00', '08:30', '12:00', '15:00'] as const;
 
 export type SourceHealth = Record<string, {
   count: number;
@@ -152,33 +166,5 @@ export const userSourceStatusLabel = {
   INVALID_RESPONSE: '잘못된 응답 차단',
 } as const;
 
-const toKstMinutes = (now: Date): number => {
-  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-  return kst.getHours() * 60 + kst.getMinutes();
-};
-
-export const isBeforeFirstCollectionTime = (now = new Date()): boolean => {
-  const [hours, minutes] = COLLECTION_RUNTIME_SCHEDULE_KST[0].split(':').map(Number);
-  return toKstMinutes(now) < hours * 60 + minutes;
-};
-
-export const getLatestCollectionTime = (now = new Date()): (typeof COLLECTION_DISPLAY_SCHEDULE_KST)[number] => {
-  const currentMinutes = toKstMinutes(now);
-  let latestIndex = -1;
-  for (let index = 0; index < COLLECTION_RUNTIME_SCHEDULE_KST.length; index += 1) {
-    const [hours, minutes] = COLLECTION_RUNTIME_SCHEDULE_KST[index].split(':').map(Number);
-    if (hours * 60 + minutes <= currentMinutes) latestIndex = index;
-  }
-  return latestIndex >= 0
-    ? COLLECTION_DISPLAY_SCHEDULE_KST[latestIndex]
-    : COLLECTION_DISPLAY_SCHEDULE_KST[COLLECTION_DISPLAY_SCHEDULE_KST.length - 1];
-};
-
-export const getNextCollectionTime = (now = new Date()): (typeof COLLECTION_RUNTIME_SCHEDULE_KST)[number] => {
-  const currentMinutes = toKstMinutes(now);
-  const next = COLLECTION_RUNTIME_SCHEDULE_KST.find(time => {
-    const [hours, minutes] = time.split(':').map(Number);
-    return hours * 60 + minutes > currentMinutes;
-  });
-  return next || COLLECTION_RUNTIME_SCHEDULE_KST[0];
-};
+export const getLatestCollectionTime = getLatestCollectionDisplayTime;
+export const getNextCollectionTime = getNextCollectionRuntimeTime;
