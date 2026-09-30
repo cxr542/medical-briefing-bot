@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from collector_sources.comwel import source_collection_diagnostics
+from collector_sources.medical_press import is_valid_press_article
 from collector_parsers import (
     get_content_hash,
     has_hira_target_board,
@@ -161,19 +162,6 @@ def persist_collector_run() -> None:
         print("✅ collector_runs 실행 이력을 저장했습니다.")
     except Exception as error:
         print(f"⚠️ collector_runs 실행 이력 저장 실패: {error}")
-
-WHITE_LIST = [
-    "건강보험", "심사평가", "수가", "급여기준", "심사기준", "의료질평가", 
-    "적정성평가", "e-평가", "DUR", "의료정책", "보건복지부", "심평원", 
-    "건보공단", "병원 경영", "병원 행정", "병원 전산", "병원 인증", 
-    "의료법", "판결", "의료계"
-]
-BLACK_LIST = ["인사", "부음", "홍보", "광고", "동정", "출시", "프로모션"]
-
-def is_valid_press_article(title: str) -> bool:
-    if any(black in title for black in BLACK_LIST): return False
-    if any(white in title for white in WHITE_LIST): return True
-    return False
 
 # 1. RSS 파서 (복지부, 질병청, 식약처, 언론사)
 def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):

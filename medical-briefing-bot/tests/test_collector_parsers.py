@@ -12,6 +12,7 @@ from collector_parsers import (
     parse_kdca_press_release_html,
     parse_rss_entries,
 )
+from collector_sources.medical_press import is_valid_press_article
 
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -69,6 +70,32 @@ class CollectorParserTests(unittest.TestCase):
         )
         self.assertEqual((result["valid_entries"], result["recent_entries"]), (2, 2))
         self.assertEqual((result["filtered_entries"], len(result["articles"])), (1, 1))
+
+    def test_medical_press_article_is_kept_without_whitelist_keyword(self):
+        entries = [{"title": "새로운 의료계 임상 연구 결과", "link": "https://example.test/press/1"}]
+        result = parse_rss_entries(
+            entries, "https://example.test/rss", "청년의사", now=NOW,
+            is_press=True, press_filter=is_valid_press_article,
+        )
+        self.assertEqual(len(result["articles"]), 1)
+        self.assertEqual(result["filtered_entries"], 1)
+
+    def test_medical_press_blacklist_still_excludes_article(self):
+        entries = [{"title": "병원장 인사 발령 안내", "link": "https://example.test/press/2"}]
+        result = parse_rss_entries(
+            entries, "https://example.test/rss", "청년의사", now=NOW,
+            is_press=True, press_filter=is_valid_press_article,
+        )
+        self.assertEqual(result["articles"], [])
+        self.assertEqual(result["filtered_entries"], 0)
+
+    def test_public_source_ignores_medical_press_filter(self):
+        entries = [{"title": "의료계 현장 간담회 결과", "link": "https://example.test/public/1"}]
+        result = parse_rss_entries(
+            entries, "https://example.test/rss", "공공기관", now=NOW,
+            is_press=False, press_filter=lambda _title: False,
+        )
+        self.assertEqual(len(result["articles"]), 1)
 
     def test_invalid_rss_url_is_rejected(self):
         result = normalize_rss_entry(

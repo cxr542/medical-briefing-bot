@@ -10,6 +10,15 @@ import {
   getLatestCollectionRuntimeTime,
   shiftKstDate,
 } from '@/lib/collectionStatus';
+import {
+  filterBySelectedSources,
+  filterMedicalPressArticles,
+  formatMedicalPressDateKst,
+  getLastSevenCalendarDaysStartIso,
+  MEDICAL_PRESS_PAGE_SIZE,
+  MEDICAL_PRESS_SOURCES,
+  type MedicalPressRange,
+} from '@/lib/medicalPress';
 
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Search } from 'lucide-react';
 
@@ -68,6 +77,9 @@ export default function ArticleList({
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [medicalPressGroupActive, setMedicalPressGroupActive] = useState(false);
+  const [medicalPressRange, setMedicalPressRange] = useState<MedicalPressRange>('latest');
+  const [medicalPressPage, setMedicalPressPage] = useState(1);
   const itemsPerPage = 5;
 
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -91,8 +103,19 @@ export default function ArticleList({
     const fetchData = async () => {
       setIsLoading(true);
       let query = supabase.from('articles').select('*').neq('status', 'DELETED').order('published_date', { ascending: false });
-      
-      if (searchTerm.trim()) {
+
+      if (medicalPressGroupActive) {
+         const now = new Date();
+         query = query.in('source', [...MEDICAL_PRESS_SOURCES]).lte('published_date', now.toISOString());
+         if (medicalPressRange === 'last-seven-days') {
+           query = query.gte('published_date', getLastSevenCalendarDaysStartIso(now));
+         }
+         if (searchTerm.trim()) {
+           const term = searchTerm.trim();
+           query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
+         }
+         query = query.limit(500);
+      } else if (searchTerm.trim()) {
          const term = searchTerm.trim();
          query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
          query = query.limit(500);
@@ -112,7 +135,7 @@ export default function ArticleList({
       fetchData();
     }, 300); // 300ms 디바운스
     return () => clearTimeout(timer);
-  }, [selectedDate, selectedTime, searchTerm]);
+  }, [selectedDate, selectedTime, searchTerm, medicalPressGroupActive, medicalPressRange]);
 
   // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
   const timeFilteredArticles = articles.filter(a => a.status !== 'DELETED');
@@ -128,8 +151,17 @@ export default function ArticleList({
   
   // 출처 필터링 적용 (timeFilteredArticles 기반)
   const filteredInitialArticles = useMemo(
-    () => timeFilteredArticles.filter(a => selectedSources.includes(a.source)),
+    () => filterBySelectedSources(timeFilteredArticles, selectedSources),
     [timeFilteredArticles, selectedSources],
+  );
+  const medicalPressArticles = useMemo(
+    () => filterMedicalPressArticles(timeFilteredArticles, medicalPressRange, searchTerm),
+    [timeFilteredArticles, medicalPressRange, searchTerm],
+  );
+  const medicalPressTotalPages = Math.ceil(medicalPressArticles.length / MEDICAL_PRESS_PAGE_SIZE);
+  const visibleMedicalPressArticles = medicalPressArticles.slice(
+    (medicalPressPage - 1) * MEDICAL_PRESS_PAGE_SIZE,
+    medicalPressPage * MEDICAL_PRESS_PAGE_SIZE,
   );
 
   // 출처 분류 (전문지 vs 공공기관)
@@ -206,6 +238,7 @@ export default function ArticleList({
   };
 
   const handleSourceToggle = (source: string) => {
+    setMedicalPressGroupActive(false);
     setSelectedSources(prev => 
       prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source]
     );
@@ -213,6 +246,7 @@ export default function ArticleList({
   };
 
   const handleAllToggle = () => {
+    setMedicalPressGroupActive(false);
     if (selectedSources.length === allSources.length) {
       setSelectedSources([]); // 전체 해제
     } else {
@@ -412,7 +446,7 @@ export default function ArticleList({
         </div>
         
         {/* 검색창 */}
-        <div className="relative w-full max-w-xs ml-4 hidden md:block">
+        <div className="relative w-full max-w-xs ml-0 lg:ml-4">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
             <Search className="h-4 w-4 text-gray-400" />
           </div>
@@ -421,7 +455,10 @@ export default function ArticleList({
             className="block w-full pl-9 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-[#C05A12] focus:border-[#C05A12] transition-colors"
             placeholder="기사 제목, 키워드 검색..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setMedicalPressPage(1);
+              setSearchTerm(e.target.value);
+            }}
           />
         </div>
       </div>
@@ -448,6 +485,17 @@ export default function ArticleList({
             className={`px-3 py-1.5 rounded-full text-sm font-bold border transition-colors shadow-sm ${selectedSources.length === allSources.length - 1 && allSources.length > 0 ? 'bg-[#FEE500] text-[#191919] border-[#FEE500]' : 'bg-white text-gray-600 border-slate-200 hover:bg-blue-50'}`}
           >
             기본 선택
+          </button>
+          <button
+            type="button"
+            aria-pressed={medicalPressGroupActive}
+            onClick={() => {
+              setMedicalPressGroupActive(true);
+              setMedicalPressPage(1);
+            }}
+            className={`min-h-11 px-4 py-2 rounded-full text-sm font-bold transition-colors ${medicalPressGroupActive ? 'bg-[#FEE500] text-[#191919] shadow-sm' : 'bg-white text-gray-600 border border-slate-200 hover:bg-blue-50'}`}
+          >
+            의학전문지
           </button>
           <div className="w-px h-5 bg-gray-300 mx-1"></div>
           {allSources.map(source => (
@@ -503,10 +551,10 @@ export default function ArticleList({
       {/* 메인 콘텐츠 영역 */}
       <div className="space-y-8">
         
-        {filteredInitialArticles.length === 0 ? (
+        {!isLoading && (medicalPressGroupActive ? medicalPressArticles.length === 0 : filteredInitialArticles.length === 0) ? (
           <div className="text-center py-20 bg-white rounded-3xl shadow-[0_10px_30px_rgba(25,25,25,0.05)] border border-slate-200 print:hidden">
             <p className="text-lg text-gray-500">
-              선택된 출처가 없습니다. 상단 메뉴에서 출처를 선택해주세요.
+              {medicalPressGroupActive ? '선택한 범위에서 검색된 의학전문지 기사가 없습니다.' : '선택된 출처가 없습니다. 상단 메뉴에서 출처를 선택해주세요.'}
             </p>
           </div>
         ) : (
@@ -526,9 +574,76 @@ export default function ArticleList({
 
             {/* Main Content Render */}
             <div className={`space-y-8 transition-opacity duration-300 ${isLoading ? 'opacity-30 pointer-events-none' : 'opacity-100'}`}>
+            {medicalPressGroupActive && (
+              <section aria-labelledby="medical-press-heading" className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_12px_36px_rgba(25,25,25,0.06)] print:shadow-none">
+                <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 id="medical-press-heading" className="flex items-center gap-2 text-xl font-bold text-[#5C2D0C]">
+                      <FileText className="h-5 w-5 text-[#8E6E53]" /> 의학전문지
+                      <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-[#1D4ED8]">{medicalPressArticles.length}건</span>
+                    </h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      {medicalPressRange === 'latest'
+                        ? '6개 전문지의 최신 기사를 한곳에서 확인합니다.'
+                        : `KST ${formatMedicalPressDateKst(getLastSevenCalendarDaysStartIso())}부터 모아봅니다.`}
+                    </p>
+                  </div>
+                  <div role="group" aria-label="의학전문지 기사 범위" className="inline-flex w-fit rounded-full bg-slate-100 p-1">
+                    <button
+                      type="button"
+                      aria-pressed={medicalPressRange === 'latest'}
+                      onClick={() => {
+                        setMedicalPressPage(1);
+                        setMedicalPressRange('latest');
+                      }}
+                      className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'latest' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
+                    >
+                      최신
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={medicalPressRange === 'last-seven-days'}
+                      onClick={() => {
+                        setMedicalPressPage(1);
+                        setMedicalPressRange('last-seven-days');
+                      }}
+                      className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'last-seven-days' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
+                    >
+                      최근 7일 모아보기
+                    </button>
+                  </div>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {visibleMedicalPressArticles.map(article => (
+                    <article key={article.url} className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-2">
+                          <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#1D4ED8]">{article.source}</span>
+                          <time dateTime={article.published_date} className="text-xs font-medium text-slate-500">{formatMedicalPressDateKst(article.published_date)}</time>
+                        </div>
+                        <a href={article.url} target="_blank" rel="noopener noreferrer" className="break-keep text-base font-bold leading-6 text-[#191919] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                          {article.title}
+                        </a>
+                      </div>
+                      <a href={article.url} target="_blank" rel="noopener noreferrer" aria-label={`${article.source} 원문 열기`} className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                        원문 보기 <ExternalLink className="h-4 w-4" />
+                      </a>
+                    </article>
+                  ))}
+                </div>
+                {medicalPressTotalPages > 1 && (
+                  <nav aria-label="의학전문지 기사 페이지" className="flex items-center justify-center gap-3 border-t border-slate-100 bg-slate-50 px-4 py-3 print:hidden">
+                    <button type="button" onClick={() => setMedicalPressPage(page => Math.max(1, page - 1))} disabled={medicalPressPage === 1} aria-label="이전 의학전문지 기사 페이지" className="min-h-11 rounded-full px-4 text-sm font-semibold text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">이전</button>
+                    <span aria-live="polite" className="text-sm font-medium text-slate-600">{medicalPressPage} / {medicalPressTotalPages}</span>
+                    <button type="button" onClick={() => setMedicalPressPage(page => Math.min(medicalPressTotalPages, page + 1))} disabled={medicalPressPage === medicalPressTotalPages} aria-label="다음 의학전문지 기사 페이지" className="min-h-11 rounded-full px-4 text-sm font-semibold text-slate-700 hover:bg-white disabled:cursor-not-allowed disabled:opacity-40">다음</button>
+                  </nav>
+                )}
+              </section>
+            )}
+
             {/* 1. 7일 이내 주요 공지 */}
             {/* 1. 7일 이내 주요 공지 */}
-            {topNotices.length > 0 && (
+            {!medicalPressGroupActive && topNotices.length > 0 && (
               <section className="bg-white rounded-3xl shadow-[0_12px_36px_rgba(25,25,25,0.06)] border border-slate-200 overflow-hidden print:shadow-none print:border-none">
                 <div className="px-5 py-4 flex justify-between items-center bg-white border-b border-gray-200">
                   <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
@@ -652,7 +767,7 @@ export default function ArticleList({
             )}
 
             {/* 2. 기관별 공지사항 */}
-            {Object.keys(publicSourcesMap).length > 0 && (
+            {!medicalPressGroupActive && Object.keys(publicSourcesMap).length > 0 && (
               <section className="print:break-before-page">
                 <h2 className="text-xl font-bold text-[#5C2D0C] flex items-center gap-2 mb-4 border-b-2 border-[#C05A12] pb-2">
                   <Megaphone className="w-6 h-6 text-[#C05A12]" /> 
@@ -668,7 +783,7 @@ export default function ArticleList({
             )}
 
             {/* 3. 의료전문지 최신기사 */}
-            {Object.keys(pressSourcesMap).length > 0 && (
+            {!medicalPressGroupActive && Object.keys(pressSourcesMap).length > 0 && (
               <section className="print:break-before-page">
                 <h2 className="text-xl font-bold text-[#5C2D0C] flex items-center gap-2 mb-4 border-b-2 border-[#8E6E53] pb-2">
                   <FileText className="w-6 h-6 text-[#8E6E53]" /> 
