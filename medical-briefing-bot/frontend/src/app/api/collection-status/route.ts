@@ -4,12 +4,11 @@ import { createAdminSupabaseClient } from '@/lib/adminSupabase';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const cacheHeaders = { 'Cache-Control': 'public, max-age=0, s-maxage=60, stale-while-revalidate=300' };
-const errorHeaders = { 'Cache-Control': 'no-store' };
+const noStoreHeaders = { 'Cache-Control': 'no-store' };
 
 const unavailableResponse = () => Response.json(getCollectionServiceErrorStatus(), {
   status: 503,
-  headers: errorHeaders,
+  headers: noStoreHeaders,
 });
 
 export async function GET() {
@@ -23,7 +22,7 @@ export async function GET() {
 
     if (error) return unavailableResponse();
 
-    return Response.json(getCollectionServiceStatus(data), { status: 200, headers: cacheHeaders });
+    return Response.json(getCollectionServiceStatus(data), { status: 200, headers: noStoreHeaders });
   } catch {
     return unavailableResponse();
   }

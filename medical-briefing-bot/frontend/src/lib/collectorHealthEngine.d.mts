@@ -32,7 +32,7 @@ export type CollectorHealth = {
   readonly sources: readonly CollectorSourceHealth[];
 };
 
-export const COLLECTION_RUNTIME_SCHEDULE_KST: readonly ['06:07', '08:30', '12:07', '15:07'];
+export { COLLECTION_RUNTIME_SCHEDULE_KST } from './collectionSchedule.mjs';
 export const COLLECTION_STALE_GRACE_MS: number;
 export const COLLECTION_HEALTH_HISTORY_LIMIT: number;
 

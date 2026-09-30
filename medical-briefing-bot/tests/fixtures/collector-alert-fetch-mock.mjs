@@ -12,7 +12,7 @@ globalThis.fetch = async (input, options = {}) => {
     const run = {
       id: 61,
       finished_at: scenario === 'stale-alert'
-        ? new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString()
+        ? new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
         : new Date().toISOString(),
       result: scenario === 'degraded' ? 'DEGRADED' : 'SUCCESS',
       source_health: scenario === 'degraded'

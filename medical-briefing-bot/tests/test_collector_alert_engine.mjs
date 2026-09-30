@@ -1,7 +1,25 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 
 import { evaluateCollectorAlerts } from '../frontend/src/lib/collectorAlertEngine.mjs';
+import {
+  COLLECTION_DISPLAY_SCHEDULE_KST,
+  COLLECTION_RUNTIME_SCHEDULE_KST,
+  getCollectionCutoffIso,
+  getKstDateKey,
+  getLatestCollectionDisplayTime,
+  getLatestCollectionRuntimeTime,
+  shiftKstDate,
+} from '../frontend/src/lib/collectionSchedule.mjs';
+import { getCollectorHealth, getNextCollectionDueAt } from '../frontend/src/lib/collectorHealthEngine.mjs';
+
+const dailyCollectorWorkflow = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../../.github/workflows/daily_collector.yml'),
+  'utf8',
+);
 
 const NOW = Date.parse('2026-09-28T06:10:00.000Z');
 const sourceName = '질병관리청 보도자료';
@@ -39,6 +57,58 @@ test('NORMAL health produces no alert', () => {
   assert.equal(result.health.state, 'NORMAL');
   assert.equal(result.health.sources.length, currentSourceNames.length);
   assert.equal(result.events.length, 0);
+});
+
+test('runtime, display, and GitHub UTC schedules stay aligned', () => {
+  assert.deepEqual(COLLECTION_RUNTIME_SCHEDULE_KST, ['08:30', '12:07', '15:07', '17:07']);
+  assert.deepEqual(COLLECTION_DISPLAY_SCHEDULE_KST, ['08:30', '12:00', '15:00', '17:00']);
+  assert.deepEqual([...dailyCollectorWorkflow.matchAll(/- cron: '([^']+)'/g)].map(([, cron]) => cron), [
+    '7 3,6,8 * * *',
+    '30 23 * * *',
+  ]);
+});
+
+test('KST date remains today before the first scheduled run and across UTC midnight', () => {
+  assert.equal(getKstDateKey('2026-09-29T15:05:00.000Z'), '2026-09-30');
+  assert.equal(getKstDateKey('2026-09-29T23:20:00.000Z'), '2026-09-30');
+  assert.equal(shiftKstDate('2026-09-30', -1), '2026-09-29');
+  assert.equal(shiftKstDate('2026-09-30', 1), '2026-10-01');
+});
+
+test('latest public slot follows the KST runtime schedule', () => {
+  const cases = [
+    ['2026-09-29T23:20:00.000Z', '08:30', '08:30'],
+    ['2026-09-29T23:40:00.000Z', '08:30', '08:30'],
+    ['2026-09-30T03:10:00.000Z', '12:07', '12:00'],
+    ['2026-09-30T08:10:00.000Z', '17:07', '17:00'],
+  ];
+
+  for (const [instant, runtimeTime, displayTime] of cases) {
+    assert.equal(getLatestCollectionRuntimeTime(instant), runtimeTime);
+    assert.equal(getLatestCollectionDisplayTime(instant), displayTime);
+  }
+});
+
+test('article cutoff retains the selected runtime minute in KST', () => {
+  assert.equal(
+    getCollectionCutoffIso('2026-09-30', '12:07'),
+    '2026-09-30T03:07:59.000Z',
+  );
+});
+
+test('Health Engine uses the next day first run and two-hour stale grace', () => {
+  const finishedAt = '2026-09-30T08:07:00.000Z';
+  assert.equal(getNextCollectionDueAt(finishedAt), '2026-09-30T23:30:00.000Z');
+
+  const run = {
+    id: 1,
+    finished_at: '2026-09-30T06:07:00.000Z',
+    result: 'SUCCESS',
+    source_health: { 정상기관: { count: 1, status: 'OK', reason: '' } },
+  };
+  const staleAt = Date.parse('2026-09-30T10:07:00.000Z');
+  assert.equal(getCollectorHealth([run], staleAt).state, 'NORMAL');
+  assert.equal(getCollectorHealth([run], staleAt + 1).state, 'STALE');
 });
 
 test('one KDCA failure is recorded without notification', () => {
@@ -97,7 +167,7 @@ test('Collector FAILED alerts immediately', () => {
 
 test('stale collector emits a deduplicated STALE alert', () => {
   const runs = [run(1, '2026-09-28T03:07:00.000Z', 'SUCCESS')];
-  const staleAt = Date.parse('2026-09-28T08:08:00.000Z');
+  const staleAt = Date.parse('2026-09-28T10:08:00.000Z');
   const first = evaluateCollectorAlerts(runs, {}, staleAt);
   assert.equal(first.health.state, 'STALE');
   assert.equal(first.events[0]?.key, 'collector:stale');

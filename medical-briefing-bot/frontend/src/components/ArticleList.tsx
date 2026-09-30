@@ -2,7 +2,14 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { COLLECTION_DISPLAY_SCHEDULE_KST, COLLECTION_RUNTIME_SCHEDULE_KST, getLatestCollectionTime, isBeforeFirstCollectionTime } from '@/lib/collectionStatus';
+import {
+  COLLECTION_DISPLAY_SCHEDULE_KST,
+  COLLECTION_RUNTIME_SCHEDULE_KST,
+  getCollectionCutoffIso,
+  getKstDateKey,
+  getLatestCollectionRuntimeTime,
+  shiftKstDate,
+} from '@/lib/collectionStatus';
 import {
   filterBySelectedSources,
   filterMedicalPressArticles,
@@ -57,7 +64,15 @@ const formatLocalYYYYMMDD = (dateStr: string | Date | number) => {
   return `${yyyy}-${mm}-${dd}`;
 };
 
-export default function ArticleList({ initialArticles }: { initialArticles: Article[] }) {
+export default function ArticleList({
+  initialArticles,
+  initialDate,
+  initialTime,
+}: {
+  initialArticles: Article[];
+  initialDate: string;
+  initialTime: string;
+}) {
   const [articles, setArticles] = useState<Article[]>(initialArticles);
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -67,36 +82,20 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
   const [medicalPressPage, setMedicalPressPage] = useState(1);
   const itemsPerPage = 5;
 
-  const getLatestScheduleTime = () => {
-    return getLatestCollectionTime();
-  };
-
-  // 달력(날짜 선택) 상태 관리 (기본값: 오늘 KST, 6시 이전이면 어제)
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (isBeforeFirstCollectionTime()) kstDate.setDate(kstDate.getDate() - 1);
-    return `${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`;
-  });
-
-  const [selectedTime, setSelectedTime] = useState<string>(getLatestScheduleTime());
+  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedTime, setSelectedTime] = useState<string>(initialTime);
 
   const handlePrevDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() - 1);
-    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    setSelectedDate(shiftKstDate(selectedDate, -1));
   };
 
   const handleNextDay = () => {
-    const d = new Date(selectedDate);
-    d.setDate(d.getDate() + 1);
-    setSelectedDate(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    setSelectedDate(shiftKstDate(selectedDate, 1));
   };
 
   const handleToday = () => {
-    const kstDate = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
-    if (isBeforeFirstCollectionTime()) kstDate.setDate(kstDate.getDate() - 1);
-    setSelectedDate(`${kstDate.getFullYear()}-${String(kstDate.getMonth() + 1).padStart(2, '0')}-${String(kstDate.getDate()).padStart(2, '0')}`);
-    setSelectedTime(getLatestScheduleTime());
+    setSelectedDate(getKstDateKey());
+    setSelectedTime(getLatestCollectionRuntimeTime());
   };
 
   // 선택된 날짜와 시간, 검색어에 맞춰 동적으로 데이터 페칭 (서버 사이드 필터링)
@@ -121,8 +120,7 @@ export default function ArticleList({ initialArticles }: { initialArticles: Arti
          query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
          query = query.limit(500);
       } else {
-         const targetEndKst = new Date(`${selectedDate}T${selectedTime}:59+09:00`);
-         query = query.lte('published_date', targetEndKst.toISOString());
+         query = query.lte('published_date', getCollectionCutoffIso(selectedDate, selectedTime));
          query = query.limit(500);
       }
       
