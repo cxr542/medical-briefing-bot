@@ -1,5 +1,96 @@
 [
   {
+    "id": "2026-09-30-pr-48",
+    "date": "2026.09.30",
+    "category": "개선",
+    "title": "예약 수집 누락 자동 복구",
+    "summary": "예정된 수집이 누락된 경우 이를 감지해 복구 실행을 시도하도록 개선했습니다.",
+    "issues": [],
+    "changes": [
+      "최신 수집 상태가 오래되고 실제 Collector 실패가 아닌 경우 누락된 일정을 확인해 자동 복구를 한 번 시도합니다.",
+      "이미 실행 중인 수집과 같은 일정의 중복 실행을 막고, 실패한 수집은 자동 재시도하지 않습니다."
+    ],
+    "verification": [
+      "관련 자동화 테스트 31개 통과",
+      "실제 운영 자동복구는 향후 일정 누락 발생 시 확인 예정입니다."
+    ],
+    "links": [
+      {
+        "label": "PR #48",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/48"
+      }
+    ]
+  },
+  {
+    "id": "2026-09-30-pr-47",
+    "date": "2026.09.30",
+    "category": "개선",
+    "title": "의료전문지 최신기사 탐색 개선",
+    "summary": "의료전문지 기사를 한곳에서 더 쉽게 찾아볼 수 있도록 탐색 위치를 정리했습니다.",
+    "issues": [],
+    "changes": [
+      "상단 출처 필터의 중복된 통합 의료전문지 항목을 제거했습니다.",
+      "하단 의료전문지 영역에서 전체 최신기사와 최근 7일 모아보기를 이용할 수 있습니다.",
+      "6개 전문지 카드와 각 전문지별 더보기 기능을 유지했습니다."
+    ],
+    "verification": [
+      "Desktop Preview 확인 완료",
+      "390px 화면에서 신규 진입 버튼 확인 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #47",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/47"
+      }
+    ]
+  },
+  {
+    "id": "2026-09-30-pr-46",
+    "date": "2026.09.30",
+    "category": "개선",
+    "title": "의료전문지 통합 최신기사와 7일 모아보기",
+    "summary": "6개 의료전문지의 최신 기사를 모아보고 기간·검색 조건으로 살펴볼 수 있습니다.",
+    "issues": [],
+    "changes": [
+      "의학신문, 청년의사, 의협신문, 보건신문, 데일리메디, 메디게이트뉴스 기사를 통합했습니다.",
+      "전체 최신기사와 Asia/Seoul 기준 최근 7일 모아보기, 검색 및 전문지별 보기를 제공합니다.",
+      "중복 URL을 정리하고 최신순 정렬과 페이지 이동을 지원합니다."
+    ],
+    "verification": [
+      "Medical Press 테스트 13개 통과",
+      "TypeScript, ESLint, production build 및 Preview 확인 통과"
+    ],
+    "links": [
+      {
+        "label": "PR #46",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/46"
+      }
+    ]
+  },
+  {
+    "id": "2026-09-30-pr-45",
+    "date": "2026.09.30",
+    "category": "버그 수정",
+    "title": "첫 화면 날짜와 마지막 수집 시각 개선",
+    "summary": "첫 방문에서도 한국 날짜와 실제 마지막 수집 확인 시각을 정확히 보여주도록 개선했습니다.",
+    "issues": [],
+    "changes": [
+      "Asia/Seoul 기준 날짜를 사용해 첫 화면에서 이전 날짜가 보일 수 있던 문제를 해결했습니다.",
+      "예약 시간을 마지막 수집 시각으로 오해하지 않도록 실제 Collector 완료 시각을 표시합니다.",
+      "사용자 일정은 08:30 / 12:00 / 15:00 / 17:00, 실제 실행 판정은 08:30 / 12:07 / 15:07 / 17:07 KST를 사용합니다."
+    ],
+    "verification": [
+      "두 Preview에서 첫 화면 날짜와 실제 마지막 수집 시각 확인 완료",
+      "TypeScript, ESLint, production build 및 회귀 테스트 통과"
+    ],
+    "links": [
+      {
+        "label": "PR #45",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/45"
+      }
+    ]
+  },
+  {
     "id": "2026-09-29-pr-42",
     "date": "2026.09.29",
     "category": "개선",

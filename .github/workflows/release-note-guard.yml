@@ -11,23 +11,16 @@ jobs:
   validate-release-note:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
       - name: Validate release note metadata
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
-          PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: |
-          if [[ ",$PR_LABELS," != *",release-note,"* ]]; then
-            echo "release-note label 없음: 릴리즈 노트 검증 생략"
-            exit 0
-          fi
-          if ! grep -q "^## Release Note" <<< "$PR_BODY"; then
-            echo "::error::release-note 라벨이 있는 PR에는 '## Release Note' 섹션이 필요합니다."
-            exit 1
-          fi
-          for field in "Category:" "Title:"; do
-            if ! grep -q "^$field" <<< "$PR_BODY"; then
-              echo "::error::Release Note 섹션에 '$field'가 필요합니다."
-              exit 1
-            fi
-          done
-          echo "Release Note metadata OK"
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: node medical-briefing-bot/scripts/validate_release_note.mjs
