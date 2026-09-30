@@ -255,6 +255,12 @@ export default function ArticleList({
     setCurrentPage(1);
   };
 
+  const openMedicalPressView = (range: MedicalPressRange) => {
+    setMedicalPressGroupActive(true);
+    setMedicalPressRange(range);
+    setMedicalPressPage(1);
+  };
+
   // 개별 카드 렌더링 컴포넌트
   const SourceCard = ({ source, articles, isPress }: { source: string, articles: Article[], isPress?: boolean }) => {
     let theme = { border: 'border-gray-200', text: 'text-gray-700', bullet: 'text-gray-400', buttonBorder: 'border-gray-200', buttonHover: 'hover:bg-gray-50 hover:text-gray-700', groupHoverText: 'group-hover:text-gray-700' };
@@ -486,17 +492,6 @@ export default function ArticleList({
           >
             기본 선택
           </button>
-          <button
-            type="button"
-            aria-pressed={medicalPressGroupActive}
-            onClick={() => {
-              setMedicalPressGroupActive(true);
-              setMedicalPressPage(1);
-            }}
-            className={`min-h-11 px-4 py-2 rounded-full text-sm font-bold transition-colors ${medicalPressGroupActive ? 'bg-[#FEE500] text-[#191919] shadow-sm' : 'bg-white text-gray-600 border border-slate-200 hover:bg-blue-50'}`}
-          >
-            의학전문지
-          </button>
           <div className="w-px h-5 bg-gray-300 mx-1"></div>
           {allSources.map(source => (
             <button
@@ -579,7 +574,8 @@ export default function ArticleList({
                 <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 id="medical-press-heading" className="flex items-center gap-2 text-xl font-bold text-[#5C2D0C]">
-                      <FileText className="h-5 w-5 text-[#8E6E53]" /> 의학전문지
+                      <FileText className="h-5 w-5 text-[#8E6E53]" />
+                      {medicalPressRange === 'latest' ? '의료전문지 전체 최신기사' : '의료전문지 최근 7일 기사'}
                       <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-[#1D4ED8]">{medicalPressArticles.length}건</span>
                     </h2>
                     <p className="mt-1 text-sm text-slate-600">
@@ -588,29 +584,35 @@ export default function ArticleList({
                         : `KST ${formatMedicalPressDateKst(getLastSevenCalendarDaysStartIso())}부터 모아봅니다.`}
                     </p>
                   </div>
-                  <div role="group" aria-label="의학전문지 기사 범위" className="inline-flex w-fit rounded-full bg-slate-100 p-1">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      aria-pressed={medicalPressRange === 'latest'}
                       onClick={() => {
+                        setMedicalPressGroupActive(false);
                         setMedicalPressPage(1);
-                        setMedicalPressRange('latest');
                       }}
-                      className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'latest' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
+                      className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-600 transition-colors hover:bg-blue-50 hover:text-[#191919]"
                     >
-                      최신
+                      전문지별로 보기
                     </button>
-                    <button
-                      type="button"
-                      aria-pressed={medicalPressRange === 'last-seven-days'}
-                      onClick={() => {
-                        setMedicalPressPage(1);
-                        setMedicalPressRange('last-seven-days');
-                      }}
-                      className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'last-seven-days' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
-                    >
-                      최근 7일 모아보기
-                    </button>
+                    <div role="group" aria-label="의료전문지 기사 범위" className="inline-flex w-fit max-w-full flex-wrap rounded-full bg-slate-100 p-1">
+                      <button
+                        type="button"
+                        aria-pressed={medicalPressRange === 'latest'}
+                        onClick={() => openMedicalPressView('latest')}
+                        className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'latest' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
+                      >
+                        전체 최신기사
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={medicalPressRange === 'last-seven-days'}
+                        onClick={() => openMedicalPressView('last-seven-days')}
+                        className={`min-h-10 rounded-full px-4 text-sm font-bold transition-colors ${medicalPressRange === 'last-seven-days' ? 'bg-white text-[#191919] shadow-sm' : 'text-slate-600 hover:text-[#191919]'}`}
+                      >
+                        최근 7일 모아보기
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="divide-y divide-slate-100">
@@ -790,6 +792,24 @@ export default function ArticleList({
                   의료전문지 최신기사
                   <span className="text-sm font-normal text-gray-500 ml-2">의료계 주요 뉴스를 확인하세요.</span>
                 </h2>
+                <div role="group" aria-label="의료전문지 기사 보기" className="mb-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    aria-label="전체 의료전문지 최신기사 보기"
+                    onClick={() => openMedicalPressView('latest')}
+                    className="min-h-11 rounded-full border border-[#1D4ED8] bg-[#1D4ED8] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-blue-700"
+                  >
+                    전체 최신기사
+                  </button>
+                  <button
+                    type="button"
+                    aria-label="최근 7일 의료전문지 기사 모아보기"
+                    onClick={() => openMedicalPressView('last-seven-days')}
+                    className="min-h-11 rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-blue-50"
+                  >
+                    최근 7일 모아보기
+                  </button>
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                   {Object.entries(pressSourcesMap).map(([source, articles]) => (
                     <SourceCard key={source} source={source} articles={articles} isPress={true} />
