@@ -1,4 +1,4 @@
-from datetime import datetime, timezone, timedelta
+from datetime import date, datetime, timezone, timedelta
 import atexit
 import os
 import time
@@ -12,6 +12,12 @@ from dotenv import load_dotenv
 from supabase import create_client, Client
 from collector_sources.comwel import source_collection_diagnostics
 from collector_sources.dailymedi import fetch_dailymedi_articles
+from collector_sources.medigate import (
+    ENDPOINT as MEDIGATE_DATE_ENDPOINT,
+    MedigateArticleRecord,
+    build_date_url,
+    collect_recent_articles as collect_medigate_articles,
+)
 from collector_sources.medical_press import is_valid_press_article
 from collector_parsers import (
     get_content_hash,
@@ -211,6 +217,28 @@ def fetch_rss_feed(source_name: str, rss_url: str, is_press=False):
             f"filtered={parsed['filtered_entries']}"
         )
     return parsed["articles"]
+
+
+def fetch_medigate_page(cursor: date) -> bytes:
+    response = get_with_transient_retry(
+        build_date_url(cursor),
+        source_name="메디게이트뉴스",
+        headers={
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "User-Agent": "Mozilla/5.0",
+        },
+        timeout=20,
+        allow_redirects=True,
+    )
+    response.raise_for_status()
+    validate_feed_redirects(response, MEDIGATE_DATE_ENDPOINT)
+    return response.content
+
+
+def fetch_medigate_articles() -> list[MedigateArticleRecord]:
+    return collect_medigate_articles(fetch_medigate_page)
+
 
 def fetch_kdca_press_releases():
     """KDCA RSS 장애 시 공식 보도자료 목록을 fallback으로 수집합니다."""
@@ -915,7 +943,6 @@ if __name__ == "__main__":
         {"name": "식품의약품안전처 보도자료", "url": "http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021", "is_press": False},
         {"name": "청년의사", "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "의협신문", "url": "http://www.doctorsnews.co.kr/rss/allArticle.xml", "is_press": True},
-        {"name": "메디게이트뉴스", "url": "https://news.google.com/rss/search?q=site:medigatenews.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True},
         {"name": "의학신문", "url": "https://cdn.bosa.co.kr/rss/gn_rss_allArticle.xml", "is_press": True},
         {"name": "보건신문", "url": "http://www.bokuennews.com/data/rss/news.xml", "is_press": True}
     ]
@@ -924,6 +951,8 @@ if __name__ == "__main__":
             s["name"],
             lambda s=s: fetch_rss_feed(s["name"], s["url"], s["is_press"]),
         )
+
+    collect_source("메디게이트뉴스", fetch_medigate_articles)
 
     collect_source("데일리메디", fetch_dailymedi_articles)
         
