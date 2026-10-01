@@ -11,6 +11,7 @@ from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
 from collector_sources.comwel import source_collection_diagnostics
+from collector_sources.dailymedi import fetch_dailymedi_articles
 from collector_sources.medical_press import is_valid_press_article
 from collector_parsers import (
     get_content_hash,
@@ -915,7 +916,6 @@ if __name__ == "__main__":
         {"name": "청년의사", "url": "http://www.docdocdoc.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "의협신문", "url": "http://www.doctorsnews.co.kr/rss/allArticle.xml", "is_press": True},
         {"name": "메디게이트뉴스", "url": "https://news.google.com/rss/search?q=site:medigatenews.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True},
-        {"name": "데일리메디", "url": "https://news.google.com/rss/search?q=site:dailymedi.com&hl=ko&gl=KR&ceid=KR:ko", "is_press": True},
         {"name": "의학신문", "url": "https://cdn.bosa.co.kr/rss/gn_rss_allArticle.xml", "is_press": True},
         {"name": "보건신문", "url": "http://www.bokuennews.com/data/rss/news.xml", "is_press": True}
     ]
@@ -924,6 +924,8 @@ if __name__ == "__main__":
             s["name"],
             lambda s=s: fetch_rss_feed(s["name"], s["url"], s["is_press"]),
         )
+
+    collect_source("데일리메디", fetch_dailymedi_articles)
         
     # 2. 크롤러
     collect_source("질병관리청 보도자료", fetch_kdca_press_releases)
