@@ -1,0 +1,50 @@
+{
+  "list": [
+    {
+      "date": "2026-09-28",
+      "newsList": [
+        {
+          "id": 57837,
+          "news_id": 2302962946,
+          "display_title": "'응급실미수용' 방지법 법사위 통과…야당 지적 나오자 복지부 \"학회도 반대 안해\"",
+          "display_modified_date": 1790600256000,
+          "modified_date": 1790601103000,
+          "regist_date": null
+        },
+        {
+          "id": 60000,
+          "news_id": 2302962946,
+          "display_title": "중복 ID 항목",
+          "display_modified_date": 1790601103000,
+          "modified_date": 1790601103000,
+          "regist_date": null
+        },
+        {
+          "id": 60001,
+          "news_id": 0,
+          "display_title": "잘못된 기사 ID",
+          "display_modified_date": 1790600256000,
+          "modified_date": 1790601103000,
+          "regist_date": null
+        },
+        {
+          "id": 60002,
+          "news_id": 2302962947,
+          "display_title": "",
+          "display_modified_date": 1790600256000,
+          "modified_date": 1790601103000,
+          "regist_date": null
+        },
+        {
+          "id": 60003,
+          "news_id": 2302962948,
+          "display_title": "발행 시각 누락",
+          "display_modified_date": null,
+          "modified_date": 1790601103000,
+          "regist_date": null
+        }
+      ]
+    }
+  ],
+  "nextDate": "2026-09-27"
+}
