@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-01-pr-50",
+    "date": "2026.10.01",
+    "category": "버그 수정",
+    "title": "데일리메디 원문 기사 링크 개선",
+    "summary": "PR #50 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "PR의 Release Note 메타데이터로 자동 등록"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #50",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/50"
+      }
+    ]
+  },
+  {
     "id": "2026-09-30-pr-48",
     "date": "2026.09.30",
     "category": "개선",
