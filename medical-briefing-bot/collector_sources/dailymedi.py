@@ -110,7 +110,7 @@ def parse_list_page(
     fetch_article_date: Optional[Callable[[str], Optional[datetime]]] = None,
 ) -> DailyMediPage:
     soup = BeautifulSoup(html, "html.parser")
-    listing = soup.select_one(".listNews > ul.webzin.main2")
+    listing = soup.select_one(".listNews > ul.webzin.main2, .listNews.mediBox > ul")
     if listing is None:
         raise ValueError("DailyMedi article listing markup not found")
     articles: List[DailyMediArticle] = []
@@ -118,16 +118,21 @@ def parse_list_page(
     all_older = True
 
     for item in listing.select("li"):
-        title_node = item.select_one(".stitle")
+        title_node = item.select_one(".stitle, .ml_subject a[href]")
         anchor = item.select_one("a[href]")
-        title = title_node.get_text(" ", strip=True) if title_node else ""
+        title = ""
+        if title_node:
+            if "stitle" in title_node.get("class", []):
+                title = title_node.get_text(" ", strip=True)
+            else:
+                title = " ".join(title_node.find_all(string=True, recursive=False)).strip()
         link = _allowed_article_url((anchor.get("href") or "") if anchor else "", list_url)
         if not title or link is None:
             continue
 
         url, wr_id = link
         fingerprint.append(wr_id)
-        date_node = item.select_one(".news_list_date")
+        date_node = item.select_one(".news_list_date, .ml_date")
         published_at = _parse_kst_datetime(date_node.get_text(" ", strip=True)) if date_node else None
         if published_at is None and fetch_article_date is not None:
             try:
