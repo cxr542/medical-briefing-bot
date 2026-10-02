@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-02-pr-52",
+    "date": "2026.10.02",
+    "category": "Fix",
+    "title": "데일리메디 수집의 일시적인 네트워크 오류 대응 개선",
+    "summary": "PR #52 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "데일리메디 목록·기사 요청에 제한된 재시도를 적용하고, 후속 페이지의 일시적인 연결 실패 시 이미 확보한 기사를 보존합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #52",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/52"
+      }
+    ]
+  },
+  {
     "id": "2026-10-01-pr-51",
     "date": "2026.10.01",
     "category": "버그 수정",
