@@ -135,6 +135,13 @@ test('collector failure after a recovery attempt records FAILED without retry', 
   assert.doesNotMatch(result.stdout, /TEST_DISPATCH_RECEIVED/);
 });
 
+test('completed degraded recovery is terminal and never reported as recovered', () => {
+  const result = runScenario('recovery-degraded');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /TEST_RECOVERY_STATUS=FAILED/);
+  assert.doesNotMatch(result.stdout, /TEST_DISPATCH_RECEIVED|TEST_RECOVERY_STATUS=RECOVERED/);
+});
+
 test('dispatch API rejection is recorded as FAILED and is never retried', () => {
   const rejected = runScenario('dispatch-fails');
   const repeated = runScenario('dispatch-attempted-failed');
