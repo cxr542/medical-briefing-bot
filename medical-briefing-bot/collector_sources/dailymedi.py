@@ -1,10 +1,12 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import re
+import time
 from typing import Callable, Dict, List, Optional, Set, Tuple
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
+import requests
 
 from collector_parsers import get_content_hash
 
@@ -15,6 +17,12 @@ SECTION_IDS = ("22", "21", "31")
 MAX_PAGES_PER_SECTION = 10
 ALLOWED_HOSTS = frozenset({"dailymedi.com", "www.dailymedi.com"})
 KST = timezone(timedelta(hours=9))
+RETRY_BACKOFFS = (1, 2)
+TRANSIENT_ERRORS = (
+    requests.exceptions.ConnectionError,
+    requests.exceptions.Timeout,
+    requests.exceptions.ChunkedEncodingError,
+)
 _DATE_FORMATS = (
     "%Y-%m-%d %H:%M",
     "%Y.%m.%d %H:%M",
@@ -155,8 +163,19 @@ def collect_recent_articles(
         seen_pages: Set[Tuple[str, ...]] = set()
         for page_number in range(1, max_pages + 1):
             list_url = f"{LIST_URL}?ca_id={section_id}&page={page_number}"
+            try:
+                html = fetch_list_page(list_url)
+            except TRANSIENT_ERRORS as error:
+                if page_number == 1 or not articles_by_id:
+                    raise
+                print(
+                    f"DailyMedi partial pagination: section={section_id} "
+                    f"page={page_number} retained={len(articles_by_id)} "
+                    f"error={type(error).__name__}"
+                )
+                break
             page = parse_list_page(
-                fetch_list_page(list_url),
+                html,
                 list_url,
                 cutoff=cutoff,
                 now=now,
@@ -173,6 +192,8 @@ def collect_recent_articles(
             if page.all_articles_older_than_cutoff:
                 break
 
+    if not articles_by_id:
+        raise ValueError("DailyMedi collection produced no recent valid articles")
     return [
         {
             "source": SOURCE_NAME,
@@ -187,17 +208,27 @@ def collect_recent_articles(
 
 
 def _fetch_text(url: str) -> str:
-    import requests
-
-    response = requests.get(
-        url,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; MedicalBriefingBot/1.0)"},
-        timeout=(5, 20),
-        allow_redirects=True,
-    )
+    for attempt in range(1, len(RETRY_BACKOFFS) + 2):
+        try:
+            response = requests.get(
+                url,
+                headers={"User-Agent": "Mozilla/5.0 (compatible; MedicalBriefingBot/1.0)"},
+                timeout=(5, 20),
+                allow_redirects=True,
+            )
+            break
+        except TRANSIENT_ERRORS as error:
+            print(
+                f"DailyMedi transient request failure: url={url} "
+                f"attempt={attempt}/3 error={type(error).__name__}"
+            )
+            if attempt > len(RETRY_BACKOFFS):
+                raise
+            time.sleep(RETRY_BACKOFFS[attempt - 1])
     response.raise_for_status()
-    final_host = (urlparse(response.url).hostname or "").lower()
-    if final_host not in ALLOWED_HOSTS:
+    final_url = urlparse(response.url)
+    final_host = (final_url.hostname or "").lower()
+    if final_url.scheme != "https" or final_host not in ALLOWED_HOSTS:
         raise ValueError(f"DailyMedi redirected outside the approved host list: {final_host}")
     return response.text
 
