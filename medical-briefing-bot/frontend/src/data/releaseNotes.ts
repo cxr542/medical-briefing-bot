@@ -14,6 +14,39 @@ export type ReleaseNote = {
 
 const curatedReleaseNotes: ReleaseNote[] = [
   {
+    id: '2026-09-28-collector-admin-stability',
+    date: '2026.09.28',
+    category: '운영',
+    title: 'Collector & Admin 운영 안정화',
+    summary: '수집 신뢰성을 강화하고 KDCA·HIRA 장애 복구, Admin 릴리즈노트, PR merge 자동 기록, 사용자 표시 스케줄 정규화까지 운영 체계를 통합 개선했습니다.',
+    issues: [
+      'HIRA 자보알림방 최신 게시물 누락 및 잘못된 응답 정상 처리 가능성',
+      'KDCA RSS placeholder와 정부기관 네트워크 timeout으로 인한 수집 불안정',
+      '운영 변경 이력의 Admin 추적 및 자동 누적 체계 부재',
+      'Collector runtime 12:07이 사용자 화면 마지막 확인 시간으로 노출',
+    ],
+    changes: [
+      'HIRA 대상 게시판 실제 응답 대기 및 fail-loud 검증 강화',
+      'KDCA 공식 HTML fallback과 DB-boundary article validation 적용',
+      '정부기관 요청 retry/backoff/timeout 강화 및 DELETED 기사 화면 제외',
+      'Admin Monitoring에 릴리즈 노트 메뉴와 curated/generated 통합 표시 추가',
+      'release-note 라벨 PR merge 후 generatedReleaseNotes.json 자동 생성 파이프라인 구축',
+      '06:07→06:00, 12:07→12:00, 15:07→15:00 사용자 표시 스케줄 정규화',
+    ],
+    verification: [
+      'Collector Run #58 SUCCESS, 17개 source 전체 OK',
+      '171건 수집·AI 처리, DB 85/85 성공, 실패 0건',
+      '자동 릴리즈노트 E2E #36 및 후속 #37 연속 성공',
+      '관련 Vercel Preview 검증 후 merge',
+    ],
+    links: [
+      { label: 'PR #32', url: 'https://github.com/cxr542/medical-briefing-bot/pull/32' },
+      { label: 'PR #36', url: 'https://github.com/cxr542/medical-briefing-bot/pull/36' },
+      { label: 'PR #37', url: 'https://github.com/cxr542/medical-briefing-bot/pull/37' },
+      { label: 'Run #58', url: 'https://github.com/cxr542/medical-briefing-bot/actions/runs/36376183065' },
+    ],
+  },
+  {
     id: '2026-09-28-collector-stability',
     date: '2026.09.28',
     category: '운영',
