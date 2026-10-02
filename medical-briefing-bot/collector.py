@@ -359,7 +359,6 @@ def fetch_law_api():
             raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
         data = response.json()
         # 데이터 추출 (LawSearch > law 객체 배열)
-        # 여기서는 API가 작동한다는 전제하에 임시 데이터를 삽입합니다.
         if "LawSearch" in data and "law" in data["LawSearch"]:
             for law in data["LawSearch"]["law"]:
                 articles_to_save.append({
@@ -371,15 +370,7 @@ def fetch_law_api():
                     "status": "NEW"
                 })
         else:
-            # API 파라미터나 키 오류 시 임시 데이터 반환 (화면 확인용)
-            articles_to_save.append({
-                "source": source_name,
-                "title": "[최신개정] 의료법 시행령 일부개정령안",
-                "url": "https://www.law.go.kr/법령/의료법시행령",
-                "published_date": datetime.now(timezone.utc).isoformat(),
-                "content_hash": get_content_hash("의료법시행령 일부개정령안"),
-                "status": "NEW"
-            })
+            raise ValueError("국가법령정보센터 API 응답에 LawSearch.law가 없습니다")
     except Exception as e:
         print(f"API 에러 ({source_name}): {e}")
         raise

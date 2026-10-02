@@ -26,6 +26,17 @@ def fixture_text(name):
 
 
 class DailyMediParserTests(unittest.TestCase):
+    def test_medibox_sections_keep_article_title_and_fetch_missing_date(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?wr_id=941101"><span class="cate2">인사</span> 새 기관장 취임</a></div><div class="ml_date"></div></li><li class="mb_banner"></li></ul></div>'
+        requested = []
+        for section in ("21", "31"):
+            with self.subTest(section=section):
+                page = parse_list_page(html, LIST_URL.replace("ca_id=22", "ca_id=" + section), cutoff=CUTOFF, now=NOW, fetch_article_date=lambda url: requested.append(url) or NOW)
+                self.assertEqual(len(page.articles), 1)
+                self.assertEqual(page.articles[0].title, "새 기관장 취임")
+                self.assertEqual(page.articles[0].published_at, NOW)
+        self.assertEqual(len(requested), 2)
+
     def test_list_extracts_title_direct_relative_url_and_date(self):
         page = parse_list_page(
             fixture_text("dailymedi-list.html"),
