@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-03-pr-56",
+    "date": "2026.10.03",
+    "category": "버그 수정",
+    "title": "데일리메디 불완전 수집 시 기존 기사 상태 보호",
+    "summary": "PR #56 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "페이지네이션 일부 실패 시 이미 수집한 기사는 보존하고, 확인되지 않은 기존 기사를 삭제 처리하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #56",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/56"
+      }
+    ]
+  },
+  {
     "id": "2026-10-02-pr-52",
     "date": "2026.10.02",
     "category": "Fix",
