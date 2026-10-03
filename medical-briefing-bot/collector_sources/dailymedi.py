@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 import re
 import time
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple, TypedDict
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
@@ -46,6 +46,23 @@ class DailyMediPage:
     articles: Tuple[DailyMediArticle, ...]
     fingerprint: Tuple[str, ...]
     all_articles_older_than_cutoff: bool
+    listing_item_count: int
+
+
+class DailyMediArticleRecord(TypedDict):
+    source: str
+    title: str
+    url: str
+    published_date: str
+    content_hash: str
+    status: str
+
+
+@dataclass(frozen=True)
+class DailyMediCollection:
+    articles: Tuple[DailyMediArticleRecord, ...]
+    complete: bool
+    reason_code: Optional[str]
 
 
 def _allowed_article_url(href: str, list_url: str) -> Optional[Tuple[str, str]]:
@@ -142,7 +159,7 @@ def parse_list_page(
 
     if not articles:
         all_older = False
-    return DailyMediPage(tuple(articles), tuple(fingerprint), all_older)
+    return DailyMediPage(tuple(articles), tuple(fingerprint), all_older, len(listing.select("li")))
 
 
 def collect_recent_articles(
@@ -152,37 +169,63 @@ def collect_recent_articles(
     now: Optional[datetime] = None,
     sections: Tuple[str, ...] = SECTION_IDS,
     max_pages: int = MAX_PAGES_PER_SECTION,
-) -> List[dict]:
+) -> DailyMediCollection:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     cutoff = now.astimezone(timezone.utc) - timedelta(days=7)
     articles_by_id: Dict[str, DailyMediArticle] = {}
+    def make_result(complete: bool, reason_code: Optional[str]) -> DailyMediCollection:
+        records = tuple(
+            {
+                "source": SOURCE_NAME,
+                "title": article.title,
+                "url": article.url,
+                "published_date": article.published_at.isoformat(),
+                "content_hash": get_content_hash(article.title + article.url),
+                "status": "NEW",
+            }
+            for article in articles_by_id.values()
+        )
+        return DailyMediCollection(records, complete, reason_code)
+
+    def make_partial(section_id: str, page_number: int, reason_code: str) -> DailyMediCollection:
+        print(
+            f"DailyMedi incomplete snapshot: section={section_id} page={page_number} "
+            f"retained={len(articles_by_id)} reason={reason_code}"
+        )
+        return make_result(False, reason_code)
 
     for section_id in sections:
         seen_pages: Set[Tuple[str, ...]] = set()
+        section_terminated = False
         for page_number in range(1, max_pages + 1):
             list_url = f"{LIST_URL}?ca_id={section_id}&page={page_number}"
             try:
                 html = fetch_list_page(list_url)
-            except TRANSIENT_ERRORS as error:
-                if page_number == 1 or not articles_by_id:
-                    raise
-                print(
-                    f"DailyMedi partial pagination: section={section_id} "
-                    f"page={page_number} retained={len(articles_by_id)} "
-                    f"error={type(error).__name__}"
+            except requests.RequestException as error:
+                return make_partial(section_id, page_number, f"list-request-{type(error).__name__}")
+            except ValueError:
+                return make_partial(section_id, page_number, "list-request-validation-failed")
+
+            try:
+                page = parse_list_page(
+                    html,
+                    list_url,
+                    cutoff=cutoff,
+                    now=now,
+                    fetch_article_date=fetch_article_date,
                 )
+            except ValueError:
+                return make_partial(section_id, page_number, "listing-markup-invalid")
+
+            if not page.fingerprint:
+                if page.listing_item_count:
+                    return make_partial(section_id, page_number, "listing-has-no-valid-article-ids")
+                section_terminated = True
                 break
-            page = parse_list_page(
-                html,
-                list_url,
-                cutoff=cutoff,
-                now=now,
-                fetch_article_date=fetch_article_date,
-            )
-            if not page.fingerprint or page.fingerprint in seen_pages:
-                break
+            if page.fingerprint in seen_pages:
+                return make_partial(section_id, page_number, "repeated-list-page")
             seen_pages.add(page.fingerprint)
 
             for article in page.articles:
@@ -190,24 +233,18 @@ def collect_recent_articles(
                     articles_by_id[article.wr_id] = article
 
             if page.all_articles_older_than_cutoff:
+                section_terminated = True
                 break
+        if not section_terminated:
+            return make_partial(section_id, max_pages, "maximum-pages-reached")
 
     if not articles_by_id:
-        raise ValueError("DailyMedi collection produced no recent valid articles")
-    return [
-        {
-            "source": SOURCE_NAME,
-            "title": article.title,
-            "url": article.url,
-            "published_date": article.published_at.isoformat(),
-            "content_hash": get_content_hash(article.title + article.url),
-            "status": "NEW",
-        }
-        for article in articles_by_id.values()
-    ]
+        return make_result(False, "no-recent-valid-articles")
+    return make_result(True, None)
 
 
 def _fetch_text(url: str) -> str:
+    is_listing_request = urlparse(url).path == urlparse(LIST_URL).path
     for attempt in range(1, len(RETRY_BACKOFFS) + 2):
         try:
             response = requests.get(
@@ -225,12 +262,60 @@ def _fetch_text(url: str) -> str:
             if attempt > len(RETRY_BACKOFFS):
                 raise
             time.sleep(RETRY_BACKOFFS[attempt - 1])
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        if is_listing_request:
+            _log_listing_diagnostic(url, response, attempt, "http-status-error", response.text)
+        raise
+
     final_url = urlparse(response.url)
     final_host = (final_url.hostname or "").lower()
+    text = response.text
+    if is_listing_request:
+        soup = BeautifulSoup(text, "html.parser")
+        has_expected_list = soup.select_one(".listNews > ul.webzin.main2") is not None
+        if not has_expected_list:
+            _log_listing_diagnostic(url, response, attempt, "missing-listing-selector", text)
     if final_url.scheme != "https" or final_host not in ALLOWED_HOSTS:
+        if is_listing_request:
+            _log_listing_diagnostic(url, response, attempt, "redirect-host-not-allowed", text)
         raise ValueError(f"DailyMedi redirected outside the approved host list: {final_host}")
-    return response.text
+    return text
+
+
+def _log_listing_diagnostic(url: str, response, attempt: int, classification: str, text: str) -> None:
+    query = parse_qs(urlparse(url).query)
+    section_id = query.get("ca_id", ["unknown"])[0]
+    page_number = query.get("page", ["unknown"])[0]
+    if not section_id.isdecimal():
+        section_id = "unknown"
+    if not page_number.isdecimal():
+        page_number = "unknown"
+
+    final_url = urlparse(response.url)
+    final_host = (final_url.hostname or "unknown").lower()
+    final_path = final_url.path[:160]
+    final_url_safe = (
+        f"{final_url.scheme}://{final_host}{final_path}"
+        if final_url.scheme in ("http", "https")
+        else "unknown"
+    )
+    content_type = response.headers.get("content-type", "unknown").split(";", 1)[0]
+    content_type = re.sub(r"[^A-Za-z0-9.+/-]", "", content_type)[:80] or "unknown"
+    soup = BeautifulSoup(text, "html.parser")
+    has_list_container = soup.select_one(".listNews") is not None
+    has_expected_list = soup.select_one(".listNews > ul.webzin.main2") is not None
+    has_article_title_marker = soup.select_one(".stitle") is not None
+    print(
+        f"DailyMedi listing diagnostic: request_url={LIST_URL}?ca_id={section_id}&page={page_number} "
+        f"final_url={final_url_safe} status={response.status_code} content_type={content_type} "
+        f"response_bytes={len(response.content)} response_chars={len(text)} "
+        f"redirects={len(response.history)} attempt={attempt} "
+        f"marker_list_container={str(has_list_container).lower()} "
+        f"marker_expected_list={str(has_expected_list).lower()} "
+        f"marker_article_title={str(has_article_title_marker).lower()} classification={classification}"
+    )
 
 
 def _fetch_article_date(url: str) -> Optional[datetime]:
@@ -242,6 +327,6 @@ def _fetch_article_date(url: str) -> Optional[datetime]:
         return None
 
 
-def fetch_dailymedi_articles() -> List[dict]:
+def fetch_dailymedi_articles() -> DailyMediCollection:
     print(f"DailyMedi HTML collection: sections={','.join(SECTION_IDS)} window_days=7")
     return collect_recent_articles(_fetch_text, _fetch_article_date)
