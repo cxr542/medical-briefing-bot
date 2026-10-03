@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-03-pr-57",
+    "date": "2026.10.03",
+    "category": "버그 수정",
+    "title": "데일리메디 최근 기사 수집 범위 개선",
+    "summary": "PR #57 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "PR의 Release Note 메타데이터로 자동 등록"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #57",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/57"
+      }
+    ]
+  },
+  {
     "id": "2026-10-03-pr-56",
     "date": "2026.10.03",
     "category": "버그 수정",
