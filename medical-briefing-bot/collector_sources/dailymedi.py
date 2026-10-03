@@ -14,7 +14,7 @@ from collector_parsers import get_content_hash
 SOURCE_NAME = "데일리메디"
 LIST_URL = "https://www.dailymedi.com/news/news_list.php"
 SECTION_IDS = ("22", "21", "31")
-MAX_PAGES_PER_SECTION = 10
+MAX_PAGES_PER_SECTION = 13
 ALLOWED_HOSTS = frozenset({"dailymedi.com", "www.dailymedi.com"})
 KST = timezone(timedelta(hours=9))
 RETRY_BACKOFFS = (1, 2)
