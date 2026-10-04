@@ -132,6 +132,148 @@ class DailyMediParserTests(unittest.TestCase):
         self.assertTrue(all("dailymedi.com/news/news_view.php" in article["url"] for article in articles.articles))
         self.assertFalse(any("news.google.com" in article["url"] for article in articles.articles))
 
+    def test_section_21_medi_box_extracts_valid_direct_article(self):
+        page = parse_list_page(
+            fixture_text("dailymedi-medibox-section21.html"),
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+            fetch_article_date=lambda _url: NOW,
+        )
+
+        self.assertEqual(len(page.articles), 1)
+        self.assertEqual(page.articles[0].title, "테스트 기사 제목")
+        self.assertEqual(page.articles[0].wr_id, "900001")
+        self.assertEqual(
+            page.articles[0].url,
+            "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=900001",
+        )
+
+    def test_section_31_medi_box_extracts_valid_direct_article(self):
+        page = parse_list_page(
+            fixture_text("dailymedi-medibox-section31.html"),
+            "https://www.dailymedi.com/news/news_list.php?ca_id=31&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+            fetch_article_date=lambda _url: NOW,
+        )
+
+        self.assertEqual(len(page.articles), 1)
+        self.assertEqual(page.articles[0].title, "테스트 인사 기사")
+        self.assertEqual(page.articles[0].wr_id, "900002")
+        self.assertEqual(
+            page.articles[0].url,
+            "https://www.dailymedi.com/news/news_view.php?ca_id=31&wr_id=900002",
+        )
+
+    def test_medi_box_rejects_article_from_different_section(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=22&amp;wr_id=941200">다른 섹션</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_rejects_non_numeric_article_id(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=bad">잘못된 식별자</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_rejects_navigation_link(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_list.php?ca_id=21&amp;page=2">다음 페이지</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_rejects_unrelated_external_link(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="https://ads.example/news/news_view.php?ca_id=21&amp;wr_id=941200">광고</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_rejects_empty_title(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941200">   </a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+            fetch_article_date=lambda _url: NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_rejects_advertisement_path(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/advertisement/view.php?ca_id=21&amp;wr_id=941200">광고</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.fingerprint, ())
+
+    def test_medi_box_missing_date_is_not_replaced_with_current_time(self):
+        html = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941200">날짜 미상 기사</a></div></li></ul></div>'
+        page = parse_list_page(
+            html,
+            "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1",
+            cutoff=CUTOFF,
+            now=NOW,
+            fetch_article_date=lambda _url: None,
+        )
+
+        self.assertEqual(page.articles, ())
+        self.assertEqual(page.unresolved_date_count, 1)
+        self.assertFalse(page.all_articles_older_than_cutoff)
+
+    def test_medi_box_duplicate_wr_id_is_deduplicated_in_collection(self):
+        duplicate = (
+            '<div class="listNews mediBox"><ul>'
+            '<li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941300">동일 기사</a></div></li>'
+            '<li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941300">동일 기사 중복</a></div></li>'
+            '</ul></div>'
+        )
+        old = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941301">과거 기사</a></div></li></ul></div>'
+
+        collection = collect_recent_articles(
+            lambda url: duplicate if "page=1" in url else old,
+            lambda url: NOW if "wr_id=941300" in url else CUTOFF - timedelta(days=1),
+            now=NOW,
+            sections=("21",),
+            max_pages=3,
+        )
+
+        self.assertTrue(collection.complete)
+        self.assertEqual(len(collection.articles), 1)
+        self.assertEqual(collection.articles[0]["url"], "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=941300")
+
 
 class DailyMediNetworkTests(unittest.TestCase):
     def run_collection(self, failures=0, fail_page=4, malformed=False, empty=False):
@@ -310,6 +452,24 @@ class DailyMediNetworkTests(unittest.TestCase):
         self.assertNotIn("private=query", logs[0])
         self.assertNotIn("private detail", logs[0])
 
+    def test_valid_medi_box_response_is_not_logged_as_missing_selector(self):
+        url = "https://www.dailymedi.com/news/news_list.php?ca_id=21&page=1"
+        body = fixture_text("dailymedi-medibox-section21.html")
+        response = Mock(
+            url=url,
+            text=body,
+            content=body.encode("utf-8"),
+            status_code=200,
+            headers={"content-type": "text/html; charset=utf-8"},
+            history=[],
+        )
+        logs = []
+
+        with patch.object(dailymedi.requests, "get", return_value=response), patch("builtins.print", side_effect=logs.append):
+            self.assertEqual(dailymedi._fetch_text(url), body)
+
+        self.assertEqual(logs, [])
+
     def test_later_page_exhaustion_is_marked_incomplete(self):
         result, attempts, _sleep = self.run_collection(failures=3, fail_page=3)
         self.assertFalse(result.complete)
@@ -323,6 +483,84 @@ class DailyMediNetworkTests(unittest.TestCase):
         ]
         absent_urls = find_absent_article_urls(old_article_rows, result.articles, {"데일리메디"})
         self.assertEqual(absent_urls, set())
+
+    def test_medi_box_unresolved_date_keeps_snapshot_incomplete_and_suppresses_deletion(self):
+        html = (
+            '<div class="listNews mediBox"><ul>'
+            '<li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941199">날짜 확인 기사</a></div>'
+            '<div class="ml_date">2026-10-01 06:19</div></li>'
+            '<li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941200">날짜 미상 기사</a></div>'
+            '<div class="ml_date"></div></li>'
+            '</ul></div>'
+        )
+        def article_date(url):
+            return NOW if "wr_id=941199" in url else None
+
+        collection = collect_recent_articles(
+            lambda _url: html,
+            article_date,
+            now=NOW,
+            sections=("21",),
+            max_pages=2,
+        )
+        old_rows = [
+            {"source": "데일리메디", "url": "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=940000"},
+        ]
+
+        self.assertFalse(collection.complete)
+        self.assertEqual(collection.reason_code, "article-date-unavailable")
+        self.assertEqual(len(collection.articles), 1)
+        self.assertTrue(collection.articles[0]["url"].endswith("wr_id=941199"))
+        self.assertEqual(
+            find_absent_article_urls(old_rows, collection.articles, {"데일리메디"}),
+            set(),
+        )
+
+    def test_section_21_invalid_markup_remains_incomplete_and_suppresses_deletion(self):
+        collection = collect_recent_articles(
+            lambda _url: "<html><body>unexpected page</body></html>",
+            lambda _url: None,
+            now=NOW,
+            sections=("21",),
+            max_pages=2,
+        )
+        old_rows = [
+            {"source": "데일리메디", "url": "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=940000"},
+        ]
+
+        self.assertFalse(collection.complete)
+        self.assertEqual(collection.reason_code, "listing-markup-invalid")
+        self.assertEqual(
+            find_absent_article_urls(old_rows, collection.articles, {"데일리메디"}),
+            set(),
+        )
+
+    def test_complete_medi_box_snapshot_allows_existing_reconciliation(self):
+        current = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941201">최근 기사</a></div></li></ul></div>'
+        old = '<div class="listNews mediBox"><ul><li><div class="subject ml_subject"><a href="/news/news_view.php?ca_id=21&amp;wr_id=941202">과거 기사</a></div></li></ul></div>'
+
+        def fetch_list(url):
+            return current if "page=1" in url else old
+
+        def article_date(url):
+            return NOW if "wr_id=941201" in url else CUTOFF - timedelta(days=1)
+
+        collection = collect_recent_articles(
+            fetch_list,
+            article_date,
+            now=NOW,
+            sections=("21",),
+            max_pages=3,
+        )
+        existing = [
+            {"source": "데일리메디", "url": "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=940000"},
+        ]
+
+        self.assertTrue(collection.complete)
+        self.assertEqual(
+            find_absent_article_urls(existing, collection.articles, set()),
+            {"https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=940000"},
+        )
 
 
 if __name__ == "__main__":

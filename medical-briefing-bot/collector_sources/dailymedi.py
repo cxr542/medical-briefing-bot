@@ -6,6 +6,7 @@ from typing import Callable, Dict, List, Optional, Set, Tuple, TypedDict
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 import requests
 
 from collector_parsers import get_content_hash
@@ -47,6 +48,7 @@ class DailyMediPage:
     fingerprint: Tuple[str, ...]
     all_articles_older_than_cutoff: bool
     listing_item_count: int
+    unresolved_date_count: int = 0
 
 
 class DailyMediArticleRecord(TypedDict):
@@ -76,6 +78,38 @@ def _allowed_article_url(href: str, list_url: str) -> Optional[Tuple[str, str]]:
     if len(wr_ids) != 1 or not re.fullmatch(r"\d+", wr_ids[0]):
         return None
     return url, wr_ids[0]
+
+
+def _medi_box_article_url(
+    href: str,
+    list_url: str,
+    section_id: str,
+) -> Optional[Tuple[str, str]]:
+    link = _allowed_article_url(href, list_url)
+    if link is None:
+        return None
+    url, wr_id = link
+    ca_ids = parse_qs(urlparse(url).query).get("ca_id", [])
+    if len(ca_ids) != 1 or ca_ids[0] != section_id:
+        return None
+    return url, wr_id
+
+
+def _listing_for_section(soup: BeautifulSoup, section_id: str) -> Optional[Tag]:
+    if section_id in ("21", "31"):
+        return soup.select_one(".listNews.mediBox > ul")
+    return soup.select_one(".listNews > ul.webzin.main2")
+
+
+def _article_title_marker_found(soup: BeautifulSoup, section_id: str) -> bool:
+    if section_id in ("21", "31"):
+        return soup.select_one(".listNews.mediBox > ul > li > .subject.ml_subject > a[href]") is not None
+    return soup.select_one(".listNews > ul.webzin.main2 .stitle") is not None
+
+
+def _section_id_from_url(list_url: str) -> str:
+    section_ids = parse_qs(urlparse(list_url).query).get("ca_id", [])
+    return section_ids[0] if len(section_ids) == 1 else ""
 
 
 def _parse_kst_datetime(value: str) -> Optional[datetime]:
@@ -127,18 +161,30 @@ def parse_list_page(
     fetch_article_date: Optional[Callable[[str], Optional[datetime]]] = None,
 ) -> DailyMediPage:
     soup = BeautifulSoup(html, "html.parser")
-    listing = soup.select_one(".listNews > ul.webzin.main2")
+    section_id = _section_id_from_url(list_url)
+    is_medi_box = section_id in ("21", "31")
+    listing = _listing_for_section(soup, section_id)
     if listing is None:
         raise ValueError("DailyMedi article listing markup not found")
     articles: List[DailyMediArticle] = []
     fingerprint: List[str] = []
     all_older = True
+    unresolved_date_count = 0
 
     for item in listing.select("li"):
-        title_node = item.select_one(".stitle")
-        anchor = item.select_one("a[href]")
-        title = title_node.get_text(" ", strip=True) if title_node else ""
-        link = _allowed_article_url((anchor.get("href") or "") if anchor else "", list_url)
+        if is_medi_box:
+            anchor = item.select_one(".subject.ml_subject > a[href]")
+            title = anchor.get_text(" ", strip=True) if anchor else ""
+            link = _medi_box_article_url(
+                (anchor.get("href") or "") if anchor else "",
+                list_url,
+                section_id,
+            )
+        else:
+            title_node = item.select_one(".stitle")
+            anchor = item.select_one("a[href]")
+            title = title_node.get_text(" ", strip=True) if title_node else ""
+            link = _allowed_article_url((anchor.get("href") or "") if anchor else "", list_url)
         if not title or link is None:
             continue
 
@@ -152,6 +198,10 @@ def parse_list_page(
             except Exception:
                 published_at = None
         if published_at is None:
+            if is_medi_box:
+                unresolved_date_count += 1
+                all_older = False
+                continue
             published_at = now.astimezone(timezone.utc)
         if published_at >= cutoff:
             all_older = False
@@ -159,7 +209,13 @@ def parse_list_page(
 
     if not articles:
         all_older = False
-    return DailyMediPage(tuple(articles), tuple(fingerprint), all_older, len(listing.select("li")))
+    return DailyMediPage(
+        tuple(articles),
+        tuple(fingerprint),
+        all_older,
+        len(listing.select("li")),
+        unresolved_date_count,
+    )
 
 
 def collect_recent_articles(
@@ -232,6 +288,9 @@ def collect_recent_articles(
                 if article.published_at >= cutoff and article.wr_id not in articles_by_id:
                     articles_by_id[article.wr_id] = article
 
+            if page.unresolved_date_count:
+                return make_partial(section_id, page_number, "article-date-unavailable")
+
             if page.all_articles_older_than_cutoff:
                 section_terminated = True
                 break
@@ -274,7 +333,7 @@ def _fetch_text(url: str) -> str:
     text = response.text
     if is_listing_request:
         soup = BeautifulSoup(text, "html.parser")
-        has_expected_list = soup.select_one(".listNews > ul.webzin.main2") is not None
+        has_expected_list = _listing_for_section(soup, _section_id_from_url(url)) is not None
         if not has_expected_list:
             _log_listing_diagnostic(url, response, attempt, "missing-listing-selector", text)
     if final_url.scheme != "https" or final_host not in ALLOWED_HOSTS:
@@ -305,8 +364,8 @@ def _log_listing_diagnostic(url: str, response, attempt: int, classification: st
     content_type = re.sub(r"[^A-Za-z0-9.+/-]", "", content_type)[:80] or "unknown"
     soup = BeautifulSoup(text, "html.parser")
     has_list_container = soup.select_one(".listNews") is not None
-    has_expected_list = soup.select_one(".listNews > ul.webzin.main2") is not None
-    has_article_title_marker = soup.select_one(".stitle") is not None
+    has_expected_list = _listing_for_section(soup, section_id) is not None
+    has_article_title_marker = _article_title_marker_found(soup, section_id)
     print(
         f"DailyMedi listing diagnostic: request_url={LIST_URL}?ca_id={section_id}&page={page_number} "
         f"final_url={final_url_safe} status={response.status_code} content_type={content_type} "
