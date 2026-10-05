@@ -442,8 +442,9 @@ class DailyMediNetworkTests(unittest.TestCase):
             dailymedi._fetch_text(LIST_URL)
 
         self.assertEqual(len(logs), 1)
-        self.assertIn("request_url=https://www.dailymedi.com/news/news_list.php?ca_id=22&page=1", logs[0])
-        self.assertIn("final_url=https://www.dailymedi.com/blocked", logs[0])
+        self.assertIn("section=22 page=1", logs[0])
+        self.assertIn("final_host=www.dailymedi.com", logs[0])
+        self.assertNotIn("https://", logs[0])
         self.assertIn("status=200", logs[0])
         self.assertIn("content_type=text/html", logs[0])
         self.assertIn("response_bytes=", logs[0])
@@ -565,3 +566,4 @@ class DailyMediNetworkTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
