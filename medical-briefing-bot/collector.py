@@ -20,6 +20,7 @@ from collector_sources.medigate import (
     collect_recent_articles as collect_medigate_articles,
 )
 from collector_sources.medical_press import is_valid_press_article
+from law_api_security import LawAPIError, build_law_api_url, require_law_api_key
 from collector_parsers import (
     get_content_hash,
     has_hira_target_board,
@@ -34,7 +35,6 @@ load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
-law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용자가 발급받은 키
 
 supabase: Client = create_client(url, key)
 
@@ -348,10 +348,11 @@ def fetch_law_api():
     source_name = "국가법령정보센터"
     print(f"🔄 오픈 API 수집: {source_name}")
     articles_to_save = []
+    law_api_key = require_law_api_key()
     
     try:
         # 최근 제정/개정된 의료법 등을 검색
-        url = f"https://www.law.go.kr/DRF/lawSearch.do?OC={law_api_key}&target=law&type=JSON&query=의료법"
+        url = build_law_api_url(law_api_key)
         headers = {'Referer': 'https://medical-briefing-bot.vercel.app'} # Referer 검증 통과용
         response = get_with_transient_retry(
             url, source_name=source_name, headers=headers, timeout=10
@@ -359,6 +360,11 @@ def fetch_law_api():
         if response.status_code != 200:
             raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
         data = response.json()
+        auth_payload = data.get("LawSearch", data) if isinstance(data, dict) else data
+        if isinstance(auth_payload, dict) and any(
+            field in auth_payload for field in ("error", "Error", "Response", "errorCode", "result", "resultCode", "message", "msg")
+        ):
+            raise LawAPIError("authentication_response")
         # 데이터 추출 (LawSearch > law 객체 배열)
         # 여기서는 API가 작동한다는 전제하에 임시 데이터를 삽입합니다.
         if "LawSearch" in data and "law" in data["LawSearch"]:
@@ -381,9 +387,10 @@ def fetch_law_api():
                 "content_hash": get_content_hash("의료법시행령 일부개정령안"),
                 "status": "NEW"
             })
-    except Exception as e:
-        print(f"API 에러 ({source_name}): {e}")
-        raise
+    except (requests.RequestException, ValueError, TypeError, KeyError) as error:
+        safe_error = error if isinstance(error, LawAPIError) else LawAPIError(type(error).__name__)
+        print(f"API 에러 ({source_name}): {safe_error}")
+        raise safe_error from None
         
     return articles_to_save
 
