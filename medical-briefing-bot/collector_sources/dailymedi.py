@@ -1,6 +1,10 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import http.client
+import json
+import platform
 import re
+import ssl
 import time
 from typing import Callable, Dict, List, Optional, Set, Tuple, TypedDict
 from urllib.parse import parse_qs, urljoin, urlparse
@@ -8,6 +12,7 @@ from urllib.parse import parse_qs, urljoin, urlparse
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 import requests
+import urllib3
 
 from collector_parsers import get_content_hash
 
@@ -302,9 +307,112 @@ def collect_recent_articles(
     return make_result(True, None)
 
 
+def _request_context(url: str) -> Dict[str, Optional[str]]:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    is_listing_request = parsed.path == urlparse(LIST_URL).path
+
+    def numeric_value(key: str) -> Optional[str]:
+        value = query.get(key, [None])[0]
+        return value if value is not None and value.isdecimal() else None
+
+    return {
+        "request_type": "list" if is_listing_request else "detail",
+        "section": numeric_value("ca_id"),
+        "page": numeric_value("page") if is_listing_request else None,
+        "article_id": numeric_value("wr_id") if not is_listing_request else None,
+    }
+
+
+def _exception_chain(error: BaseException) -> Tuple[BaseException, ...]:
+    pending = [error]
+    seen = set()
+    chain = []
+    while pending:
+        current = pending.pop(0)
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        chain.append(current)
+        for attribute in ("__cause__", "__context__", "reason"):
+            related = getattr(current, attribute, None)
+            if isinstance(related, BaseException) and id(related) not in seen:
+                pending.append(related)
+    return tuple(chain)
+
+
+def _classify_transient_error(error: BaseException) -> str:
+    chain = _exception_chain(error)
+
+    if any(isinstance(item, ssl.SSLEOFError) for item in chain):
+        return "ssl_eof"
+    if any(isinstance(item, http.client.RemoteDisconnected) for item in chain):
+        return "remote_disconnect"
+    if any(isinstance(item, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)) for item in chain):
+        return "connection_reset"
+
+    handshake_reasons = {
+        "SSLV3_ALERT_HANDSHAKE_FAILURE",
+        "TLSV1_ALERT_HANDSHAKE_FAILURE",
+        "SSL_HANDSHAKE_FAILURE",
+        "NO_SHARED_CIPHER",
+        "NO_SUITABLE_SIGNATURE_ALGORITHM",
+        "UNSUPPORTED_PROTOCOL",
+        "WRONG_VERSION_NUMBER",
+    }
+    for item in chain:
+        reason = getattr(item, "reason", None)
+        if isinstance(reason, str) and reason.upper() in handshake_reasons:
+            return "ssl_handshake"
+
+    if any(isinstance(item, (requests.exceptions.ConnectTimeout, urllib3.exceptions.ConnectTimeoutError)) for item in chain):
+        return "timeout_connect"
+    if any(isinstance(item, (requests.exceptions.ReadTimeout, urllib3.exceptions.ReadTimeoutError)) for item in chain):
+        return "timeout_read"
+    if any(isinstance(item, requests.exceptions.ChunkedEncodingError) for item in chain):
+        return "chunked_encoding"
+    if any(isinstance(item, (requests.exceptions.SSLError, ssl.SSLError, urllib3.exceptions.SSLError)) for item in chain):
+        return "unknown_ssl"
+    if any(isinstance(item, requests.exceptions.Timeout) for item in chain):
+        return "timeout_unknown"
+    return "unknown_connection"
+
+
+def _log_request_diagnostic(
+    context: Dict[str, Optional[str]],
+    attempt: int,
+    max_attempts: int,
+    result: str,
+    elapsed_ms: int,
+    error: Optional[BaseException] = None,
+) -> None:
+    record = {
+        **context,
+        "attempt": attempt,
+        "max_attempts": max_attempts,
+        "result": result,
+        "exception_class": type(error).__name__ if error is not None else None,
+        "classification": _classify_transient_error(error) if error is not None else None,
+        "elapsed_ms": elapsed_ms,
+    }
+    print("DailyMedi request diagnostic: " + json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
+def _log_runtime_diagnostic() -> None:
+    record = {
+        "python_version": platform.python_version(),
+        "requests_version": requests.__version__,
+        "urllib3_version": urllib3.__version__,
+        "openssl_version": ssl.OPENSSL_VERSION,
+    }
+    print("DailyMedi runtime diagnostic: " + json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
 def _fetch_text(url: str) -> str:
-    is_listing_request = urlparse(url).path == urlparse(LIST_URL).path
-    for attempt in range(1, len(RETRY_BACKOFFS) + 2):
+    context = _request_context(url)
+    max_attempts = len(RETRY_BACKOFFS) + 1
+    for attempt in range(1, max_attempts + 1):
+        started_at = time.monotonic()
         try:
             response = requests.get(
                 url,
@@ -312,32 +420,36 @@ def _fetch_text(url: str) -> str:
                 timeout=(5, 20),
                 allow_redirects=True,
             )
-            break
         except TRANSIENT_ERRORS as error:
-            print(
-                f"DailyMedi transient request failure: url={url} "
-                f"attempt={attempt}/3 error={type(error).__name__}"
-            )
-            if attempt > len(RETRY_BACKOFFS):
+            elapsed_ms = max(0, int((time.monotonic() - started_at) * 1000))
+            result = "exhausted" if attempt == max_attempts else "retry"
+            _log_request_diagnostic(context, attempt, max_attempts, result, elapsed_ms, error)
+            if result == "exhausted":
                 raise
             time.sleep(RETRY_BACKOFFS[attempt - 1])
+        else:
+            if attempt > 1:
+                elapsed_ms = max(0, int((time.monotonic() - started_at) * 1000))
+                _log_request_diagnostic(context, attempt, max_attempts, "success", elapsed_ms)
+            break
+
     try:
         response.raise_for_status()
     except requests.HTTPError:
-        if is_listing_request:
+        if context["request_type"] == "list":
             _log_listing_diagnostic(url, response, attempt, "http-status-error", response.text)
         raise
 
     final_url = urlparse(response.url)
     final_host = (final_url.hostname or "").lower()
     text = response.text
-    if is_listing_request:
+    if context["request_type"] == "list":
         soup = BeautifulSoup(text, "html.parser")
         has_expected_list = _listing_for_section(soup, _section_id_from_url(url)) is not None
         if not has_expected_list:
             _log_listing_diagnostic(url, response, attempt, "missing-listing-selector", text)
     if final_url.scheme != "https" or final_host not in ALLOWED_HOSTS:
-        if is_listing_request:
+        if context["request_type"] == "list":
             _log_listing_diagnostic(url, response, attempt, "redirect-host-not-allowed", text)
         raise ValueError(f"DailyMedi redirected outside the approved host list: {final_host}")
     return text
@@ -353,13 +465,8 @@ def _log_listing_diagnostic(url: str, response, attempt: int, classification: st
         page_number = "unknown"
 
     final_url = urlparse(response.url)
-    final_host = (final_url.hostname or "unknown").lower()
-    final_path = final_url.path[:160]
-    final_url_safe = (
-        f"{final_url.scheme}://{final_host}{final_path}"
-        if final_url.scheme in ("http", "https")
-        else "unknown"
-    )
+    raw_final_host = (final_url.hostname or "unknown").lower()
+    final_host = raw_final_host if raw_final_host in ALLOWED_HOSTS else "other"
     content_type = response.headers.get("content-type", "unknown").split(";", 1)[0]
     content_type = re.sub(r"[^A-Za-z0-9.+/-]", "", content_type)[:80] or "unknown"
     soup = BeautifulSoup(text, "html.parser")
@@ -367,8 +474,8 @@ def _log_listing_diagnostic(url: str, response, attempt: int, classification: st
     has_expected_list = _listing_for_section(soup, section_id) is not None
     has_article_title_marker = _article_title_marker_found(soup, section_id)
     print(
-        f"DailyMedi listing diagnostic: request_url={LIST_URL}?ca_id={section_id}&page={page_number} "
-        f"final_url={final_url_safe} status={response.status_code} content_type={content_type} "
+        f"DailyMedi listing diagnostic: section={section_id} page={page_number} "
+        f"final_host={final_host} status={response.status_code} content_type={content_type} "
         f"response_bytes={len(response.content)} response_chars={len(text)} "
         f"redirects={len(response.history)} attempt={attempt} "
         f"marker_list_container={str(has_list_container).lower()} "
@@ -387,5 +494,6 @@ def _fetch_article_date(url: str) -> Optional[datetime]:
 
 
 def fetch_dailymedi_articles() -> DailyMediCollection:
+    _log_runtime_diagnostic()
     print(f"DailyMedi HTML collection: sections={','.join(SECTION_IDS)} window_days=7")
     return collect_recent_articles(_fetch_text, _fetch_article_date)
