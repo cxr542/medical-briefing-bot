@@ -1,0 +1,35 @@
+name: Keyword quality tests
+
+on:
+  pull_request:
+    paths:
+      - 'medical-briefing-bot/frontend/src/lib/articleKeywords.ts'
+      - 'medical-briefing-bot/frontend/src/components/ArticleList.tsx'
+      - 'medical-briefing-bot/frontend/tests/**'
+      - 'medical-briefing-bot/frontend/package*.json'
+      - '.github/workflows/keyword-quality-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  keyword-quality:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: medical-briefing-bot/frontend
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:43191
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: offline-qa-placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: medical-briefing-bot/frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx tsc --noEmit
+      - run: npm run lint
