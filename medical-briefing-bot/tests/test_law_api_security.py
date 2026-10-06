@@ -2,17 +2,23 @@ import ast
 import os
 from pathlib import Path
 import sys
+from types import ModuleType
 import unittest
 from unittest.mock import Mock, patch
 
 import requests
-import supabase
 
 
 PACKAGE_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PACKAGE_ROOT))
 
-with patch.object(supabase, "create_client", return_value=Mock()):
+supabase_stub = ModuleType("supabase")
+supabase_stub.create_client = Mock(return_value=Mock())
+supabase_stub.Client = object
+dotenv_stub = ModuleType("dotenv")
+dotenv_stub.load_dotenv = Mock(return_value=False)
+
+with patch.dict(sys.modules, {"supabase": supabase_stub, "dotenv": dotenv_stub}):
     import collector
 
 
