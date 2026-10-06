@@ -4,6 +4,68 @@ import { extractTitleKeywords, getArticleKeywords } from '../src/lib/articleKeyw
 
 const REPORTED_TITLE = "[질병군] 행위 별도보상 코드목록('26.10.1.기준)";
 const concepts = keywords => keywords.join(' ').replace(/\s/gu, '');
+const COMPOUND_TITLE = '2026년「요양급여 청구 자율점검 사례모음집」 책자 파일(PDF) 안내';
+const COMPOUND_KEYWORDS = ['요양급여', '청구', '자율점검', '사례모음집'];
+
+test('bound compound uses one display slot without changing frozen original keywords', () => {
+  const keywords = Object.freeze([...COMPOUND_KEYWORDS]);
+  const article = Object.freeze({ title: COMPOUND_TITLE, keywords });
+  const result = getArticleKeywords(article);
+  assert.equal(result, '요양급여청구, 자율점검, 사례모음집');
+  assert.equal(result.split(', ').length, 3);
+  assert.deepEqual(keywords, COMPOUND_KEYWORDS);
+});
+
+test('bound compound normalizes stored text while preserving the original value', () => {
+  const article = Object.freeze({ title: COMPOUND_TITLE, keywords: COMPOUND_KEYWORDS.join(', ') });
+  const result = getArticleKeywords(article);
+  assert.equal(result, '요양급여청구, 자율점검, 사례모음집');
+  assert.equal(article.keywords, '요양급여, 청구, 자율점검, 사례모음집');
+});
+
+test('missing or invalid stored keywords normalize the grounded title fallback', () => {
+  for (const keywords of [null, [], '[broken']) {
+    assert.equal(getArticleKeywords({ title: COMPOUND_TITLE, keywords }), '요양급여청구, 자율점검, 사례모음집');
+  }
+  assert.deepEqual(extractTitleKeywords(COMPOUND_TITLE), COMPOUND_KEYWORDS);
+});
+
+test('unbound, separate, differently headed and newline-separated concepts remain unchanged', () => {
+  for (const title of ['자율점검 사례모음집 안내', '요양급여 확대와 별도 청구 시스템',
+    '요양급여 지급과 비급여 청구', '요양급여\n청구 자율점검', '비급여요양급여 청구', '요양급여 청구서 안내']) {
+    const keywords = '요양급여,청구, 자율점검, 사례모음집';
+    assert.equal(getArticleKeywords({ title, keywords }), keywords);
+  }
+});
+
+test('unapproved pairs and independent concepts are not combined or capped', () => {
+  for (const keywords of [['보험', '보험급여', '인증', '미인증'], ['병원', '안내', '정책', '결과'],
+    [...COMPOUND_KEYWORDS, '수가']]) {
+    assert.equal(getArticleKeywords({ title: COMPOUND_TITLE, keywords }), keywords.join(', '));
+  }
+});
+
+test('existing canonical compound occupies one slot while preserving its original array', () => {
+  const keywords = Object.freeze(['요양급여', '청구', '요양급여청구', '자율점검', '사례모음집']);
+  assert.equal(getArticleKeywords({ title: COMPOUND_TITLE, keywords }), '요양급여청구, 자율점검, 사례모음집');
+  assert.deepEqual(keywords, ['요양급여', '청구', '요양급여청구', '자율점검', '사례모음집']);
+});
+
+test('valid three-keyword stored inputs keep priority even with title compound evidence', () => {
+  for (const keywords of [['요양급여', '청구', '자율점검'], '[질병군], 별도보상, 코드목록']) {
+    assert.equal(getArticleKeywords({ title: COMPOUND_TITLE, keywords }),
+      Array.isArray(keywords) ? keywords.join(', ') : keywords);
+  }
+});
+
+test('source changes neither authorize nor block compound normalization', () => {
+  for (const source of ['심사평가원 공지사항', '테스트 기관', '요양급여 청구']) {
+    assert.equal(getArticleKeywords({ title: COMPOUND_TITLE, keywords: COMPOUND_KEYWORDS, source }),
+      '요양급여청구, 자율점검, 사례모음집');
+    assert.equal(getArticleKeywords({ title: '독립 주제 안내', keywords: COMPOUND_KEYWORDS, source }),
+      COMPOUND_KEYWORDS.join(', '));
+  }
+});
 
 test('reported article preserves its three semantic concepts instead of source-derived terms', () => {
   const article = { source: '심사평가원 공지사항', title: REPORTED_TITLE, keywords: null };

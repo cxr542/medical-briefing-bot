@@ -67,6 +67,44 @@ export function extractTitleKeywords(title: string): readonly string[] {
   return selected.sort((a, b) => a.index - b.index).map(item => item.text);
 }
 
+const DISPLAY_COMPOUNDS = [{
+  id: 'benefit-claim-v1',
+  parts: ['요양급여', '청구'],
+  label: '요양급여청구',
+  binding: /(?:^|[^\p{L}\p{N}])요양급여[ \t]*청구(?=$|[^\p{L}\p{N}])/u,
+}] as const;
+
+type DisplayConcept = {
+  readonly label: string;
+  readonly members: readonly { readonly index: number; readonly raw: string }[];
+  readonly ruleId: string | null;
+  readonly evidence: string | null;
+};
+
+function normalizeCompoundDisplay(title: string, keywords: readonly string[]): string | undefined {
+  if (keywords.length <= 3) return undefined;
+  const canonical = (value: string) => value.normalize('NFKC').replace(/\s/gu, '');
+  for (const rule of DISPLAY_COMPOUNDS) {
+    const indices = rule.parts.map(part => keywords.findIndex(keyword => canonical(keyword) === part));
+    const evidence = title.normalize('NFKC').match(rule.binding);
+    if (indices.some(index => index < 0) || !evidence) continue;
+    const consumed = new Set(indices);
+    keywords.forEach((keyword, index) => {
+      if (canonical(keyword) === rule.label) consumed.add(index);
+    });
+    const members = [...consumed].sort((a, b) => a - b)
+      .map(index => ({ index, raw: keywords[index] }));
+    const compound: DisplayConcept = { label: rule.label, members, ruleId: rule.id, evidence: evidence[0].trim() };
+    const concepts: readonly DisplayConcept[] = keywords.flatMap((keyword, index) => {
+      if (index === members[0].index) return [compound];
+      if (consumed.has(index)) return [];
+      return [{ label: keyword, members: [{ index, raw: keyword }], ruleId: null, evidence: null }];
+    });
+    if (concepts.length <= 3) return concepts.map(concept => concept.label).join(', ');
+  }
+  return undefined;
+}
+
 export function getArticleKeywords(article: {
   readonly title: string;
   readonly keywords?: unknown;
@@ -76,11 +114,15 @@ export function getArticleKeywords(article: {
     const value = stored.trim();
     const annotatedText = /^(?:\[[^\[\]{}"',]+\]|\{[^\[\]{}"',]+\})(?:\s*,|\s*$)/u.test(value);
     if (/\p{L}/u.test(value) && !/^(null|undefined)$/iu.test(value)
-      && (!/^[\[{]/u.test(value) || annotatedText)) return value;
+      && (!/^[\[{]/u.test(value) || annotatedText)) {
+      return normalizeCompoundDisplay(article.title, value.split(',').map(keyword => keyword.trim())) ?? value;
+    }
   }
   if (Array.isArray(stored) && stored.length > 0
     && stored.every((keyword: unknown) => typeof keyword === 'string' && /\p{L}/u.test(keyword))) {
-    return stored.map((keyword: string) => keyword.trim()).join(', ');
+    const keywords = stored.map((keyword: string) => keyword.trim());
+    return normalizeCompoundDisplay(article.title, keywords) ?? keywords.join(', ');
   }
-  return extractTitleKeywords(article.title).join(', ');
+  const keywords = extractTitleKeywords(article.title);
+  return normalizeCompoundDisplay(article.title, keywords) ?? keywords.join(', ');
 }
