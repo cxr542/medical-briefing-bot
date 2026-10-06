@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-06-pr-62",
+    "date": "2026.10.06",
+    "category": "개선",
+    "title": "검증된 요양급여 청구 복합 키워드의 표시 보존",
+    "summary": "PR #62 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "제목에 직접 결합 근거가 있는 요양급여·청구 후보를 한 display concept로 표시합니다. DB 원문과 기존 stored keyword 우선순위는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #62",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/62"
+      }
+    ]
+  },
+  {
     "id": "2026-10-06-pr-61",
     "date": "2026.10.06",
     "category": "버그 수정",
