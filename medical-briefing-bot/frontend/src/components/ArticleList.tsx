@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { getArticleKeywords } from '@/lib/articleKeywords';
 import {
   COLLECTION_DISPLAY_SCHEDULE_KST,
   COLLECTION_RUNTIME_SCHEDULE_KST,
@@ -329,7 +330,7 @@ export default function ArticleList({
   }, [initialArticles]);
 
   const analyzeArticle = (article: Article): BriefingAnalysis => {
-    // AI가 추출한 진짜 카테고리와 키워드가 DB에 있다면 우선 사용
+    const keywords = getArticleKeywords(article);
     if (article.category || article.keywords) {
       let categoryClassName = "bg-gray-100 text-gray-700";
       const cat = article.category || "일반공지";
@@ -341,52 +342,11 @@ export default function ArticleList({
       return {
         category: cat,
         categoryClassName,
-        keywords: article.keywords || ""
+        keywords,
       };
     }
 
-    const text = `${article.source} ${article.title}`;
-    const matchedKeywords = [
-      ['의료질평가', ['의료질평가', '지표', '정정신청']],
-      ['적정성평가', ['적정성평가', '평가지표', '요양기관']],
-      ['평가', ['평가', '지표', '결과']],
-      ['수가', ['수가', '건강보험', '급여']],
-      ['급여', ['급여기준', '청구', '건강보험']],
-      ['심사', ['심사기준', '청구', '심평원']],
-      ['개인정보', ['개인정보', '제3자 제공', '공개내역']],
-      ['자동이체', ['보험료', '자동이체', '납부']],
-      ['검진', ['검진기관', '장비현황', '건강검진']],
-      ['공모', ['공모', '신청', '마감']],
-      ['교육', ['교육', '안내', '참여']],
-      ['설명회', ['설명회', '정책안내', '참여']],
-      ['시스템', ['시스템', '점검', '업무중단']],
-      ['법률', ['법령', '개정', '시행']],
-      ['법령', ['법령', '개정', '시행']],
-      ['의료법', ['의료법', '개정', '의료기관']],
-      ['연명의료', ['연명의료', '계획서', '입법']],
-      ['환자안전', ['환자안전', '자율규제', '의료계']],
-      ['의료기사', ['의료기사법', '원격지도', '쟁점']],
-      ['당뇨병', ['당뇨병', 'CGM', '급여확대']],
-      ['보직', ['기관인사', '임원', '공백']],
-      ['임명', ['기관인사', '임명', '보직']],
-    ] as const;
-
-    const keywordSet = new Set<string>();
-    matchedKeywords.forEach(([needle, keywords]) => {
-      if (text.includes(needle)) {
-        keywords.forEach(keyword => keywordSet.add(keyword));
-      }
-    });
-
-    if (keywordSet.size === 0) {
-      if (article.source.includes('국가법령')) {
-        ['법령', '보건의료', '제도'].forEach(keyword => keywordSet.add(keyword));
-      } else if (PRESS_SOURCES.includes(article.source)) {
-        ['의료계', '정책동향', '뉴스'].forEach(keyword => keywordSet.add(keyword));
-      } else {
-        ['공지', '기관안내', '확인필요'].forEach(keyword => keywordSet.add(keyword));
-      }
-    }
+    const text = article.title;
 
     let category = '일반공지';
     let categoryClassName = 'text-gray-600 border-gray-200 bg-gray-50';
@@ -413,7 +373,7 @@ export default function ArticleList({
     return {
       category: article.category || category,
       categoryClassName,
-      keywords: article.keywords || Array.from(keywordSet).slice(0, 3).join(', '),
+      keywords,
     };
   };
 
