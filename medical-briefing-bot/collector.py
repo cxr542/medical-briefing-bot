@@ -4,6 +4,7 @@ import os
 import time
 from urllib.parse import urlparse
 import re
+from typing import Optional
 
 from collector_lifecycle import find_absent_article_urls
 import feedparser
@@ -34,7 +35,6 @@ load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
-law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용자가 발급받은 키
 
 supabase: Client = create_client(url, key)
 
@@ -88,6 +88,7 @@ def get_with_transient_retry(
     headers=None,
     verify: bool = True,
     allow_redirects: bool = True,
+    params: Optional[dict[str, str]] = None,
     sleep_fn=time.sleep,
 ):
     # 정부기관 사이트는 GitHub Actions 구간에서 일시적인 connect timeout이 종종 발생합니다.
@@ -95,13 +96,23 @@ def get_with_transient_retry(
     backoffs = (3, 8, 15)
     for attempt in range(1, 5):
         try:
-            response = requests.get(
-                url,
-                headers=headers,
-                timeout=timeout,
-                verify=verify,
-                allow_redirects=allow_redirects,
-            )
+            if params is None:
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=timeout,
+                    verify=verify,
+                    allow_redirects=allow_redirects,
+                )
+            else:
+                response = requests.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=timeout,
+                    verify=verify,
+                    allow_redirects=allow_redirects,
+                )
             if attempt > 1:
                 print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/4")
             return response
@@ -344,47 +355,77 @@ def fetch_kha_notices():
     return articles_to_save
 
 # 3. 국가법령정보센터 오픈 API
+class LawApiError(RuntimeError):
+    pass
+
 def fetch_law_api():
     source_name = "국가법령정보센터"
     print(f"🔄 오픈 API 수집: {source_name}")
     articles_to_save = []
-    
+
+    api_key = os.environ.get("LAW_API_KEY")
+    if not api_key or not api_key.strip():
+        raise LawApiError("LAW_API_KEY is not configured")
+
     try:
-        # 최근 제정/개정된 의료법 등을 검색
-        url = f"https://www.law.go.kr/DRF/lawSearch.do?OC={law_api_key}&target=law&type=JSON&query=의료법"
-        headers = {'Referer': 'https://medical-briefing-bot.vercel.app'} # Referer 검증 통과용
         response = get_with_transient_retry(
-            url, source_name=source_name, headers=headers, timeout=10
+            "https://www.law.go.kr/DRF/lawSearch.do",
+            source_name=source_name,
+            headers={"Referer": "https://medical-briefing-bot.vercel.app"},
+            timeout=10,
+            params={
+                "OC": api_key,
+                "target": "law",
+                "type": "JSON",
+                "query": "의료법",
+            },
         )
-        if response.status_code != 200:
-            raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
+    except requests.exceptions.RequestException as error:
+        raise LawApiError(
+            f"LAW API request failed: {type(error).__name__}"
+        ) from None
+
+    if response.status_code != 200:
+        raise LawApiError(
+            f"LAW API returned HTTP status {response.status_code}"
+        )
+
+    try:
         data = response.json()
-        # 데이터 추출 (LawSearch > law 객체 배열)
-        # 여기서는 API가 작동한다는 전제하에 임시 데이터를 삽입합니다.
-        if "LawSearch" in data and "law" in data["LawSearch"]:
-            for law in data["LawSearch"]["law"]:
-                articles_to_save.append({
-                    "source": source_name,
-                    "title": f"[법령] {law.get('법령명한글', '의료법')}",
-                    "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law.get('법령일련번호')}",
-                    "published_date": datetime.now(timezone.utc).isoformat(),
-                    "content_hash": get_content_hash(law.get('법령일련번호', '0')),
-                    "status": "NEW"
-                })
-        else:
-            # API 파라미터나 키 오류 시 임시 데이터 반환 (화면 확인용)
-            articles_to_save.append({
-                "source": source_name,
-                "title": "[최신개정] 의료법 시행령 일부개정령안",
-                "url": "https://www.law.go.kr/법령/의료법시행령",
-                "published_date": datetime.now(timezone.utc).isoformat(),
-                "content_hash": get_content_hash("의료법시행령 일부개정령안"),
-                "status": "NEW"
-            })
-    except Exception as e:
-        print(f"API 에러 ({source_name}): {e}")
-        raise
-        
+    except ValueError:
+        raise LawApiError("LAW API returned invalid JSON") from None
+
+    if not isinstance(data, dict):
+        raise LawApiError("LAW API returned an unexpected response")
+    if data.get("error") or data.get("errors"):
+        raise LawApiError("LAW API returned an error response")
+    law_search = data.get("LawSearch")
+    if not isinstance(law_search, dict):
+        raise LawApiError("LAW API returned an unexpected response")
+    if law_search.get("error") or law_search.get("errors"):
+        raise LawApiError("LAW API returned an error response")
+    laws = law_search.get("law")
+    if not isinstance(laws, list):
+        raise LawApiError("LAW API returned an unexpected response")
+
+    for law in laws:
+        if not isinstance(law, dict):
+            raise LawApiError("LAW API returned an invalid law record")
+        title = law.get("법령명한글")
+        law_id = law.get("법령일련번호")
+        if not isinstance(title, str) or not title.strip():
+            raise LawApiError("LAW API returned an invalid law record")
+        if law_id is None or not str(law_id).strip():
+            raise LawApiError("LAW API returned an invalid law record")
+        articles_to_save.append({
+            "source": source_name,
+            "title": f"[법령] {title}",
+            "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law_id}",
+            "published_date": datetime.now(timezone.utc).isoformat(),
+            "content_hash": get_content_hash(str(law_id)),
+            "status": "NEW"
+        })
+
     return articles_to_save
 
 import urllib3
