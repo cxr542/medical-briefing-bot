@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-06-pr-61",
+    "date": "2026.10.06",
+    "category": "버그 수정",
+    "title": "기사 제목 기반 주요 키워드 fallback 품질 개선",
+    "summary": "PR #61 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "기관명으로 잘못 추정하던 주요 키워드를 제목 기반으로 생성합니다.",
+      "저장 키워드를 우선하고 전문 용어를 보존하며 일반어와 중복 후보를 줄입니다.",
+      "Production 데이터 재생성이나 DB 변경 없이 frontend 표시 로직만 개선합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #61",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/61"
+      }
+    ]
+  },
+  {
     "id": "2026-10-04-pr-58",
     "date": "2026.10.04",
     "category": "버그 수정",
