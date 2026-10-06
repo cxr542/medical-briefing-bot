@@ -74,7 +74,9 @@ export function getArticleKeywords(article: {
   const stored = article.keywords;
   if (typeof stored === 'string') {
     const value = stored.trim();
-    if (/\p{L}/u.test(value) && !/^[\[{]|^(null|undefined)$/iu.test(value)) return value;
+    const annotatedText = /^(?:\[[^\[\]{}"',]+\]|\{[^\[\]{}"',]+\})(?:\s*,|\s*$)/u.test(value);
+    if (/\p{L}/u.test(value) && !/^(null|undefined)$/iu.test(value)
+      && (!/^[\[{]/u.test(value) || annotatedText)) return value;
   }
   if (Array.isArray(stored) && stored.length > 0
     && stored.every((keyword: unknown) => typeof keyword === 'string' && /\p{L}/u.test(keyword))) {

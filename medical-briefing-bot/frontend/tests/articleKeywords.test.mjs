@@ -22,7 +22,21 @@ test('a valid stored string array takes priority at the display boundary', () =>
   assert.equal(getArticleKeywords({ title: REPORTED_TITLE, keywords }), keywords.join(', '));
 });
 
-for (const keywords of [null, undefined, [], '', '  \n ', 42, {}, [' '], ['GLP-1', null], '[broken', '{}']) {
+for (const keywords of [
+  '[질병군], 별도보상, 코드목록',
+  '[GLP-1], 비만치료제',
+  '[수가/청구]',
+  '(질병군), 별도보상',
+  '{급여}, 코드목록',
+]) {
+  test(`stored annotated keywords bypass a semantically different title fallback: ${keywords}`, () => {
+    const title = '[감염병] 백신 접종 안내';
+    assert.notEqual(extractTitleKeywords(title).join(', '), keywords);
+    assert.equal(getArticleKeywords({ title, keywords }), keywords);
+  });
+}
+
+for (const keywords of [null, undefined, [], '', '  \n ', 42, {}, [' '], ['GLP-1', null], '[broken', '{}', '[]', '()', ',', '123', 'null', 'undefined', '["GLP-1"]', '[GLP-1, 비만치료제]', '{"keywords":"GLP-1"}', '{broken']) {
   test(`missing or malformed stored keywords use grounded fallback: ${JSON.stringify(keywords)}`, () => {
     const result = getArticleKeywords({ title: REPORTED_TITLE, keywords });
     for (const concept of ['질병군', '별도보상', '코드목록']) assert.ok(result.includes(concept));
