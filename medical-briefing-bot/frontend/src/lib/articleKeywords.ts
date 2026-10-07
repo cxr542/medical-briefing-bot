@@ -15,14 +15,45 @@ const PHRASE_END = /^(안전|평가|기준|예방|지원|공급|손상|질환|�
 const ORGANIZATION = /(평가원|심사평가원|관리청|안전처|복지부|공단|협회|대학교|의료원)$/u;
 const NUMBER_METADATA = /^\d+(?:여)?(년|년도|월|일|차|호|분기|등급|단계|세|위|명|건|개|억|만)?$/u;
 
-export function extractTitleKeywords(title: string): readonly string[] {
+function titleBoundary(title: string, words: readonly string[], metadata: unknown): ReadonlyMap<string, string | null> | undefined {
+  if (typeof metadata !== 'object' || metadata === null
+    || !('format_version' in metadata) || metadata.format_version !== 'kiwi-title-boundary-v1'
+    || !('processor_version' in metadata) || metadata.processor_version !== 'kiwipiepy-0.24.0-cong-boundary-v1'
+    || !('input_title' in metadata) || metadata.input_title !== title
+    || !('decisions' in metadata) || !Array.isArray(metadata.decisions)
+    || metadata.decisions.length === 0 || metadata.decisions.length > 512) return undefined;
+  const result = new Map<string, string | null>();
+  const lexical = /^[\p{L}\p{N}]+(?:[-·][\p{L}\p{N}]+)*$/u;
+  const entries: readonly unknown[] = metadata.decisions;
+  for (const entry of entries) {
+    if (typeof entry !== 'object' || entry === null
+      || !('original' in entry) || typeof entry.original !== 'string'
+      || !lexical.test(entry.original) || result.has(entry.original)
+      || !('decision' in entry) || !('normalized' in entry)) return undefined;
+    const valid = (entry.decision === 'KEEP' && entry.normalized === entry.original)
+      || (entry.decision === 'REJECT_PREDICATE' && entry.normalized === null)
+      || (entry.decision === 'NORMALIZE_NOUN' && typeof entry.normalized === 'string'
+        && lexical.test(entry.normalized) && entry.normalized !== entry.original
+        && entry.original.startsWith(entry.normalized));
+    if (!valid || (entry.normalized !== null && typeof entry.normalized !== 'string')) return undefined;
+    result.set(entry.original, entry.normalized);
+  }
+  return words.every(word => result.has(word)) ? result : undefined;
+}
+
+export function extractTitleKeywords(title: string, metadata?: unknown): readonly string[] {
   const normalized = title.normalize('NFKC')
     .replace(/&(?:amp;)?(?:quot|apos|#39|#x27);/giu, ' ')
     .replace(/[([{]([^\])}]*\d[^\])}]*)[\])}]/gu, (whole, body: string) =>
       /^[\s\d.'’‘"년월일차호분기:~/-]*(?:기준|시행)?[\s.]*$/u.test(body) ? ' ' : whole)
     .replace(/\d{2,4}[./-]\d{1,2}(?:[./-]\d{1,2})?\.?/gu, ' ');
   const words = normalized.match(/[\p{L}\p{N}]+(?:[-·][\p{L}\p{N}]+)*/gu) ?? [];
+  const boundary = titleBoundary(title, words, metadata);
   const tokens = words.map(word => {
+    if (boundary) {
+      const derived = boundary.get(word);
+      return derived === undefined ? word : derived;
+    }
     const stripped = word.length > 3
       ? word.replace(/(?:으로|에서|에게|까지|부터|은|는|을|를|와)$/u, '') : word;
     return stripped.replace(/([A-Za-z0-9])(?:이|도)$/u, '$1')
@@ -32,6 +63,7 @@ export function extractTitleKeywords(title: string): readonly string[] {
 
   for (let index = 0; index < tokens.length; index += 1) {
     const token = tokens[index];
+    if (token === null) continue;
     const standalone = token.replace(/(?:을|를|에|의|은|는|이|도|가)$/u, '');
     if (GENERIC_WORDS.has(token) || GENERIC_WORDS.has(standalone)
       || NUMBER_METADATA.test(token)
@@ -108,6 +140,7 @@ function normalizeCompoundDisplay(title: string, keywords: readonly string[]): s
 export function getArticleKeywords(article: {
   readonly title: string;
   readonly keywords?: unknown;
+  readonly keyword_boundary?: unknown;
 }): string {
   const stored = article.keywords;
   if (typeof stored === 'string') {
@@ -123,6 +156,6 @@ export function getArticleKeywords(article: {
     const keywords = stored.map((keyword: string) => keyword.trim());
     return normalizeCompoundDisplay(article.title, keywords) ?? keywords.join(', ');
   }
-  const keywords = extractTitleKeywords(article.title);
+  const keywords = extractTitleKeywords(article.title, article.keyword_boundary);
   return normalizeCompoundDisplay(article.title, keywords) ?? keywords.join(', ');
 }

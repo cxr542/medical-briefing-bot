@@ -1,11 +1,94 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import fs from 'node:fs';
 import { extractTitleKeywords, getArticleKeywords } from '../src/lib/articleKeywords.ts';
 
 const REPORTED_TITLE = "[질병군] 행위 별도보상 코드목록('26.10.1.기준)";
 const concepts = keywords => keywords.join(' ').replace(/\s/gu, '');
 const COMPOUND_TITLE = '2026년「요양급여 청구 자율점검 사례모음집」 책자 파일(PDF) 안내';
 const COMPOUND_KEYWORDS = ['요양급여', '청구', '자율점검', '사례모음집'];
+
+const BOUNDARY_FIXTURE = JSON.parse(fs.readFileSync(new URL('../../tests/fixtures/keyword_boundary_challenge.json', import.meta.url), 'utf8'));
+function boundaryMetadata(title) {
+  const words = [...new Set(title.normalize('NFKC').match(/[\p{L}\p{N}]+(?:[-·][\p{L}\p{N}]+)*/gu) ?? [])];
+  return {
+    format_version: 'kiwi-title-boundary-v1',
+    processor_version: 'kiwipiepy-0.24.0-cong-boundary-v1',
+    input_title: title,
+    decisions: words.map(original => {
+      const fixture = BOUNDARY_FIXTURE.find(row => row.token === original);
+      return { original, decision: fixture?.decision ?? 'KEEP', normalized: fixture ? fixture.normalized : original };
+    }),
+  };
+}
+
+test('derived fallback normalizes noun particles before existing selection', () => {
+  const title = '간호사는 전문의는 치료제는 AI의';
+  const article = Object.freeze({ title, keywords: null, keyword_boundary: boundaryMetadata(title) });
+  assert.equal(getArticleKeywords(article), '간호사, 전문의, 치료제, AI');
+  assert.equal(article.keywords, null);
+});
+
+test('derived predicates are rejected without padding or baseline resurrection', () => {
+  for (const title of ['누리는', '끊김없는', '안전하고', '건강하게']) {
+    assert.equal(getArticleKeywords({ title, keyword_boundary: boundaryMetadata(title) }), '');
+  }
+  const title = '누리는 끊김없는 안전하고 건강하게 환자안전';
+  assert.equal(getArticleKeywords({ title, keyword_boundary: boundaryMetadata(title) }), '환자안전');
+});
+
+test('derived preserve keeps policy identifiers and domain concepts', () => {
+  for (const title of ['제3차', 'GLP-1', 'COVID-19', '1형당뇨', '환자안전', '보험급여']) {
+    assert.equal(getArticleKeywords({ title, keyword_boundary: boundaryMetadata(title) }), title);
+  }
+});
+
+test('reject keeps a phrase barrier rather than joining new neighbors', () => {
+  const title = '급성 누리는 손상';
+  assert.deepEqual(extractTitleKeywords(title, boundaryMetadata(title)), ['손상']);
+});
+
+test('stored #61 text and arrays bypass derived metadata completely', () => {
+  for (const keywords of ['[질병군], 별도보상, 코드목록', ['GLP-1', '비만치료제']]) {
+    const article = Object.freeze({ title: '누리는', keywords,
+      get keyword_boundary() { throw new Error('stored path must not read metadata'); } });
+    assert.equal(getArticleKeywords(article), Array.isArray(keywords) ? keywords.join(', ') : keywords);
+  }
+});
+
+test('derived fallback retains #62 title evidence and original preservation', () => {
+  const article = Object.freeze({ title: COMPOUND_TITLE, keywords: null, keyword_boundary: boundaryMetadata(COMPOUND_TITLE) });
+  assert.equal(getArticleKeywords(article), '요양급여청구, 자율점검, 사례모음집');
+  assert.equal(article.keywords, null);
+  const title = '요양급여 확대와 별도 청구 시스템';
+  assert.ok(!getArticleKeywords({ title, keyword_boundary: boundaryMetadata(title) }).includes('요양급여청구'));
+});
+
+test('invalid stale or incomplete metadata returns the exact deterministic baseline', () => {
+  const title = '간호사는 전문의는 치료제는 AI의';
+  const valid = boundaryMetadata(title);
+  const baseline = getArticleKeywords({ title });
+  assert.notEqual(getArticleKeywords({ title, keyword_boundary: valid }), baseline);
+  for (const keyword_boundary of [null, {}, { ...valid, input_title: 'old title' },
+    { ...valid, format_version: 'future' }, { ...valid, processor_version: 'future' },
+    { ...valid, decisions: [] }, { ...valid, decisions: valid.decisions.slice(1) },
+    { ...valid, decisions: [...valid.decisions, valid.decisions[0]] },
+    { ...valid, decisions: [{ original: '간호사는', decision: 'NORMALIZE_NOUN', normalized: 'invented' }] },
+    { ...valid, decisions: valid.decisions.map(row => ({ ...row, decision: 'UNKNOWN' })) }]) {
+    assert.equal(getArticleKeywords({ title, keyword_boundary }), baseline);
+  }
+});
+
+test('date preprocessing coverage miss falls back atomically', () => {
+  const title = 'ABC2026-10-07DEF 간호사는';
+  assert.equal(extractTitleKeywords(title, boundaryMetadata(title)).join(', '), getArticleKeywords({ title }));
+});
+
+test('KEEP-only metadata retains existing scores order and cap without new ranking', () => {
+  for (const title of ['감염병 백신 치료제 심전도 뇌전이 보험급여', '요양병원 환자안전 보험급여 심전도']) {
+    assert.deepEqual(extractTitleKeywords(title, boundaryMetadata(title)), extractTitleKeywords(title));
+  }
+});
 
 test('bound compound uses one display slot without changing frozen original keywords', () => {
   const keywords = Object.freeze([...COMPOUND_KEYWORDS]);

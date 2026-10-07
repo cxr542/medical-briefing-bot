@@ -7,11 +7,16 @@ import re
 from typing import Optional
 
 from collector_lifecycle import find_absent_article_urls
+from collector_keyword_boundary import KeywordBoundaryClient
+from collector_keyword_enrichment import SavedArticle, enrich_saved_article
+from keyword_boundary_contract import Metadata
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from postgrest.exceptions import APIError
+from httpx import HTTPError
 from collector_sources.comwel import source_collection_diagnostics
 from collector_sources.dailymedi import DailyMediCollection, fetch_dailymedi_articles
 from collector_sources.medigate import (
@@ -707,6 +712,16 @@ def track_states(new_articles: list, supabase: Client, incomplete_sources=None):
 
     return final_articles_to_upsert
 
+def save_keyword_boundary(snapshot: SavedArticle, metadata: Metadata) -> bool:
+    try:
+        supabase.table('articles').update({'keyword_boundary': metadata}).eq(
+            'url', snapshot['url']
+        ).eq('title', snapshot['title']).execute()
+        return True
+    except (APIError, HTTPError, OSError, RuntimeError, ValueError):
+        return False
+
+
 def save_to_supabase(articles: list) -> dict[str, int]:
     attempted = len(articles)
     succeeded = 0
@@ -716,10 +731,14 @@ def save_to_supabase(articles: list) -> dict[str, int]:
         print("✅ 새로 저장하거나 업데이트할 변경사항이 없습니다.")
         return {"attempted": 0, "succeeded": 0, "failed": 0}
 
+    boundary = KeywordBoundaryClient()
+    saved_articles = []
     for article in articles:
         try:
             # upsert를 사용하여 기존 데이터 덮어쓰기 (url이 UNIQUE key라고 가정)
-            supabase.table('articles').upsert(article, on_conflict='url').execute()
+            response = supabase.table('articles').upsert(article, on_conflict='url').execute()
+            if isinstance(response.data, list):
+                saved_articles.extend(row for row in response.data if isinstance(row, dict))
             succeeded += 1
         except Exception as e:
             failed += 1
@@ -734,6 +753,16 @@ def save_to_supabase(articles: list) -> dict[str, int]:
                 f"⚠️ 저장 실패 [{article.get('title', 'N/A')}]"
                 f"{schema_hint} error: {e}"
             )
+
+    try:
+        metadata_failures = 0
+        for snapshot in saved_articles:
+            if enrich_saved_article(snapshot, boundary, save_keyword_boundary) is False:
+                metadata_failures += 1
+        if metadata_failures:
+            print(f"Kiwi metadata unavailable: failures={metadata_failures}; baseline retained")
+    finally:
+        boundary.close()
 
     print(f"DB attempted: {attempted}")
     print(f"DB succeeded: {succeeded}")

@@ -38,6 +38,7 @@ interface Article {
   status: string;
   category?: string;
   keywords?: string;
+  keyword_boundary?: unknown;
   is_merged?: boolean;
   related_links?: RelatedLink[];
 }
