@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-07-pr-63",
+    "date": "2026.10.07",
+    "category": "개선",
+    "title": "Collector의 선택적 Kiwi 키워드 경계 보정 및 프로세스 실패 격리",
+    "summary": "PR #63 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "제목 fallback에만 조사·서술어 경계 보정을 적용하며 저장된 원본 키워드와 기존 중요도 선택 및 복합 표시 규칙을 보존합니다.",
+      "Kiwi child 실패 시 기존 baseline으로 복귀합니다. Nullable metadata migration은 별도 적용이 필요하며 이 PR에서는 Production을 변경하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #63",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/63"
+      }
+    ]
+  },
+  {
     "id": "2026-10-06-pr-62",
     "date": "2026.10.06",
     "category": "개선",
