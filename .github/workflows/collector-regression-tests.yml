@@ -21,8 +21,36 @@ jobs:
       - name: Install parser dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install beautifulsoup4 feedparser requests
+          python -m pip install beautifulsoup4 feedparser requests postgrest httpx
 
       - name: Run offline collector parser regression tests
         working-directory: medical-briefing-bot
         run: python -m unittest discover -s tests -v
+
+  native-keyword-boundary:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect native boundary changes
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if ! git diff --quiet "$BASE_SHA" HEAD -- medical-briefing-bot/collector_keyword_boundary.py medical-briefing-bot/collector_keyword_boundary_child.py medical-briefing-bot/keyword_boundary_contract.py medical-briefing-bot/requirements-keyword-boundary.txt medical-briefing-bot/tests/test_collector_keyword_boundary.py medical-briefing-bot/tests/fixtures/keyword_boundary_challenge.json .github/workflows/collector-regression-tests.yml; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/setup-python@v5
+        if: steps.scope.outputs.run == 'true'
+        with:
+          python-version: '3.9'
+      - name: Install pinned native boundary dependencies
+        if: steps.scope.outputs.run == 'true'
+        run: python -m pip install -r medical-briefing-bot/requirements-keyword-boundary.txt
+      - name: Native child compatibility and memory smoke
+        if: steps.scope.outputs.run == 'true'
+        working-directory: medical-briefing-bot
+        env:
+          KIWI_NATIVE_SMOKE: '1'
+        run: python -m unittest discover -s tests -p test_collector_keyword_boundary.py -v
