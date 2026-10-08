@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-08-pr-66",
+    "date": "2026.10.08",
+    "category": "운영 변경",
+    "title": "Collector 자동 실행 trigger cutover 준비",
+    "summary": "PR #66 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "GitHub Actions의 자동 schedule trigger를 제거하고 수동 `workflow_dispatch`는 유지합니다. 외부 scheduler는 별도 구성 전입니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #66",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/66"
+      }
+    ]
+  },
+  {
     "id": "2026-10-08-pr-65",
     "date": "2026.10.08",
     "category": "운영 개선",
