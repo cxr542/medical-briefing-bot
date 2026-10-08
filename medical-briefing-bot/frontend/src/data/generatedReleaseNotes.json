@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-08-pr-67",
+    "date": "2026.10.08",
+    "category": "Improvement",
+    "title": "DailyMedi SSL 및 날짜 실패 진단 로그 보강",
+    "summary": "PR #67 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "SSL 예외 체인과 날짜 미확정 사유를 민감정보 없이 기록합니다. 수집 및 삭제 보호 정책은 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #67",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/67"
+      }
+    ]
+  },
+  {
     "id": "2026-10-08-pr-66",
     "date": "2026.10.08",
     "category": "운영 변경",
