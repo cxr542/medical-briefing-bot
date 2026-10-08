@@ -8,7 +8,7 @@ import signal
 import subprocess
 import sys
 import time
-from typing import Final, NamedTuple
+from typing import Final, NamedTuple, TypedDict
 
 from keyword_boundary_contract import FORMAT, PROCESSOR, PROTOCOL, MAX_TOKENS, Frame, Metadata, lexical_tokens, parse_decisions
 
@@ -23,9 +23,22 @@ class Timeouts(NamedTuple):
 
 
 class ChannelFailure(Exception):
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, subcode: str | None = None) -> None:
         self.code = code
+        self.subcode = subcode or code
         super().__init__(code)
+
+
+class Diagnostic(TypedDict, total=False):
+    phase: str
+    response_bytes: int
+    line_bytes: int
+    remainder_bytes: int
+    newline_observed: bool
+    json_parse_succeeded: bool
+    frame_was_object: bool
+    schema_valid: bool
+    request_id_matched: bool
 
 
 class KeywordBoundaryClient:
@@ -39,8 +52,10 @@ class KeywordBoundaryClient:
         self.disabled = False
         self.request_id = 0
         self.buffer = bytearray()
+        self.diagnostic: Diagnostic = {}
 
-    def _read(self, deadline: float) -> Frame:
+    def _read(self, deadline: float, phase: str = "response") -> Frame:
+        self.diagnostic = Diagnostic(phase=phase, response_bytes=len(self.buffer), newline_observed=False)
         process = self.process
         if process is None or process.stdout is None:
             raise ChannelFailure("unavailable")
@@ -49,15 +64,18 @@ class KeywordBoundaryClient:
             while True:
                 if b"\n" in self.buffer:
                     line, _, remainder = self.buffer.partition(b"\n")
+                    self.diagnostic.update(line_bytes=len(line), remainder_bytes=len(remainder), newline_observed=True)
                     self.buffer = bytearray(remainder)
                     if len(line) > MAX_RESPONSE or remainder:
-                        raise ChannelFailure("malformed")
+                        raise ChannelFailure("malformed", "oversized_line" if len(line) > MAX_RESPONSE else "buffered_remainder")
                     try:
                         value = json.loads(line)
                     except (ValueError, UnicodeError, RecursionError) as error:
-                        raise ChannelFailure("malformed") from error
+                        self.diagnostic["json_parse_succeeded"] = False
+                        raise ChannelFailure("malformed", "invalid_json") from error
+                    self.diagnostic.update(json_parse_succeeded=True, frame_was_object=isinstance(value, dict))
                     if not isinstance(value, dict):
-                        raise ChannelFailure("malformed")
+                        raise ChannelFailure("malformed", "non_object_frame")
                     return value
                 remaining = deadline - time.monotonic()
                 if remaining <= 0 or not selector.select(remaining):
@@ -69,10 +87,15 @@ class KeywordBoundaryClient:
                 if not chunk:
                     raise ChannelFailure("exit")
                 self.buffer.extend(chunk)
+                self.diagnostic.update(response_bytes=len(self.buffer), newline_observed=b"\n" in self.buffer)
                 if len(self.buffer) > MAX_RESPONSE:
-                    raise ChannelFailure("oversized")
+                    line, separator, remainder = self.buffer.partition(b"\n")
+                    if separator:
+                        self.diagnostic.update(line_bytes=len(line), remainder_bytes=len(remainder))
+                    raise ChannelFailure("oversized", "oversized_line" if len(line) > MAX_RESPONSE else "oversized")
 
     def _write(self, data: bytes, deadline: float) -> None:
+        self.diagnostic = Diagnostic(phase="write")
         process = self.process
         if process is None or process.stdin is None:
             raise ChannelFailure("unavailable")
@@ -123,7 +146,7 @@ class KeywordBoundaryClient:
         self.buffer.clear()
         return exited
 
-    def _fail(self, code: str, terminal: bool = False) -> None:
+    def _fail(self, code: str, terminal: bool = False, subcode: str | None = None) -> None:
         self.failures += 1
         process = self.process
         if process is not None:
@@ -132,11 +155,17 @@ class KeywordBoundaryClient:
             except subprocess.TimeoutExpired:
                 terminal = bool(terminal)
             terminal = terminal or process.returncode == -signal.SIGKILL
+        pid = process.pid if process is not None else None
+        exit_status = process.returncode if process is not None else None
         cleaned = self._stop()
         self.disabled = terminal or not cleaned or self.failures >= 2 or self.restarts >= 1
-        print(f"Kiwi fallback: code={code} failures={self.failures} disabled={int(self.disabled)}")
+        diagnostic = {**self.diagnostic, "subcode": subcode or code, "request_id": self.request_id,
+                      "child_pid": pid, "child_exit_status": exit_status, "restarts": self.restarts,
+                      "failures": self.failures, "disabled": self.disabled}
+        print(f"Kiwi fallback: code={code} failures={self.failures} disabled={int(self.disabled)} diagnostics={json.dumps(diagnostic)}")
 
     def _start(self) -> bool:
+        self.diagnostic = Diagnostic(phase="ready")
         if self.starts:
             self.restarts += 1
         self.starts += 1
@@ -146,9 +175,11 @@ class KeywordBoundaryClient:
             raise ChannelFailure("unavailable")
         os.set_blocking(self.process.stdin.fileno(), False)
         os.set_blocking(self.process.stdout.fileno(), False)
-        ready = self._read(time.monotonic() + self.timeouts.startup)
+        ready = self._read(time.monotonic() + self.timeouts.startup, "ready")
         if ready.get("version") != PROTOCOL or ready.get("processor") != PROCESSOR:
-            raise ChannelFailure("malformed")
+            self.diagnostic["schema_valid"] = False
+            raise ChannelFailure("malformed", "invalid_schema")
+        self.diagnostic["schema_valid"] = True
         if ready.get("status") != "ready":
             self._fail("initialization", terminal=True)
             return False
@@ -171,8 +202,10 @@ class KeywordBoundaryClient:
             deadline = time.monotonic() + self.timeouts.request
             self._write(data, deadline)
             response = self._read(deadline)
+            self.diagnostic["request_id_matched"] = response.get("id") == self.request_id
             if response.get("version") != PROTOCOL or response.get("id") != self.request_id:
-                raise ChannelFailure("malformed")
+                self.diagnostic["schema_valid"] = False
+                raise ChannelFailure("malformed", "invalid_schema" if response.get("version") != PROTOCOL else "request_id_mismatch")
             if response.get("status") == "error" and response.get("code") in ("memory", "analysis"):
                 self.failures += 1
                 if response.get("code") == "memory" or self.failures >= 2:
@@ -181,14 +214,18 @@ class KeywordBoundaryClient:
                 print(f"Kiwi analysis fallback: failures={self.failures} disabled={int(self.disabled)}")
                 return None
             if response.get("status") != "ok":
-                raise ChannelFailure("malformed")
+                self.diagnostic["schema_valid"] = False
+                raise ChannelFailure("malformed", "invalid_schema")
             values = response.get("decisions")
             decisions = parse_decisions(values, tokens) if isinstance(values, list) else None
             if decisions is None:
-                raise ChannelFailure("malformed")
+                self.diagnostic["schema_valid"] = False
+                raise ChannelFailure("malformed", "invalid_schema")
             return Metadata(format_version=FORMAT, processor_version=PROCESSOR, input_title=title, decisions=decisions)
         except (ChannelFailure, OSError, ValueError, subprocess.SubprocessError) as error:
-            self._fail(error.code if isinstance(error, ChannelFailure) else "channel")
+            subcode = error.subcode if isinstance(error, ChannelFailure) else (
+                "broken_pipe" if isinstance(error, BrokenPipeError) else "channel")
+            self._fail(error.code if isinstance(error, ChannelFailure) else "channel", subcode=subcode)
             return None
 
     def close(self) -> None:

@@ -32,3 +32,19 @@ Rollback the producer/consumer code and optional dependency install to return to
 baseline. The nullable column may remain unused; no backfill or column drop is
 required. This guard does not solve importance ranking or the care/welfare terms
 missing from an AI article's top display.
+
+Failure messages retain their existing `code` and append a `diagnostics` JSON
+object. `subcode` distinguishes invalid_json, non_object_frame, oversized_line,
+buffered_remainder, invalid_schema and request_id_mismatch. Existing timeout,
+exit, oversized and unavailable classifications remain; an observed write-side
+BrokenPipeError uses subcode broken_pipe while retaining code channel.
+The object contains only phase, local request ID, child PID/observed exit status,
+byte counts, observed parsing/validation booleans and restart/failure/disabled
+state. Missing booleans mean that validation stage was not reached; a null exit
+status means no exit was observed before cleanup. No article, token, payload,
+URL, environment value or fingerprint is logged. This is observability only:
+nonempty remainder still fails and restart/fallback decisions are unchanged.
+
+After explicit merge approval, inspect the next natural scheduled run. Do not
+manually trigger the Collector. A recurrence can identify the failing phase and
+subcode before deciding whether a protocol or data-specific fix is justified.

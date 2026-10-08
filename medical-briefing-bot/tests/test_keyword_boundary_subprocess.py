@@ -1,4 +1,6 @@
 import json
+import contextlib
+import io
 import os
 from pathlib import Path
 import signal
@@ -92,6 +94,51 @@ class SubprocessTests(unittest.TestCase):
         self.assertIsNone(client.analyze_title("보험급여"))
         self.assertEqual(client.starts, 1)
 
+    def test_failure_diagnostics_preserve_budget_and_hide_payload(self):
+        cases = {"malformed": ("malformed", "invalid_json"),
+                 "nonobject": ("malformed", "non_object_frame"),
+                 "remainder": ("malformed", "buffered_remainder"),
+                 "schema": ("malformed", "invalid_schema"),
+                 "wrongid": ("malformed", "request_id_mismatch"),
+                 "oversized": ("oversized", "oversized_line")}
+        for mode, (code, subcode) in cases.items():
+            with self.subTest(mode=mode):
+                client = self.client(mode)
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    self.assertIsNone(client.analyze_title("PRIVATE_ARTICLE_TOKEN"))
+                    self.assertEqual(client.starts, 1)  # Failed request was not replayed.
+                    self.assertFalse(client.disabled)
+                    self.assertIsNone(client.analyze_title("SECOND_PRIVATE_TOKEN"))
+                    self.assertTrue(client.disabled)
+                    self.assertIsNone(client.analyze_title("THIRD_PRIVATE_TOKEN"))
+                lines = [line for line in output.getvalue().splitlines() if "diagnostics=" in line]
+                self.assertEqual(len(lines), 2)
+                for index, line in enumerate(lines, 1):
+                    diagnostic = json.loads(line.split("diagnostics=", 1)[1])
+                    self.assertIn(f"code={code}", line)
+                    self.assertEqual(diagnostic["subcode"], subcode)
+                    self.assertEqual(diagnostic["request_id"], index)
+                    self.assertEqual(diagnostic["failures"], index)
+                    self.assertEqual(diagnostic["restarts"], index - 1)
+                    self.assertEqual(diagnostic["disabled"], index == 2)
+                    self.assertEqual(diagnostic["phase"], "response")
+                    self.assertGreater(diagnostic["child_pid"], 0)
+                    self.assertIn("child_exit_status", diagnostic)
+                    self.assertGreater(diagnostic["response_bytes"], 0)
+                self.assertEqual(client.starts, 2)
+                for private in ("PRIVATE_ARTICLE_TOKEN", "SECOND_PRIVATE_TOKEN", "THIRD_PRIVATE_TOKEN", "PRIVATE_FRAME", "PRIVATE_REMAINDER"):
+                    self.assertNotIn(private, output.getvalue())
+
+    def test_normal_response_does_not_emit_failure_diagnostics(self):
+        client = self.client("normal")
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = client.analyze_title("PRIVATE_ARTICLE_TOKEN")
+        self.assertIsNotNone(result)
+        self.assertNotIn("diagnostics=", output.getvalue())
+        self.assertNotIn("PRIVATE_ARTICLE_TOKEN", output.getvalue())
+
 
 def fake_child(mode):
     if mode == "brokenpipe":
@@ -115,7 +162,18 @@ def fake_child(mode):
         if mode == "sigkill":
             os.kill(os.getpid(), signal.SIGKILL)
         if mode == "malformed":
-            print("not JSON", flush=True)
+            print("PRIVATE_FRAME not JSON", flush=True)
+            continue
+        if mode == "nonobject":
+            print(json.dumps(["PRIVATE_FRAME"]), flush=True)
+            continue
+        if mode == "remainder":
+            sys.stdout.write(json.dumps(response) + "\nPRIVATE_REMAINDER\n")
+            sys.stdout.flush()
+            continue
+        if mode == "schema":
+            response["decisions"] = "PRIVATE_FRAME"
+            print(json.dumps(response), flush=True)
             continue
         if mode == "oversized":
             print("x" * 262145, flush=True)
