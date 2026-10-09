@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-09-pr-70",
+    "date": "2026.10.09",
+    "category": "링크 개선",
+    "title": "NHIS 공지의 공식 상세 화면 연결 복구",
+    "summary": "PR #70 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "검증된 NHIS 공지를 새 탭에서 바로 열 수 있도록 개선합니다.",
+      "잘못된 식별자·다른 게시판·추가 라우팅 입력은 기존 기관 안내를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #70",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/70"
+      }
+    ]
+  },
+  {
     "id": "2026-10-09-pr-69",
     "date": "2026.10.09",
     "category": "UI/UX",
