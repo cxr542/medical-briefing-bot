@@ -58,3 +58,14 @@ test('unknown safe links retain the unverified accessible label and original hre
   assert.match(html, /href="https:\/\/example.org\/article"/);
   assert.match(html, /lucide-info/);
 });
+
+test('NHIS stored identity renders an official new-tab detail action without institution guidance', () => {
+  const article = Object.freeze({ source: '건보공단 업무포탈', title: '공지', url: 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886' });
+  const html = render(article, { variant: 'icon' });
+  assert.match(html, /원문 바로가기/);
+  assert.match(html, /bipaza410m02\.xml/);
+  assert.match(html, /brdCtsNo=/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(html, /<dialog|기관에서 공지 찾기/);
+  assert.equal(article.url, 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886');
+});

@@ -57,6 +57,29 @@ const DIRECT_RULES = [
   { source: '청년의사', host: 'www.docdocdoc.co.kr', path: /^\/news\/articleView\.html$/, id: 'idxno' },
 ] as const;
 
+function nhisNoticeHref(url: URL): string | undefined {
+  const identifiers = url.searchParams.getAll('artiId');
+  const id = identifiers[0] ?? '';
+  if (url.hash || url.searchParams.size !== 1 || identifiers.length !== 1
+    || !/^\d{2}POR0000006\d{18}$/.test(id)) return undefined;
+
+  // NHIS mainContent.xml uses comLib.encode64 / WebSquare BASE64Encoder:
+  // UTF-16BE with a BOM, then Base64. These inputs are fixed ASCII or validated IDs.
+  const encode = (value: string): string => btoa('\xfe\xff' + value.replace(/./g, char => '\x00' + char));
+  const target = new URL('https://medicare.nhis.or.kr/portal/index.do');
+  target.searchParams.set('w2xPath', '/portal/views/bip/az/a/bipaza410m02.xml');
+  target.searchParams.set('programId', 'bipaza410m01');
+  target.searchParams.set('pageNo', encode('1'));
+  target.searchParams.set('brdCtsNo', encode(id));
+  for (const key of ['searchPeriod', 'searchTarget', 'searchText', 'artiPttnCd']) {
+    target.searchParams.set(key, encode(''));
+  }
+  target.searchParams.set('sidx', encode('0'));
+  target.searchParams.set('w2xHome', '/portal/views/bip/');
+  target.searchParams.set('w2xDocumentRoot', '');
+  return target.href;
+}
+
 export function resolveSourceLink(article: SourceArticle): SourceLinkResolution {
   const unavailable: SourceLinkResolution = { kind: 'unavailable', label: '원문 링크 확인 필요' };
   let url: URL;
@@ -74,6 +97,10 @@ export function resolveSourceLink(article: SourceArticle): SourceLinkResolution 
   const dailyMediAlias = article.source === '데일리메디' && url.hostname === 'dailymedi.com';
   if (expectedHost && url.hostname !== expectedHost && !dailyMediAlias) return unavailable;
   if (portal && url.pathname === portal.path) {
+    if (portal.host === 'medicare.nhis.or.kr') {
+      const href = nhisNoticeHref(url);
+      if (href) return { kind: 'direct', href, label: '원문 바로가기' };
+    }
     return { kind: 'institution', href: portal.href, label: '기관에서 공지 찾기',
       institution: portal.institution, board: portal.board, steps: portal.steps };
   }
