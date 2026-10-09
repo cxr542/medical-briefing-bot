@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-09-pr-68",
+    "date": "2026.10.09",
+    "category": "Fix",
+    "title": "원문 링크의 기관별 접근 안내 개선",
+    "summary": "PR #68 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "상세 연결이 확인되지 않은 포털 링크는 기관·게시판·공지 제목과 찾는 방법을 안내합니다.",
+      "주요 공지, 기관별 공지, 더보기, 연관 링크에 동일한 표시 정책을 적용하고 정상 원문 주소는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #68",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/68"
+      }
+    ]
+  },
+  {
     "id": "2026-10-08-pr-67",
     "date": "2026.10.08",
     "category": "Improvement",
