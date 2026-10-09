@@ -705,7 +705,7 @@ export default function ArticleList({
                               {analysis.keywords}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
-                              <SourceLink article={article} className="inline-flex min-h-11 min-w-11 items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" />
+                              <SourceLink article={article} variant="icon" />
                             </td>
                           </tr>
                         );
@@ -848,7 +848,7 @@ export default function ArticleList({
                           {analysis.keywords}
                         </td>
                         <td className="px-4 py-4 align-middle text-center">
-                          <SourceLink article={article} className="inline-flex min-h-11 min-w-11 items-center justify-center p-2 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition-colors group" />
+                          <SourceLink article={article} variant="icon" />
                         </td>
                       </tr>
                     );

@@ -67,15 +67,19 @@ inside their own overflow container.
 Public article links reuse the existing blue-50/blue-700 information treatment,
 white surfaces, text-xs/text-sm type and 4px spacing scale. `SourceLink` is the
 shared primitive for tables, source cards, related links and article lists.
-Verified detail links retain their existing appearance and open a new tab.
-Unverified portal routes use native details/summary labelled “기관에서 공지 찾기”
+Table actions share a 44px square blue-50 button, blue-100 border and rounded-lg
+corners. Verified links use ExternalLink; institutional guidance uses Info.
+Verified detail links preserve their original href and open a new tab.
+Unverified portal routes open a native modal dialog labelled “기관에서 공지 찾기”
 with institution, board, full article title and confirmed navigation steps.
 The explicit institution link opens a new tab with noopener/noreferrer; it never
 includes a guessed article ID. Guidance wraps with break-keep and whitespace-normal,
-including inside tables, where guidance keeps a 256px minimum readable width in
-the existing horizontal scroll container. Keyboard focus uses the existing blue focus-visible ring;
-summary and destination controls have a minimum 44px target. No new animation,
-dependency, colour token or modal is introduced. Unsafe URLs are noninteractive.
+inside a viewport-constrained 448px white surface in the browser top layer, clear
+of table overflow. The dialog supports Escape, backdrop and an explicit close
+button; native modal focus containment and restoration apply. Keyboard focus uses
+the existing blue focus-visible ring; controls have a minimum 44px target.
+Cards and related links retain contextual text and open the same guidance.
+No new animation, dependency or colour token is introduced. Unsafe URLs remain noninteractive.
 
 Monitoring is read-only. Existing button transition-colors behavior remains
 unchanged; status and history updates do not animate layout.
