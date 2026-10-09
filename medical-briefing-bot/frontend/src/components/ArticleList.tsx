@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
+import { SourceLink } from './SourceLink';
 import { getArticleKeywords } from '@/lib/articleKeywords';
 import {
   COLLECTION_DISPLAY_SCHEDULE_KST,
@@ -293,15 +294,15 @@ export default function ArticleList({
           <ul className="space-y-4">
             {articles.slice(0, 3).map(article => (
               <li key={article.id} className="group">
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="block" title={article.title}>
-                  <div className={`text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
+                <SourceLink article={article} className="block">
+                  <span className={`block text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
                     <span className={`text-sm mr-1.5 ${theme.bullet}`}>•</span>
                     {article.title}
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-1 ml-3 font-medium">
+                  </span>
+                  <span className="block text-[11px] text-gray-400 mt-1 ml-3 font-medium">
                     {formatLocalYYYYMMDD(article.published_date)}
-                  </div>
-                </a>
+                  </span>
+                </SourceLink>
               </li>
             ))}
           </ul>
@@ -584,13 +585,13 @@ export default function ArticleList({
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#1D4ED8]">{article.source}</span>
                           <time dateTime={article.published_date} className="text-xs font-medium text-slate-500">{formatMedicalPressDateKst(article.published_date)}</time>
                         </div>
-                        <a href={article.url} target="_blank" rel="noopener noreferrer" className="break-keep text-base font-bold leading-6 text-[#191919] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                        <SourceLink article={article} className="break-keep text-base font-bold leading-6 text-[#191919] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
                           {article.title}
-                        </a>
+                        </SourceLink>
                       </div>
-                      <a href={article.url} target="_blank" rel="noopener noreferrer" aria-label={`${article.source} 원문 열기`} className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                      <SourceLink article={article} className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
                         원문 보기 <ExternalLink className="h-4 w-4" />
-                      </a>
+                      </SourceLink>
                     </article>
                   ))}
                 </div>
@@ -678,7 +679,7 @@ export default function ArticleList({
                             </td>
                             <td className="px-4 py-4 align-middle font-medium text-gray-700">{article.source}</td>
                             <td className="px-4 py-4 align-middle">
-                              <span className={`text-gray-800 font-medium ${isDeleted ? 'line-through' : ''}`}>
+                              <span className={`break-keep text-gray-800 font-medium ${isDeleted ? 'line-through' : ''}`}>
                                 {article.title}
                               </span>
                               {article.is_merged && article.related_links && article.related_links.length > 0 && (
@@ -686,9 +687,9 @@ export default function ArticleList({
                                   <ul className="space-y-1">
                                     {article.related_links.map((link, idx) => (
                                       <li key={idx}>
-                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-[#C05A12] flex items-center gap-1">
+                                        <SourceLink article={link} className="text-xs text-gray-500 hover:text-[#C05A12] flex items-center gap-1">
                                           <span className="font-semibold">[{link.source}]</span>{link.title}
-                                        </a>
+                                        </SourceLink>
                                       </li>
                                     ))}
                                   </ul>
@@ -704,9 +705,7 @@ export default function ArticleList({
                               {analysis.keywords}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
-                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" title="원문 바로가기">
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
+                              <SourceLink article={article} className="inline-flex min-h-11 min-w-11 items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" />
                             </td>
                           </tr>
                         );
@@ -836,7 +835,7 @@ export default function ArticleList({
                           {formatLocalYYYYMMDD(article.published_date)}
                         </td>
                         <td className="px-4 py-4 align-middle">
-                          <div className={`text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
+                          <div className={`break-keep text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
                             {article.title}
                           </div>
                         </td>
@@ -849,9 +848,7 @@ export default function ArticleList({
                           {analysis.keywords}
                         </td>
                         <td className="px-4 py-4 align-middle text-center">
-                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-2 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition-colors group">
-                            <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          </a>
+                          <SourceLink article={article} className="inline-flex min-h-11 min-w-11 items-center justify-center p-2 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition-colors group" />
                         </td>
                       </tr>
                     );

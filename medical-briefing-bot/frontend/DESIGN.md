@@ -62,6 +62,21 @@ inside their own overflow container.
 
 ## 6. Motion & Interaction
 
+### Public source link guidance
+
+Public article links reuse the existing blue-50/blue-700 information treatment,
+white surfaces, text-xs/text-sm type and 4px spacing scale. `SourceLink` is the
+shared primitive for tables, source cards, related links and article lists.
+Verified detail links retain their existing appearance and open a new tab.
+Unverified portal routes use native details/summary labelled “기관에서 공지 찾기”
+with institution, board, full article title and confirmed navigation steps.
+The explicit institution link opens a new tab with noopener/noreferrer; it never
+includes a guessed article ID. Guidance wraps with break-keep and whitespace-normal,
+including inside tables, where guidance keeps a 256px minimum readable width in
+the existing horizontal scroll container. Keyboard focus uses the existing blue focus-visible ring;
+summary and destination controls have a minimum 44px target. No new animation,
+dependency, colour token or modal is introduced. Unsafe URLs are noninteractive.
+
 Monitoring is read-only. Existing button transition-colors behavior remains
 unchanged; status and history updates do not animate layout.
 
