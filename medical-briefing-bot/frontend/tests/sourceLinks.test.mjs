@@ -36,6 +36,7 @@ const directCases = [
   ['국민건강보험공단 공지사항', 'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do?mode=view&articleNo=11013171'],
   ['질병관리청 보도자료', 'https://www.kdca.go.kr/bbs/kdca/42/312868/artclView.do'],
   ['데일리메디', 'https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=941293'],
+  ['데일리메디', 'https://dailymedi.com/news/news_view.php?ca_id=21&wr_id=941293'],
   ['메디게이트뉴스', 'https://www.medigatenews.com/news/1938565427'],
   ['보건신문', 'http://www.bokuennews.com/news/article.html?no=285280'],
   ['의학신문', 'https://www.bosa.co.kr/news/articleView.html?idxno=3013612'],

@@ -71,7 +71,8 @@ export function resolveSourceLink(article: SourceArticle): SourceLinkResolution 
   const portal = PORTALS.find(rule => rule.source === article.source);
   const direct = DIRECT_RULES.find(rule => rule.source === article.source);
   const expectedHost = portal?.host ?? direct?.host;
-  if (expectedHost && url.hostname !== expectedHost) return unavailable;
+  const dailyMediAlias = article.source === '데일리메디' && url.hostname === 'dailymedi.com';
+  if (expectedHost && url.hostname !== expectedHost && !dailyMediAlias) return unavailable;
   if (portal && url.pathname === portal.path) {
     return { kind: 'institution', href: portal.href, label: '기관에서 공지 찾기',
       institution: portal.institution, board: portal.board, steps: portal.steps };
