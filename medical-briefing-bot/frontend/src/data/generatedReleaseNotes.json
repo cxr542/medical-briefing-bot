@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-09-pr-69",
+    "date": "2026.10.09",
+    "category": "UI/UX",
+    "title": "원문 링크 버튼 통일 및 기관 안내 개선",
+    "summary": "PR #69 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "원문 버튼의 크기와 정렬을 통일하고, 직접 상세 링크가 확인되지 않은 기관은 안내 아이콘에서 공지 검색 절차를 확인할 수 있도록 개선했습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #69",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/69"
+      }
+    ]
+  },
+  {
     "id": "2026-10-09-pr-68",
     "date": "2026.10.09",
     "category": "Fix",
