@@ -6,8 +6,8 @@ const portalCases = [
   ...[2279, 2280, 2281].map(id => ['심평원 e-평가 (평가알림방)', `https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=${id}`, 'https://aq.hira.or.kr/hira_aq/index.jsp', '평가알림방']),
   ...[2146, 2145, 2142].map(id => ['산재업무포탈', `https://total.comwel.or.kr/#ser=${id}`, 'https://total.comwel.or.kr/', '공지사항']),
   ['보건의료자원포탈', 'https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok#no=758', 'https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok', '공지사항'],
-  ['건보공단 업무포탈', 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
-  ['건보공단 업무포탈 (요양기관)', 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005842', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
+  ['건보공단 업무포탈', 'https://medicare.nhis.or.kr/portal/index.do?artiId=unknown', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
+  ['건보공단 업무포탈 (요양기관)', 'https://medicare.nhis.or.kr/portal/index.do', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
   ['심평원 업무포탈 (자보알림방)', 'http://biz.hira.or.kr/indexS.ndo?PROGRAM_ID=MP00000616&PROGRAM_PARAM=nttId==75941', 'https://biz.hira.or.kr/index.do', '자보알림방'],
   ['질병관리청 보도자료', 'https://www.kdca.go.kr/bbs/kdca/42/artclList.do?page=1&srchWrd=title', 'https://www.kdca.go.kr/bbs/kdca/42/artclList.do', '보도자료'],
 ];
@@ -85,4 +85,52 @@ test('unrecognized sources preserve safe links without claiming verification', (
 test('a related link is resolved using its own institution and board', () => {
   const related = { source: '산재업무포탈', title: '연관 공지', url: 'https://total.comwel.or.kr/#ser=2145' };
   assert.equal(resolveSourceLink(related).href, 'https://total.comwel.or.kr/');
+});
+
+const nhisSamples = [
+  ['건보공단 업무포탈', '26POR0000006000000000000005886'],
+  ['건보공단 업무포탈', '26POR0000006000000000000005884'],
+  ['건보공단 업무포탈', '26POR0000006000000000000005882'],
+  ['건보공단 업무포탈 (요양기관)', '26POR0000006000000000000005477'],
+  ['건보공단 업무포탈 (요양기관)', '25POR0000006000000000000005315'],
+  ['건보공단 업무포탈 (요양기관)', '25POR0000006000000000000005022'],
+];
+
+for (const [source, id] of nhisSamples) {
+  test(`NHIS official public route preserves the stored identity: ${source} ${id}`, () => {
+    const article = Object.freeze({ source, title: '공지', url: `https://medicare.nhis.or.kr/portal/index.do?artiId=${id}` });
+    const result = resolveSourceLink(article);
+    assert.equal(result.kind, 'direct');
+    const href = new URL(result.href);
+    assert.equal(href.origin, 'https://medicare.nhis.or.kr');
+    assert.equal(href.pathname, '/portal/index.do');
+    assert.equal(href.searchParams.get('w2xPath'), '/portal/views/bip/az/a/bipaza410m02.xml');
+    assert.equal(href.searchParams.get('programId'), 'bipaza410m01');
+    const bytes = Buffer.from(href.searchParams.get('brdCtsNo'), 'base64');
+    assert.equal(bytes.subarray(0, 2).toString('hex'), 'feff');
+    assert.equal(bytes.subarray(2).swap16().toString('utf16le'), id);
+    assert.equal(article.url, `https://medicare.nhis.or.kr/portal/index.do?artiId=${id}`);
+    assert.equal(result.label, '원문 바로가기');
+  });
+}
+
+test('NHIS route rejects ambiguous IDs, other boards and extra routing input', () => {
+  const id = nhisSamples[0][1];
+  for (const query of ['artiId=', 'artiId=123', 'artiId=wrong',
+    `artiId=${id}&artiId=${id}`, `artiId=${id}&w2xPath=/other.xml`,
+    `artiId=${id}#other`, `artiId=${id.slice(0, -1)}`, `artiId=${id}0`,
+    `artiId=${id.replace('POR0000006', 'POR0000007')}`]) {
+    assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '공지', url: `https://medicare.nhis.or.kr/portal/index.do?${query}` }).kind, 'institution');
+  }
+  for (const url of [`https://medicare.nhis.or.kr.evil.example/portal/index.do?artiId=${id}`,
+    `https://user:secret@medicare.nhis.or.kr/portal/index.do?artiId=${id}`,
+    `https://medicare.nhis.or.kr:8443/portal/index.do?artiId=${id}`]) {
+    assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '공지', url }).kind, 'unavailable');
+  }
+});
+
+test('NHIS derivation is source-specific and applies to related-link records', () => {
+  const url = `https://medicare.nhis.or.kr/portal/index.do?artiId=${nhisSamples[0][1]}`;
+  assert.deepEqual(resolveSourceLink({ source: '추가 기관', title: '공지', url }), { kind: 'unverified', href: url, label: '링크 열기 (상세 미확인)' });
+  assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '연관 공지', url }).kind, 'direct');
 });
