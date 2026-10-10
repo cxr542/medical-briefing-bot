@@ -1,6 +1,52 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { resolveSourceLink } from '../src/lib/sourceLinks.ts';
+import { kdcaNotices, storedKdcaArticle } from './fixtures/kdca-verified.mjs';
+
+for (const notice of kdcaNotices) {
+  test(`verified KDCA search identity opens its own official detail: ${notice.id}`, () => {
+    const article = Object.freeze({ ...storedKdcaArticle(notice), id: notice.id, status: 'NEW', content_hash: 'stored-hash', related_links: Object.freeze([]) });
+    const before = JSON.stringify(article);
+    assert.deepEqual(resolveSourceLink(article), {
+      kind: 'direct', label: '원문 바로가기',
+      href: `https://www.kdca.go.kr/bbs/kdca/42/${notice.id}/artclView.do`,
+    });
+    assert.equal(JSON.stringify(article), before);
+  });
+}
+
+test('KDCA mismatched titles, ambiguous query and unverified notices keep guidance', () => {
+  const article = storedKdcaArticle(kdcaNotices[0]);
+  const changed = [
+    { ...article, title: kdcaNotices[1].title },
+    storedKdcaArticle({ title: '확인하지 않은 공지' }),
+    ...['&srchWrd=other', '&page=2', '&other=1', '#312844'].map(extra => ({ ...article, url: article.url + extra })),
+    ...['page=2', 'srchColumn=content', 'srchWrd=other'].map(value => {
+      const url = new URL(article.url);
+      const [key, replacement] = value.split('=');
+      url.searchParams.set(key, replacement);
+      return { ...article, url: url.href };
+    }),
+    { ...article, url: article.url.replace('https:', 'http:') },
+  ];
+  for (const input of changed) assert.equal(resolveSourceLink(input).kind, 'institution');
+});
+
+test('KDCA mapping remains source-specific and rejects unsafe hosts and credentials', () => {
+  const article = storedKdcaArticle(kdcaNotices[0]);
+  assert.equal(resolveSourceLink({ ...article, source: '다른 기관' }).kind, 'unverified');
+  for (const host of ['www.kdca.go.kr.evil.example', 'user:secret@www.kdca.go.kr', 'www.kdca.go.kr:8443']) {
+    assert.equal(resolveSourceLink({ ...article, url: article.url.replace('www.kdca.go.kr', host) }).kind, 'unavailable');
+  }
+});
+
+test('KDCA related-link resolution preserves parent and related stored identities', () => {
+  const related = Object.freeze(storedKdcaArticle(kdcaNotices[1]));
+  const parent = Object.freeze({ source: '다른 기관', title: '통합 공지', url: 'https://example.org/article', related_links: Object.freeze([related]) });
+  const before = JSON.stringify(parent);
+  assert.equal(resolveSourceLink(parent.related_links[0]).href, 'https://www.kdca.go.kr/bbs/kdca/42/312844/artclView.do');
+  assert.equal(JSON.stringify(parent), before);
+});
 
 const portalCases = [
   ...[2279, 2280, 2281].map(id => ['심평원 e-평가 (평가알림방)', `https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=${id}`, 'https://aq.hira.or.kr/hira_aq/index.jsp', '평가알림방']),
