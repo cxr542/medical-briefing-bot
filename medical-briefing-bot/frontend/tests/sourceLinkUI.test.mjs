@@ -6,6 +6,7 @@ import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { kdcaNotices, storedKdcaArticle } from './fixtures/kdca-verified.mjs';
 
 // Exercise the real TSX without adding a second test runner or DOM dependency.
 const filename = new URL('../src/components/SourceLink.tsx', import.meta.url);
@@ -18,6 +19,20 @@ runInNewContext(compiled, { exports, require: (name) => require(name === '../lib
 const render = (article, props = {}) => renderToStaticMarkup(React.createElement(exports.SourceLink, { article, ...props }));
 const hira = { source: '심평원 e-평가 (평가알림방)', title: '전체 공지 제목 <원문>', url: 'https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=2279' };
 const mfds = { source: '식품의약품안전처 보도자료', title: '식약처 공지', url: 'https://www.mfds.go.kr/brd/m_99/view.do?seq=50403' };
+
+test('KDCA table and content actions open verified detail while keeping the input identity', () => {
+  for (const notice of kdcaNotices) {
+    const article = Object.freeze(storedKdcaArticle(notice));
+    const before = JSON.stringify(article);
+    for (const variant of ['icon', 'content']) {
+      const html = render(article, { variant });
+      assert.ok(html.includes(`href="https://www.kdca.go.kr/bbs/kdca/42/${notice.id}/artclView.do"`));
+      assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+      assert.doesNotMatch(html, /<dialog|artclList\.do/);
+    }
+    assert.equal(JSON.stringify(article), before);
+  }
+});
 
 test('table guidance and direct actions share the same 44px button style without visible long labels', () => {
   const guidance = render(hira, { variant: 'icon' });

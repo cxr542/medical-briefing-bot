@@ -57,6 +57,25 @@ const DIRECT_RULES = [
   { source: '청년의사', host: 'www.docdocdoc.co.kr', path: /^\/news\/articleView\.html$/, id: 'idxno' },
 ] as const;
 
+const VERIFIED_KDCA_NOTICES = [
+  { title: '[10.8.목.조간] 임신당뇨병 산모의 자녀, 당뇨병 위험 최대 4배 이상 높아',
+    href: 'https://www.kdca.go.kr/bbs/kdca/42/312868/artclView.do' },
+  { title: '「아이치-나고야 하계 아시아경기대회」 감염병 예방은 마지막까지 빈틈없이!(10.6.화)',
+    href: 'https://www.kdca.go.kr/bbs/kdca/42/312844/artclView.do' },
+  { title: '질병관리청, 건전한 조직문화 조성을 위한 ‘청렴라이브(LIVE)’ 개최(10.2.금)',
+    href: 'https://www.kdca.go.kr/bbs/kdca/42/312845/artclView.do' },
+] as const;
+
+function verifiedKdcaHref(url: URL, title: string): string | undefined {
+  if (url.origin !== 'https://www.kdca.go.kr'
+    || url.pathname !== '/bbs/kdca/42/artclList.do' || url.hash
+    || url.searchParams.size !== 3 || url.searchParams.get('page') !== '1'
+    || url.searchParams.get('srchColumn') !== 'title'
+    || url.searchParams.get('srchWrd') !== title) return undefined;
+
+  return VERIFIED_KDCA_NOTICES.find(notice => notice.title === title)?.href;
+}
+
 function nhisNoticeHref(url: URL): string | undefined {
   const identifiers = url.searchParams.getAll('artiId');
   const id = identifiers[0] ?? '';
@@ -97,6 +116,10 @@ export function resolveSourceLink(article: SourceArticle): SourceLinkResolution 
   const dailyMediAlias = article.source === '데일리메디' && url.hostname === 'dailymedi.com';
   if (expectedHost && url.hostname !== expectedHost && !dailyMediAlias) return unavailable;
   if (portal && url.pathname === portal.path) {
+    if (portal.host === 'www.kdca.go.kr') {
+      const href = verifiedKdcaHref(url, article.title);
+      if (href) return { kind: 'direct', href, label: '원문 바로가기' };
+    }
     if (portal.host === 'medicare.nhis.or.kr') {
       const href = nhisNoticeHref(url);
       if (href) return { kind: 'direct', href, label: '원문 바로가기' };
