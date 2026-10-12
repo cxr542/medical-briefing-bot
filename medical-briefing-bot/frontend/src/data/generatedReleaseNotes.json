@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-12-pr-74",
+    "date": "2026.10.12",
+    "category": "표시 개선",
+    "title": "NEW 표시와 기사 날짜를 한국 시간 브리핑 기준으로 통일",
+    "summary": "PR #74 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "선택한 날짜에 처음 수집·저장된 신규 기사에만 NEW를 표시합니다.",
+      "기사 날짜, CSV 및 7일 공지 범위를 한국 시간 기준으로 일치시킵니다.",
+      "상태 안내 문구를 실제 동작에 맞게 수정합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #74",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/74"
+      }
+    ]
+  },
+  {
     "id": "2026-10-12-pr-73",
     "date": "2026.10.12",
     "category": "운영",
