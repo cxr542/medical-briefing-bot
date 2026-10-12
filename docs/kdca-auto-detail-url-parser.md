@@ -1,6 +1,9 @@
 # KDCA optional detail extraction
 
-Baseline main: `93d42d2d36a46513a4d8891b225011027899cbdc`, including #70/#71/#72/#73.
+Final baseline main: `5489af269ea596ce7d4b38e6b155169c4dcdb736`, including #70/#71/#72/#73/#74.
+Initial inspection used 93d42d2; main advanced with the independent #74 KST badge
+change during this task. Branch was rebased and frontend/build checks rerun. The
+frozen 93d42d2 parser baseline is identical to the final main parser.
 Branch: `feat/kdca-auto-detail-url-parser`. Open baseline PRs #54/#55/#38 remain
 untouched; their LAW/release hunks do not overlap this parser implementation.
 
@@ -84,13 +87,13 @@ recovery, source health, collector_runs, Admin, #70 NHIS, #71 three mappings,
 | Suite | Total | PASS | FAIL | SKIP |
 |---|---:|---:|---:|---:|
 | Python Collector, including 20 new KDCA parser/integration tests | 191 | 190 | 0 | 1 |
-| Frontend | 152 | 152 | 0 | 0 |
+| Frontend | 160 | 160 | 0 | 0 |
 | Health Engine | 16 | 16 | 0 | 0 |
 | Recovery | 17 | 17 | 0 | 0 |
 | Admin security | 9 | 9 | 0 | 0 |
 | Admin integration (local fixture) | 7 | 7 | 0 | 0 |
 | Release-note guard | 6 | 6 | 0 | 0 |
-| **Unique tests** | **398** | **397** | **0** | **1** |
+| **Unique tests** | **406** | **405** | **0** | **1** |
 
 The 108 lifecycle vectors are subcases, not additional test counts. SKIP is the
 existing optional pinned Kiwi native smoke. TypeScript, ESLint, diff check and
