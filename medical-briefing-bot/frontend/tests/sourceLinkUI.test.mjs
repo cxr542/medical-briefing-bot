@@ -84,3 +84,22 @@ test('NHIS stored identity renders an official new-tab detail action without ins
   assert.doesNotMatch(html, /<dialog|기관에서 공지 찾기/);
   assert.equal(article.url, 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886');
 });
+
+test('optional metadata renders real SourceLink and old schema retains guidance', () => {
+  const article = storedKdcaArticle({ title: '오프라인 계약 공지' });
+  const href = 'https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do';
+  for (const variant of ['icon', 'content']) {
+    const html = render({ ...article, source_detail_url: href }, { variant });
+    assert.ok(html.includes(`href="${href}"`));
+    assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+    assert.doesNotMatch(html, /<dialog|artclList\.do/);
+    const old = render(article, { variant });
+    // React-generated IDs differ across renders; compare behavior, not IDs.
+    for (const value of [undefined, null, 'https://evil.test/a']) {
+      const fallback = render({ ...article, source_detail_url: value }, { variant });
+      assert.match(fallback, /<dialog/);
+      assert.doesNotMatch(fallback, /href="[^"]*312999/);
+    }
+    assert.match(old, /<dialog/);
+  }
+});

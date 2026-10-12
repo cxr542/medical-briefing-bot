@@ -7,6 +7,7 @@ import unittest
 from collector_keyword_enrichment import SavedArticle, enrich_saved_article
 from collector_keyword_boundary import KeywordBoundaryClient
 from keyword_boundary_contract import Metadata
+from collector_detail_links import primary_article_payload
 
 
 class Boundary:
@@ -74,6 +75,7 @@ def load_save_functions(store, boundary):
     functions = [n for n in tree.body if isinstance(n, ast.FunctionDef)
                  and n.name in ("save_keyword_boundary", "save_to_supabase")]
     namespace = {"supabase": store, "KeywordBoundaryClient": lambda: boundary,
+                 "primary_article_payload": primary_article_payload,
                  "enrich_saved_article": enrich_saved_article, "APIError": ValueError, "HTTPError": OSError,
                  "SavedArticle": SavedArticle, "Metadata": Metadata}
     exec(compile(ast.Module(body=functions, type_ignores=[]), str(source), "exec"), namespace)
