@@ -5,6 +5,8 @@ import re
 
 from bs4 import BeautifulSoup
 
+from collector_kdca_detail import suppress_ambiguous_details, title_anchor_detail_url
+
 
 KST = timezone(timedelta(hours=9))
 RSS_INVALID_ENTRIES_ERROR = "RSS 유효 article entry가 없습니다"
@@ -173,7 +175,11 @@ def parse_kdca_press_release_html(html: str, list_url: str, *, now=None):
             "status": "NEW",
         }
         if is_valid_article_record(article):
+            detail = title_anchor_detail_url(row, title_link, article, list_url=list_url)
+            if detail is not None:
+                article["source_detail_url"] = detail
             articles.append(article)
+    suppress_ambiguous_details(articles)
     return {
         "articles": articles,
         "rows": len(rows),
