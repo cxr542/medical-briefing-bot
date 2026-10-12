@@ -1,15 +1,31 @@
+import json
+import logging
+import re
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
-from urllib.parse import quote, urljoin, urlparse
-import re
+from urllib.parse import parse_qsl, quote, urlencode, urljoin, urlparse
 
 from bs4 import BeautifulSoup
-
 from collector_kdca_detail import suppress_ambiguous_details, title_anchor_detail_url
-
 
 KST = timezone(timedelta(hours=9))
 RSS_INVALID_ENTRIES_ERROR = "RSS 유효 article entry가 없습니다"
+# Allow small publisher/collector clock skew, not hours of timezone drift.
+RSS_FUTURE_TOLERANCE = timedelta(minutes=5)
+logger = logging.getLogger(__name__)
+
+
+def _diagnostic_article_url(link: str) -> str:
+    """Keep article IDs while omitting credentials, fragments and other query data."""
+    parsed = urlparse(link)
+    article_keys = {"idxno", "wr_id", "articleNo", "articleId", "id"}
+    query = urlencode([
+        (key, value) for key, value in parse_qsl(parsed.query)
+        if key in article_keys and value.isascii() and value.isdigit()
+    ])
+    return parsed._replace(
+        netloc=parsed.netloc.rsplit("@", 1)[-1], params="", query=query, fragment=""
+    ).geturl()
 
 
 def get_content_hash(text: str) -> str:
@@ -58,12 +74,14 @@ def parse_rss_entries(
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
-    recent_since = now.astimezone(timezone.utc) - timedelta(days=7)
+    now = now.astimezone(timezone.utc)
+    recent_since = now - timedelta(days=7)
     articles = []
     recent_count = 0
     filtered_count = 0
     valid_entry_count = 0
     invalid_entry_count = 0
+    future_entry_count = 0
 
     for entry in entries:
         normalized_entry = normalize_rss_entry(entry, feed_url)
@@ -77,6 +95,21 @@ def parse_rss_entries(
         published_parsed = entry.get("published_parsed")
         if published_parsed:
             pub_date = datetime(*published_parsed[:6], tzinfo=timezone.utc)
+        future_delta = pub_date - now
+        if future_delta > RSS_FUTURE_TOLERANCE:
+            future_entry_count += 1
+            logger.warning("RSS future publication fallback: %s", json.dumps({
+                "source": source_name,
+                "article_url": _diagnostic_article_url(link),
+                "parsed_published_time": pub_date.isoformat(),
+                "collector_now": now.isoformat(),
+                "future_delta_seconds": future_delta.total_seconds(),
+                "tolerance_seconds": RSS_FUTURE_TOLERANCE.total_seconds(),
+                "policy": "now_fallback",
+            }, ensure_ascii=True))
+            # Preserve the URL in the snapshot: dropping it could mark an existing
+            # healthy article DELETED. This is collection time, not a timezone fix.
+            pub_date = now
         if pub_date < recent_since:
             continue
 
@@ -103,6 +136,7 @@ def parse_rss_entries(
         "raw_entries": len(entries),
         "valid_entries": valid_entry_count,
         "invalid_entries": invalid_entry_count,
+        "future_entries": future_entry_count,
         "recent_entries": recent_count,
         "filtered_entries": filtered_count,
     }
