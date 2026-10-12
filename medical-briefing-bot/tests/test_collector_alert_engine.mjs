@@ -20,6 +20,17 @@ const dailyCollectorWorkflow = readFileSync(
   resolve(dirname(fileURLToPath(import.meta.url)), '../../.github/workflows/daily_collector.yml'),
   'utf8',
 );
+const alertEngineWorkflow = readFileSync(
+  resolve(dirname(fileURLToPath(import.meta.url)), '../../.github/workflows/collector-alert-engine.yml'),
+  'utf8',
+);
+
+// Read only the top-level on block; nested inputs and job keys are not triggers.
+const workflowTriggers = workflow => {
+  const block = workflow.match(/^on:\r?\n((?:(?:[ \t]+[^\r\n]*|[ \t]*)\r?\n)*)/m);
+  assert.ok(block, 'workflow must declare an explicit on block');
+  return [...block[1].matchAll(/^ {2}([a-z_]+):(?:\s|$)/gm)].map(([, trigger]) => trigger);
+};
 
 const NOW = Date.parse('2026-09-28T06:10:00.000Z');
 const sourceName = '질병관리청 보도자료';
@@ -59,13 +70,20 @@ test('NORMAL health produces no alert', () => {
   assert.equal(result.events.length, 0);
 });
 
-test('runtime, display, and GitHub UTC schedules stay aligned', () => {
+test('runtime and display schedules match the confirmed external dispatch contract', () => {
   assert.deepEqual(COLLECTION_RUNTIME_SCHEDULE_KST, ['08:30', '12:07', '15:07', '17:07']);
   assert.deepEqual(COLLECTION_DISPLAY_SCHEDULE_KST, ['08:30', '12:00', '15:00', '17:00']);
-  assert.deepEqual([...dailyCollectorWorkflow.matchAll(/- cron: '([^']+)'/g)].map(([, cron]) => cron), [
-    '7 3,6,8 * * *',
-    '30 23 * * *',
-  ]);
+});
+
+test('Collector remains dispatch-only so GitHub cron cannot duplicate external scheduling', () => {
+  assert.deepEqual(workflowTriggers(dailyCollectorWorkflow), ['workflow_dispatch']);
+  assert.match(dailyCollectorWorkflow, /^    runs-on: ubuntu-latest$/m);
+});
+
+test('Alert Engine retains its independent scheduled recovery evaluator', () => {
+  assert.deepEqual(workflowTriggers(alertEngineWorkflow), ['schedule', 'workflow_dispatch']);
+  assert.deepEqual([...alertEngineWorkflow.matchAll(/- cron: '([^']+)'/g)].map(([, cron]) => cron), ['*/15 * * * *']);
+  assert.match(alertEngineWorkflow, /^  actions: write$/m);
 });
 
 test('KST date remains today before the first scheduled run and across UTC midnight', () => {
