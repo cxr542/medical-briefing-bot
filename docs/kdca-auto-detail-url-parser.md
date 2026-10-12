@@ -1,9 +1,13 @@
 # KDCA optional detail extraction
 
-Final baseline main: `5489af269ea596ce7d4b38e6b155169c4dcdb736`, including #70/#71/#72/#73/#74.
+Final baseline main: `e096edf31a53c0d90687aa0476d6fffc7f5b8411`, including #70/#71/#72/#73/#74/#76.
 Initial inspection used 93d42d2; main advanced with the independent #74 KST badge
 change during this task. Branch was rebased and frontend/build checks rerun. The
 frozen 93d42d2 parser baseline is identical to the final main parser.
+Final #75 synchronization rebased onto #76 without conflicts. ArticleList is
+identical to main; search pagination reset is preserved. Three supplemental
+offline tests exercise its actual search/next/previous handlers (AST extraction
+in a workspace scratch harness, not a frontend code change or remote CI suite).
 Branch: `feat/kdca-auto-detail-url-parser`. Open baseline PRs #54/#55/#38 remain
 untouched; their LAW/release hunks do not overlap this parser implementation.
 
@@ -93,7 +97,8 @@ recovery, source health, collector_runs, Admin, #70 NHIS, #71 three mappings,
 | Admin security | 9 | 9 | 0 | 0 |
 | Admin integration (local fixture) | 7 | 7 | 0 | 0 |
 | Release-note guard | 6 | 6 | 0 | 0 |
-| **Unique tests** | **406** | **405** | **0** | **1** |
+| Supplemental #76 actual-handler pagination | 3 | 3 | 0 | 0 |
+| **Unique tests** | **409** | **408** | **0** | **1** |
 
 The 108 lifecycle vectors are subcases, not additional test counts. SKIP is the
 existing optional pinned Kiwi native smoke. TypeScript, ESLint, diff check and
