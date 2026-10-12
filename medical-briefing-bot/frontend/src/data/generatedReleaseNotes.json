@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-12-pr-78",
+    "date": "2026.10.12",
+    "category": "Fix",
+    "title": "RSS 미래 발행시각 저장 방어",
+    "summary": "PR #78 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "RSS 발행시각이 수집 기준 시각보다 5분을 초과해 미래인 경우 수집 시각으로 대체하고 진단 로그를 남깁니다.",
+      "정상 시간대 변환과 기존 삭제 감지를 유지합니다. 기존 데이터의 날짜를 보정하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #78",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/78"
+      }
+    ]
+  },
+  {
     "id": "2026-10-12-pr-75",
     "date": "2026.10.12",
     "category": "운영",
