@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-12-pr-73",
+    "date": "2026.10.12",
+    "category": "운영",
+    "title": "공식 원문 상세 주소 저장 기반 추가",
+    "summary": "PR #73 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "기사 URL identity와 분리된 optional 상세 주소 저장·표시 기반을 준비합니다.",
+      "기존 원문 routing과 Collector lifecycle을 유지하고 조건부 metadata 저장을 검증합니다.",
+      "Migration·Backfill은 실행하지 않았으며 KDCA 자동 추출은 후속 PR에서 구현합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #73",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/73"
+      }
+    ]
+  },
+  {
     "id": "2026-10-10-pr-71",
     "date": "2026.10.10",
     "category": "링크 개선",
