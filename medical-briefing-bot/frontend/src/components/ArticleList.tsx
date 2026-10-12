@@ -417,6 +417,9 @@ export default function ArticleList({
             placeholder="기사 제목, 키워드 검색..."
             value={searchTerm}
             onChange={(e) => {
+              // Search can shrink the major-notice result set below the current page.
+              // Reset both paginated views so a matching result never renders as an empty table.
+              setCurrentPage(1);
               setMedicalPressPage(1);
               setSearchTerm(e.target.value);
             }}
