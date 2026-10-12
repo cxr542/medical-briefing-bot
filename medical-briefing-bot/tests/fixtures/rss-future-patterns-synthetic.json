@@ -1,0 +1,17 @@
+{
+  "description": "Synthetic GMT pubDate inputs reproducing the 11 observed DB UTC times. Original publisher pubDate values are unavailable; these are not captured RSS.",
+  "collector_now": "2026-10-12T08:08:05+00:00",
+  "records": [
+    {"id": 19561, "source": "의협신문", "published_utc": "2026-10-12T16:19:34+00:00"},
+    {"id": 19562, "source": "의협신문", "published_utc": "2026-10-12T16:19:23+00:00"},
+    {"id": 19563, "source": "의협신문", "published_utc": "2026-10-12T16:19:17+00:00"},
+    {"id": 19564, "source": "의협신문", "published_utc": "2026-10-12T16:18:58+00:00"},
+    {"id": 19565, "source": "의협신문", "published_utc": "2026-10-12T16:18:55+00:00"},
+    {"id": 19566, "source": "의협신문", "published_utc": "2026-10-12T16:18:55+00:00"},
+    {"id": 19525, "source": "청년의사", "published_utc": "2026-10-12T16:49:56+00:00"},
+    {"id": 19526, "source": "청년의사", "published_utc": "2026-10-12T16:49:44+00:00"},
+    {"id": 19527, "source": "청년의사", "published_utc": "2026-10-12T16:49:33+00:00"},
+    {"id": 19528, "source": "청년의사", "published_utc": "2026-10-12T16:48:08+00:00"},
+    {"id": 19529, "source": "청년의사", "published_utc": "2026-10-12T16:44:54+00:00"}
+  ]
+}
