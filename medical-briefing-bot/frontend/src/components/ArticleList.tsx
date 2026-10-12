@@ -28,6 +28,7 @@ interface RelatedLink {
   title: string;
   url: string;
   source: string;
+  source_detail_url?: string | null;
 }
 
 interface Article {
@@ -42,6 +43,7 @@ interface Article {
   keyword_boundary?: unknown;
   is_merged?: boolean;
   related_links?: RelatedLink[];
+  source_detail_url?: string | null;
 }
 
 interface BriefingAnalysis {

@@ -2,6 +2,7 @@ export type SourceArticle = {
   readonly source: string;
   readonly title: string;
   readonly url: string;
+  readonly source_detail_url?: unknown;
 };
 
 type LinkTarget = { readonly href: string; readonly label: string };
@@ -66,12 +67,38 @@ const VERIFIED_KDCA_NOTICES = [
     href: 'https://www.kdca.go.kr/bbs/kdca/42/312845/artclView.do' },
 ] as const;
 
-function verifiedKdcaHref(url: URL, title: string): string | undefined {
+function isKdcaSearchIdentity(url: URL, title: string): boolean {
   if (url.origin !== 'https://www.kdca.go.kr'
     || url.pathname !== '/bbs/kdca/42/artclList.do' || url.hash
     || url.searchParams.size !== 3 || url.searchParams.get('page') !== '1'
     || url.searchParams.get('srchColumn') !== 'title'
-    || url.searchParams.get('srchWrd') !== title) return undefined;
+    || url.searchParams.get('srchWrd') !== title) return false;
+
+  return true;
+}
+
+function validatedSourceDetailHref(article: SourceArticle, identity: URL): string | undefined {
+  const value = article.source_detail_url;
+  if (typeof value !== 'string' || !value.startsWith('https://')) return undefined;
+  let detail: URL;
+  try {
+    detail = new URL(value);
+  } catch {
+    return undefined;
+  }
+  if (detail.protocol !== 'https:' || detail.username || detail.password || detail.port
+    || detail.href !== value) return undefined;
+  // Source-specific policies start with the existing KDCA board/path contract.
+  // Unsupported sources cannot become DIRECT merely by adding an HTTPS field.
+  if (article.source !== '질병관리청 보도자료') return undefined;
+  const match = value.match(/^https:\/\/www\.kdca\.go\.kr\/bbs\/kdca\/42\/[1-9][0-9]{0,17}\/artclView\.do$/);
+  if (match?.[0] !== value) return undefined;
+  if (article.url === value) return value;
+  return !article.url.includes('#') && isKdcaSearchIdentity(identity, article.title) ? value : undefined;
+}
+
+function verifiedKdcaHref(url: URL, title: string): string | undefined {
+  if (!isKdcaSearchIdentity(url, title)) return undefined;
 
   return VERIFIED_KDCA_NOTICES.find(notice => notice.title === title)?.href;
 }
@@ -115,6 +142,8 @@ export function resolveSourceLink(article: SourceArticle): SourceLinkResolution 
   const expectedHost = portal?.host ?? direct?.host;
   const dailyMediAlias = article.source === '데일리메디' && url.hostname === 'dailymedi.com';
   if (expectedHost && url.hostname !== expectedHost && !dailyMediAlias) return unavailable;
+  const detail = validatedSourceDetailHref(article, url);
+  if (detail) return { kind: 'direct', href: detail, label: '원문 바로가기' };
   if (portal && url.pathname === portal.path) {
     if (portal.host === 'www.kdca.go.kr') {
       const href = verifiedKdcaHref(url, article.title);

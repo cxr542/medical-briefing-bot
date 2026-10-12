@@ -7,6 +7,7 @@ import re
 from typing import Optional
 
 from collector_lifecycle import find_absent_article_urls
+from collector_detail_links import primary_article_payload, save_source_detail_urls
 from collector_keyword_boundary import KeywordBoundaryClient
 from collector_keyword_enrichment import SavedArticle, enrich_saved_article
 from keyword_boundary_contract import Metadata
@@ -653,7 +654,7 @@ def fetch_nhis_public_notices():
     return articles_to_save
 
 
-def track_states(new_articles: list, supabase: Client, incomplete_sources=None):
+def track_states(new_articles: list, supabase: Client, incomplete_sources=None, *, detail_snapshots=None):
     """
     기존 DB 데이터와 비교하여 NEW, UPDATE, DELETED 상태를 판별합니다.
     """
@@ -667,6 +668,9 @@ def track_states(new_articles: list, supabase: Client, incomplete_sources=None):
     except Exception as e:
         print(f"DB 데이터 조회 실패: {e}")
         db_articles = []
+
+    if detail_snapshots is not None:
+        detail_snapshots.extend(dict(article) for article in db_articles)
 
     # url을 키로 하는 딕셔너리로 변환
     db_dict = {a['url']: a for a in db_articles}
@@ -722,7 +726,7 @@ def save_keyword_boundary(snapshot: SavedArticle, metadata: Metadata) -> bool:
         return False
 
 
-def save_to_supabase(articles: list) -> dict[str, int]:
+def save_to_supabase(articles: list, *, detail_snapshots=None) -> dict[str, int]:
     attempted = len(articles)
     succeeded = 0
     failed = 0
@@ -736,9 +740,11 @@ def save_to_supabase(articles: list) -> dict[str, int]:
     for article in articles:
         try:
             # upsert를 사용하여 기존 데이터 덮어쓰기 (url이 UNIQUE key라고 가정)
-            response = supabase.table('articles').upsert(article, on_conflict='url').execute()
+            response = supabase.table('articles').upsert(primary_article_payload(article), on_conflict='url').execute()
             if isinstance(response.data, list):
                 saved_articles.extend(row for row in response.data if isinstance(row, dict))
+                if detail_snapshots is not None:
+                    detail_snapshots.extend(dict(row) for row in response.data if isinstance(row, dict))
             succeeded += 1
         except Exception as e:
             failed += 1
@@ -768,6 +774,19 @@ def save_to_supabase(articles: list) -> dict[str, int]:
     print(f"DB succeeded: {succeeded}")
     print(f"DB failed: {failed}")
     return {"attempted": attempted, "succeeded": succeeded, "failed": failed}
+
+
+def sync_articles(articles: list, incomplete_sources=None) -> dict[str, int]:
+    observed = []
+    changes = track_states(articles, supabase, incomplete_sources, detail_snapshots=observed)
+    saved = []
+    stats = save_to_supabase(changes, detail_snapshots=saved)
+    # Never enrich a failed/unrepresented primary save or an originally DELETED row.
+    blocked = {row['url'] for row in changes} - {row['url'] for row in saved}
+    blocked.update(row['url'] for row in observed if row.get('status') == 'DELETED')
+    # Unlike primary upsert, this also runs when the lifecycle change list is empty.
+    save_source_detail_urls(supabase, articles, observed + saved, blocked_urls=blocked)
+    return stats
 
 
 
@@ -1055,10 +1074,7 @@ if __name__ == "__main__":
     processed_articles = [a for a in total_articles if is_valid_article_record(a)]
         
     # 5. 기존 DB와 비교하여 상태 감지 (NEW, UPDATE, DELETED)
-    final_sync_articles = track_states(processed_articles, supabase, incomplete_sources)
-    
-    # DB 저장
-    db_stats = save_to_supabase(final_sync_articles)
+    db_stats = sync_articles(processed_articles, incomplete_sources)
     failed_sources = [name for name, health in source_health.items() if health["status"] == "FAILED"]
 
     if db_stats["failed"] > 0:

@@ -1,0 +1,36 @@
+{
+  "detail": "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do",
+  "valid": [
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/312868/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/312844/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/312845/artclView.do"
+  ],
+  "invalid": [
+    null,
+    42,
+    "",
+    "javascript:alert(1)",
+    "data:text/html,x",
+    "file:///tmp/x",
+    "http://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do",
+    "https://evil.test/bbs/kdca/42/312999/artclView.do",
+    "https://www.kdca.go.kr.evil.test/bbs/kdca/42/312999/artclView.do",
+    "https://user:secret@www.kdca.go.kr/bbs/kdca/42/312999/artclView.do",
+    "https://www.kdca.go.kr:443/bbs/kdca/42/312999/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/43/312999/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/0/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/abc/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/１２３/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/1234567890123456789/artclView.do",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do?x=1",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do#x",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do?",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do#",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do\n",
+    "https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do ",
+    "https://www.kdca.go.kr\\bbs/kdca/42/312999/artclView.do",
+    "HTTPS://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do",
+    "https://WWW.kdca.go.kr/bbs/kdca/42/312999/artclView.do"
+  ]
+}
