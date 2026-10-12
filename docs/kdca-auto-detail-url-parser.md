@@ -94,7 +94,9 @@ recovery, source health, collector_runs, Admin, #70 NHIS, #71 three mappings,
 
 The 108 lifecycle vectors are subcases, not additional test counts. SKIP is the
 existing optional pinned Kiwi native smoke. TypeScript, ESLint, diff check and
-production webpack build pass. Build uses command-local fake/offline Supabase
+production webpack build pass. Initial Admin integration startup failed because a
+prior test-owned Next dev server/lock remained; after stopping that orphan, all
+seven integration tests passed on rerun. Build uses command-local fake/offline Supabase
 configuration with normal font fetching, not Production values. No Turbopack run
 was repeated for this parser-only change; prior Cloud listener EPERM is historical
 and is not a current PASS or fresh failure. Remote CI/Preview are separate checks.
