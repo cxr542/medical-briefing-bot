@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-12-pr-75",
+    "date": "2026.10.12",
+    "category": "운영",
+    "title": "KDCA 공식 상세 링크 자동 추출",
+    "summary": "PR #75 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "공식 목록의 같은 제목 anchor에서 검증된 게시물 ID를 optional 상세 주소로 전달합니다.",
+      "기존 기사 identity·hash·lifecycle과 원문 fallback을 유지합니다.",
+      "기존 기사 Backfill이나 수동 Collector 실행은 수행하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #75",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/75"
+      }
+    ]
+  },
+  {
     "id": "2026-10-12-pr-74",
     "date": "2026.10.12",
     "category": "표시 개선",
