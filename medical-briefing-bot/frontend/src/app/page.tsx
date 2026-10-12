@@ -5,19 +5,23 @@ import Link from "next/link";
 
 import ArticleList from '@/components/ArticleList';
 import CollectionStatusBanner, { CollectionLastCheck, CollectionStatusProvider } from '@/components/CollectionStatusBanner';
-import { COLLECTION_DISPLAY_SCHEDULE_KST, getKstDateKey, getLatestCollectionRuntimeTime, getLatestCollectionTime } from '@/lib/collectionStatus';
+import { COLLECTION_DISPLAY_SCHEDULE_KST, getCollectionCutoffIso, getKstDateKey, getLatestCollectionRuntimeTime, getLatestCollectionTime, shiftKstDate } from '@/lib/collectionStatus';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Dashboard() {
-  // Supabase에서 초기 데이터 100건만 제한적으로 조회 (대용량 대비 서버사이드 최적화)
-  // 14일치 데이터를 가져와 넉넉하게 풀을 확보 (limit 대신 날짜 기반 필터링)
-  const fourteenDaysAgo = new Date();
-  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const now = new Date();
+  const initialDate = getKstDateKey(now);
+  const initialTime = getLatestCollectionRuntimeTime(now);
+  // 초기 화면도 클라이언트와 동일한 KST 브리핑 마감 시각/삭제 제외 기준을 적용합니다.
+  // 초기 조회 범위는 14일 전 KST 자정부터이며 최대 500건을 유지합니다.
+  const fourteenDaysAgo = new Date(`${shiftKstDate(initialDate, -14)}T00:00:00+09:00`);
   const { data: articles, error } = await supabase
     .from('articles')
     .select('*')
     .gte('published_date', fourteenDaysAgo.toISOString())
+    .lte('published_date', getCollectionCutoffIso(initialDate, initialTime))
+    .neq('status', 'DELETED')
     .order('published_date', { ascending: false })
     .limit(500);
 
@@ -25,10 +29,6 @@ export default async function Dashboard() {
     console.error(error);
     return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;
   }
-
-  const now = new Date();
-  const initialDate = getKstDateKey(now);
-  const initialTime = getLatestCollectionRuntimeTime(now);
 
   return (
     <CollectionStatusProvider>
