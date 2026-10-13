@@ -1,0 +1,10 @@
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { LockKeyhole } from 'lucide-react';
+import { adminRequest, safeAdminNext } from '@/lib/customerAdminApi';
+import './customer-admin.css';
+export default function CustomerAdminLogin({next}:{next:string}) {
+  const router=useRouter();const [id,setId]=useState('');const [password,setPassword]=useState('');const [busy,setBusy]=useState(false);const [error,setError]=useState('');
+  return <main className="customer-admin flex min-h-screen items-center justify-center bg-[#F7F9FC] p-4"><section className="ca-card w-full max-w-md"><div className="mb-6 flex items-center gap-3 text-blue-600"><LockKeyhole size={24}/><span className="font-bold">Medical Briefing</span></div><h1 className="text-2xl font-bold text-slate-800">고객 관리자 로그인</h1><p className="mt-3 text-sm leading-6 text-slate-500">고객 사용자와 공용 비밀번호를 관리하는 전용 계정으로 로그인하세요.</p><form className="mt-6 space-y-4" onSubmit={async event=>{event.preventDefault();if(busy)return;setBusy(true);setError('');try{await adminRequest('login',{method:'POST',body:JSON.stringify({identifier:id,password})});setPassword('');router.replace(safeAdminNext(next));router.refresh();}catch(e){setPassword('');setError(e instanceof Error?e.message:'로그인할 수 없습니다.');}finally{setBusy(false);}}}><div><label className="ca-label" htmlFor="customer-admin-id">관리자 ID</label><input id="customer-admin-id" autoComplete="username" maxLength={64} required value={id} onChange={e=>setId(e.target.value)} className="ca-input"/></div><div><label className="ca-label" htmlFor="customer-admin-password">관리자 비밀번호</label><input id="customer-admin-password" type="password" autoComplete="current-password" required maxLength={512} value={password} onChange={e=>setPassword(e.target.value)} className="ca-input"/></div>{error&&<p role="alert" className="text-sm leading-6 text-rose-700">{error}</p>}<button type="submit" disabled={busy} className="ca-primary w-full">{busy?'로그인 중…':'로그인'}</button></form><p className="mt-6 text-xs leading-5 text-slate-500">일반 사용자 공용 비밀번호와 내부 운영 Admin 계정은 사용할 수 없습니다.</p></section></main>;
+}

@@ -1,5 +1,5 @@
 import { History, ChevronRight } from 'lucide-react';
-import type { CustomerActivity } from '@/lib/customerAdminMockData';
+import type { DisplayActivity as CustomerActivity } from '@/lib/customerAdminApi';
 
 export default function ActivityHistory({ activities, onViewAll }: { activities: CustomerActivity[]; onViewAll: () => void }) {
   return <section className="ca-card min-w-0" aria-labelledby="activity-title"><div className="flex flex-wrap items-center justify-between gap-2"><h2 id="activity-title" className="ca-card-title"><History size={20} className="text-blue-600" />최근 관리 이력</h2><button type="button" className="ca-text-button" onClick={onViewAll}>전체보기<ChevronRight size={15} /></button></div><p className="mt-3 text-sm leading-6 text-slate-500">사번 추가, 상태 변경, 비밀번호 변경 등의 이력을 확인할 수 있습니다.</p><ActivityList activities={activities.slice(0, 6)} /></section>;

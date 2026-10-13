@@ -1,5 +1,7 @@
 # Customer Auth / DB Foundation
 
+This document records PR #81 scope. For subsequent live Customer Admin UI/API integration, see [customer-admin-integration.md](customer-admin-integration.md).
+
 ## Scope and baseline
 
 Baseline: remote main `02e5e5b243f15b1ae91332b2bdb1742e0af763f7` (PR #80 merged).

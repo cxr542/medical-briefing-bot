@@ -29,7 +29,9 @@ await test('anonymous logout clears secure cookie; disabled session never accept
  assert.equal(response.status,200);assert.match(response.headers.get('set-cookie'),/Max-Age=0; HttpOnly; SameSite=Lax; Secure/);
  assert.equal((await request('/api/customer-auth/session',{headers:{cookie:productionCookie}})).status,503);
 });
-await test('mock customer-admin/deep link stays accessible; data-protection rollout is not enabled',async()=>{
- const r=await request('/customer-admin');assert.equal(r.status,200);assert.match(await r.text(),/UI 시안 · 샘플 데이터/);
+await test('customer-admin has server login guard while medical deep link remains open',async()=>{
+ const r=await fetch(base+'/customer-admin',{redirect:'manual'});assert.equal(r.status,307);
+ assert.equal(new URL(r.headers.get('location'),base).pathname,'/customer-admin/login');
+ const login=await request('/customer-admin/login');assert.equal(login.status,200);assert.match(await login.text(),/고객 관리자 로그인/);
  assert.equal((await request('/neurology-dashboard')).status,200);
 });
