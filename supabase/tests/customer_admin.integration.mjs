@@ -156,7 +156,7 @@ if(process.env.CUSTOMER_ADMIN_PLAYWRIGHT_PATH)await test('general browser login/
   const articlePage=await context.newPage();await articlePage.goto(href);assert.equal(await articlePage.title(),'Synthetic external article');await articlePage.close();
   await page.getByRole('button',{name:'로그아웃',exact:true}).click();await page.waitForURL('**/login');await page.goBack();await page.waitForURL('**/login**');
   assert.equal(await page.getByText('Synthetic article 1',{exact:true}).count(),0);
-  await page.getByLabel('사번',{exact:true}).fill(employee);await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/');
+  await page.getByLabel('사번',{exact:true}).fill(employee);await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');const loginResponse=page.waitForResponse(r=>r.url().endsWith('/api/customer-auth/login'));await page.getByRole('button',{name:'로그인',exact:true}).click();const loggedIn=await loginResponse;assert.equal(loggedIn.status(),200,await loggedIn.text());await page.waitForURL(url=>['/','/neurology-dashboard'].includes(url.pathname));
   sql("UPDATE customer_auth.customer_sessions SET issued_at=now()-interval '9 hours',expires_at=now()-interval '1 hour' WHERE kind='user';");await page.reload();await page.waitForURL('**/login**');
   await context.close();
  }

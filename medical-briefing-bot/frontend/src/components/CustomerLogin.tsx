@@ -1,7 +1,9 @@
  'use client';
-import { useState } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { safeUserNext } from '@/lib/customerReturn';
+const subscribe=()=>()=>{};
 export default function CustomerLogin({next}:{next:string}) {
+  const ready=useSyncExternalStore(subscribe,()=>true,()=>false);
   const [identifier,setIdentifier]=useState('');
   const [password,setPassword]=useState('');
   const [busy,setBusy]=useState(false);
@@ -12,5 +14,5 @@ export default function CustomerLogin({next}:{next:string}) {
       if(!response.ok) {setError(response.status===429?'잠시 후 다시 시도해 주세요.':response.status===503?'인증 서비스를 사용할 수 없습니다.':'사번 또는 비밀번호를 확인해 주세요.');return;}
       window.location.replace(safeUserNext(next));
     } catch {setError('인증 서비스를 사용할 수 없습니다.');} finally {setPassword('');setBusy(false);}
-  }}><div><label htmlFor="employee" className="mb-2 block text-sm font-semibold text-slate-700">사번</label><input id="employee" autoComplete="username" required maxLength={64} value={identifier} onChange={e=>setIdentifier(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 px-3"/></div><div><label htmlFor="shared-password" className="mb-2 block text-sm font-semibold text-slate-700">공용 비밀번호</label><input id="shared-password" type="password" autoComplete="current-password" required maxLength={512} value={password} onChange={e=>setPassword(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 px-3"/></div>{error&&<p role="alert" className="text-sm text-rose-700">{error}</p>}<button disabled={busy} className="min-h-11 w-full rounded-xl bg-blue-700 px-4 font-semibold text-white disabled:opacity-50">{busy?'로그인 중…':'로그인'}</button></form></section></main>;
+  }}><div><label htmlFor="employee" className="mb-2 block text-sm font-semibold text-slate-700">사번</label><input disabled={!ready||busy} id="employee" autoComplete="username" required maxLength={64} value={identifier} onChange={e=>setIdentifier(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 px-3"/></div><div><label htmlFor="shared-password" className="mb-2 block text-sm font-semibold text-slate-700">공용 비밀번호</label><input disabled={!ready||busy} id="shared-password" type="password" autoComplete="current-password" required maxLength={512} value={password} onChange={e=>setPassword(e.target.value)} className="min-h-11 w-full rounded-xl border border-slate-300 px-3"/></div>{error&&<p role="alert" className="text-sm text-rose-700">{error}</p>}<button disabled={!ready||busy} className="min-h-11 w-full rounded-xl bg-blue-700 px-4 font-semibold text-white disabled:opacity-50">{busy?'로그인 중…':'로그인'}</button></form></section></main>;
 }
