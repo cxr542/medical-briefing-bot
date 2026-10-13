@@ -23,7 +23,7 @@ sql(`INSERT INTO customer_auth.customer_users(employee_number) SELECT 'E-'||lpad
 let app,transport,browser;let origin,adminCookie,userCookie,secondUserCookie;let calls=0;
 async function cleanup(){await browser?.close();app?.kill('SIGTERM');if(app&&app.exitCode===null)await Promise.race([once(app,'exit'),delay(3000)]);if(app?.exitCode===null)app.kill('SIGKILL');if(transport){transport.closeAllConnections();await new Promise(resolve=>transport.close(resolve));}}
 transport=createServer(async(req,res)=>{
- if(req.url?.startsWith('/rest/v1/articles')){res.setHeader('content-type','application/json');const date=new Date();date.setHours(date.getHours()-24);const rows=Array.from({length:12},(_,i)=>({id:i+1,source:'대한병원협회 공지사항',title:'Synthetic article '+(i+1),url:'https://example.com/article/'+(i+1),published_date:date.toISOString(),created_at:date.toISOString(),status:'NEW',category:'공지',keywords:'synthetic',private_fixture:'must-not-serialize'}));res.end(JSON.stringify(rows));return;}
+ if(req.url?.startsWith('/rest/v1/articles')){res.setHeader('content-type','application/json');const date=new Date();date.setHours(date.getHours()-24);const rows=Array.from({length:12},(_,i)=>({id:i+1,source:'대한병원협회 공지사항',title:'Synthetic article '+(i+1),url:'https://www.kha.or.kr/kha_home/notice_list.do?articleNo='+(i+1)+'&mode=view',published_date:date.toISOString(),created_at:date.toISOString(),status:'NEW',category:'공지',keywords:'synthetic',private_fixture:'must-not-serialize'}));res.end(JSON.stringify(rows));return;}
  const functionName=req.url==='/rest/v1/rpc/customer_auth_rpc'?'customer_auth_rpc':req.url==='/rest/v1/rpc/customer_admin_rpc'?'customer_admin_rpc':null;
  if(!functionName||req.headers.apikey!=='isolated-fake-service-role'){res.writeHead(403).end();return;}
  let input='';for await(const chunk of req)input+=chunk;
@@ -150,8 +150,10 @@ if(process.env.CUSTOMER_ADMIN_PLAYWRIGHT_PATH)await test('general browser login/
 
   await page.getByPlaceholder('기사 제목, 키워드 검색...').fill('Synthetic');await page.waitForResponse(r=>r.url().includes('/api/articles?')&&r.url().includes('search=Synthetic'));
   await page.getByText('Synthetic article 1',{exact:true}).first().waitFor();
-  await context.route('https://example.com/**',route=>route.fulfill({body:'Synthetic external article'}));
-  const opened=context.waitForEvent('page');await page.locator('a[href="https://example.com/article/1"]').first().click();const articlePage=await opened;await articlePage.waitForURL('https://example.com/article/1');await articlePage.close();
+  await context.route('https://www.kha.or.kr/**',route=>route.fulfill({status:200,contentType:'text/html',body:'<!doctype html><title>Synthetic external article</title>'}));
+  assert.equal(await page.locator('a[href="https://www.kha.or.kr/kha_home/notice_list.do?articleNo=1&mode=view"]').first().getAttribute('target'),'_blank');
+  const href=await page.locator('a[href="https://www.kha.or.kr/kha_home/notice_list.do?articleNo=1&mode=view"]').first().getAttribute('href');
+  const articlePage=await context.newPage();await articlePage.goto(href);assert.equal(await articlePage.title(),'Synthetic external article');await articlePage.close();
   await page.getByRole('button',{name:'로그아웃',exact:true}).click();await page.waitForURL('**/login');await page.goBack();await page.waitForURL('**/login**');
   assert.equal(await page.getByText('Synthetic article 1',{exact:true}).count(),0);
   await page.getByLabel('사번',{exact:true}).fill(employee);await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/');
