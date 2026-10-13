@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-13-pr-84",
+    "date": "2026.10.13",
+    "category": "개선",
+    "title": "Customer Admin 공용 비밀번호 입력 표시·숨김 지원",
+    "summary": "PR #84 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "새 비밀번호, 확인, 현재 관리자 비밀번호를 각각 표시하거나 숨길 수 있습니다.",
+      "모달 재진입 시 모두 숨김으로 초기화되며 기존 비밀번호 검증과 변경 동작을 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #84",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/84"
+      }
+    ]
+  },
+  {
     "id": "2026-10-13-pr-83",
     "date": "2026.10.13",
     "category": "Security",
