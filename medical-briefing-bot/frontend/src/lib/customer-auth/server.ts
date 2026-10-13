@@ -21,7 +21,7 @@ export function createCustomerAuthService() {
   });
 }
 
-async function readBody(request: Request): Promise<Record<string, unknown> | null> {
+export async function readBody(request: Request, limit = 4096): Promise<Record<string, unknown> | null> {
   if (request.headers.get('content-type')?.split(';')[0].trim() !== 'application/json') return null;
   const reader = request.body?.getReader();
   if (!reader) return null;
@@ -32,7 +32,7 @@ async function readBody(request: Request): Promise<Record<string, unknown> | nul
       const { value, done } = await reader.read();
       if (done) break;
       size += value.length;
-      if (size > 4096) { await reader.cancel(); return null; }
+      if (size > limit) { await reader.cancel(); return null; }
       chunks.push(value);
     }
     const bytes = new Uint8Array(size);
