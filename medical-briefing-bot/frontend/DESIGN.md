@@ -62,6 +62,17 @@ inside their own overflow container.
 
 ## 6. Motion & Interaction
 
+### Customer password visibility
+
+The shared-password dialog reuses the 44px `ca-input` and `ca-icon-button`
+primitives. Each password input reserves the existing `pr-12` spacing scale
+for a right-aligned Eye/EyeOff button without changing its height. Inputs start
+masked; each button independently reveals or hides only its associated input.
+Closing the dialog unmounts these controls, so reopening always starts masked.
+Buttons use the existing focus-visible ring, native keyboard activation,
+action labels and titles, `aria-controls`, and `aria-pressed`. Visibility never
+submits the form, persists a password, or changes validation or authorization.
+
 ### Public source link guidance
 
 Public article links reuse the existing blue-50/blue-700 information treatment,
