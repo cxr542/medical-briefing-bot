@@ -1,5 +1,9 @@
 # 기관별 원문 링크 복구 조사 (2026-10-09)
 
+> 현재 정책 (2026-10-13): e-평가·자보알림방·COMWEL·HURB는 사용자 Chrome 새 세션
+> 검증으로 CONSTRAINT CONFIRMED / FALLBACK BY DESIGN이 됐습니다. 아래 내용은 당시
+> 조사 기록으로 보존합니다. [최종 제약 및 UX 정책](institution-permalink-constraints.md)을 참고하세요.
+
 ## 기준과 범위
 
 main `73c57bb1786a3e76e4f0f6b67ad491e56ef5192a` 기준. PR #68, #69 포함.

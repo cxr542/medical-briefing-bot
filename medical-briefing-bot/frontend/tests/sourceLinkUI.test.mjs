@@ -15,7 +15,7 @@ const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
 }).outputText;
 const require = createRequire(filename);
 const exports = {};
-runInNewContext(compiled, { exports, require: (name) => require(name === '../lib/sourceLinks' ? '../lib/sourceLinks.ts' : name) });
+runInNewContext(compiled, { exports, require: (name) => require(name.startsWith('../lib/') ? `${name}.ts` : name) });
 const render = (article, props = {}) => renderToStaticMarkup(React.createElement(exports.SourceLink, { article, ...props }));
 const hira = { source: '심평원 e-평가 (평가알림방)', title: '전체 공지 제목 <원문>', url: 'https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=2279' };
 const mfds = { source: '식품의약품안전처 보도자료', title: '식약처 공지', url: 'https://www.mfds.go.kr/brd/m_99/view.do?seq=50403' };
@@ -53,8 +53,8 @@ test('guidance has a labelled modal, complete escaped title, procedure and canon
   assert.match(html, /<dialog[^>]*aria-labelledby="[^"]+"[^>]*aria-describedby="[^"]+"/);
   assert.match(html, /전체 공지 제목 &lt;원문&gt;/);
   assert.match(html, /건강보험심사평가원 e-평가 · 평가알림방/);
-  assert.match(html, /직접 상세 링크가 확인되지 않았습니다/);
-  assert.match(html, /기관 홈페이지 열기/);
+  assert.match(html, /기관 사이트 특성상 해당 공지로 직접 이동할 수 없습니다/);
+  assert.match(html, /기관 페이지 열기/);
   assert.match(html, /aria-label="기관 안내 닫기"/);
   assert.match(html, /href="https:\/\/aq.hira.or.kr\/hira_aq\/index.jsp"/);
   assert.doesNotMatch(html, /href="[^"]*brdSno/);
