@@ -57,8 +57,8 @@ test('PR70 NHIS and other sources retain prior resolution for any optional metad
     for (const detail of [undefined, fixture.detail, ...fixture.invalid]) assert.deepEqual(resolveSourceLink({ ...input, source_detail_url: detail }), expected);
   }
 });
-test('page SELECT remains compatible with old schema and omits explicit new column', () => {
-  const page = readFileSync(new URL('../src/app/page.tsx', import.meta.url), 'utf8');
+test('server SELECT remains compatible with old schema and omits explicit new column', () => {
+  const page = readFileSync(new URL('../src/lib/articlesServer.ts', import.meta.url), 'utf8');
   assert.match(page, /\.select\(['"]\*['"]\)/);
   assert.doesNotMatch(page, /\.select\([^)]*source_detail_url/);
 });

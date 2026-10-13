@@ -1,3 +1,4 @@
+import { authorizeUser } from '@/lib/customer-auth/general';
 import { getCollectionServiceErrorStatus, getCollectionServiceStatus } from '@/lib/collectionStatus';
 import { createAdminSupabaseClient } from '@/lib/adminSupabase';
 
@@ -11,7 +12,8 @@ const unavailableResponse = () => Response.json(getCollectionServiceErrorStatus(
   headers: noStoreHeaders,
 });
 
-export async function GET() {
+export async function GET(request: Request) {
+  const denied=await authorizeUser(request);if(denied)return denied;
   try {
     const supabase = createAdminSupabaseClient();
     const { data, error } = await supabase.from('collector_runs')

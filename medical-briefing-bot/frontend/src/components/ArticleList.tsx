@@ -1,14 +1,13 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import type { Article } from '@/lib/articleTypes';
 import { SourceLink } from './SourceLink';
 import { getArticleKeywords } from '@/lib/articleKeywords';
 import { formatDateKst, getDisplayedArticleStatus, getRecentNotices } from '@/lib/articleDisplay';
 import {
   COLLECTION_DISPLAY_SCHEDULE_KST,
   COLLECTION_RUNTIME_SCHEDULE_KST,
-  getCollectionCutoffIso,
   getKstDateKey,
   getLatestCollectionRuntimeTime,
   shiftKstDate,
@@ -19,34 +18,10 @@ import {
   formatMedicalPressDateKst,
   getLastSevenCalendarDaysStartIso,
   MEDICAL_PRESS_PAGE_SIZE,
-  MEDICAL_PRESS_SOURCES,
   type MedicalPressRange,
 } from '@/lib/medicalPress';
 
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Search } from 'lucide-react';
-
-interface RelatedLink {
-  title: string;
-  url: string;
-  source: string;
-  source_detail_url?: string | null;
-}
-
-interface Article {
-  id: number;
-  source: string;
-  title: string;
-  url: string;
-  published_date: string;
-  status: string;
-  created_at?: string | null;
-  category?: string;
-  keywords?: string;
-  keyword_boundary?: unknown;
-  is_merged?: boolean;
-  related_links?: RelatedLink[];
-  source_detail_url?: string | null;
-}
 
 interface BriefingAnalysis {
   category: string;
@@ -99,41 +74,23 @@ export default function ArticleList({
 
   // 선택된 날짜와 시간, 검색어에 맞춰 동적으로 데이터 페칭 (서버 사이드 필터링)
   useEffect(() => {
+    const controller=new AbortController();
     const fetchData = async () => {
       setIsLoading(true);
-      let query = supabase.from('articles').select('*').neq('status', 'DELETED').order('published_date', { ascending: false });
+      try {
+        const params=new URLSearchParams({date:selectedDate,time:selectedTime,search:searchTerm,group:medicalPressGroupActive?'medical':'notice',range:medicalPressRange});
+        const response=await fetch(`/api/articles?${params}`,{cache:'no-store',signal:controller.signal});
+        if(response.status===401){setArticles([]);window.location.replace('/login');return;}
+        if(response.ok){const body=await response.json();if(!controller.signal.aborted)setArticles(body.articles as Article[]);}
+      } catch { /* Cancellation keeps the current results. */ }
 
-      if (medicalPressGroupActive) {
-         const now = new Date();
-         query = query.in('source', [...MEDICAL_PRESS_SOURCES]).lte('published_date', now.toISOString());
-         if (medicalPressRange === 'last-seven-days') {
-           query = query.gte('published_date', getLastSevenCalendarDaysStartIso(now));
-         }
-         if (searchTerm.trim()) {
-           const term = searchTerm.trim();
-           query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
-         }
-         query = query.limit(500);
-      } else if (searchTerm.trim()) {
-         const term = searchTerm.trim();
-         query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
-         query = query.limit(500);
-      } else {
-         query = query.lte('published_date', getCollectionCutoffIso(selectedDate, selectedTime));
-         query = query.limit(500);
-      }
-      
-      const { data, error } = await query;
-      if (!error && data) {
-         setArticles(data as Article[]);
-      }
       setIsLoading(false);
     };
 
     const timer = setTimeout(() => {
       fetchData();
     }, 300); // 300ms 디바운스
-    return () => clearTimeout(timer);
+    return () => {clearTimeout(timer);controller.abort();};
   }, [selectedDate, selectedTime, searchTerm, medicalPressGroupActive, medicalPressRange]);
 
   // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
