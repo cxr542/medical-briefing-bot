@@ -12,6 +12,7 @@
 .customer-admin button:disabled { opacity: .35; cursor: not-allowed; }
 .customer-admin .ca-input { width: 100%; min-height: 44px; border: 1px solid #dbe2ea; border-radius: .65rem; background: white; padding: .625rem .75rem; font-size: .875rem; color: #334155; }
 .customer-admin .ca-input.pl-10 { padding-left: 2.5rem; }
+.customer-admin .ca-input.pr-12 { padding-right: 3rem; }
 .customer-admin .ca-label { display: block; margin-bottom: .5rem; font-size: .875rem; font-weight: 600; }
 @media (max-width: 639px) { .customer-admin .ca-card { padding: 1.125rem; } }
 @media (prefers-reduced-motion: reduce) { .customer-admin button { transition: none; } }
