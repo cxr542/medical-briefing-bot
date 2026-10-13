@@ -1,0 +1,28 @@
+{
+  "project_ref": "kkcvglldsoxglfjqnsga",
+  "baseline_main": "3d7e3162abbd9f4cf4f2d6717cc4ef755237d313",
+  "status": "PREPARED_NOT_APPLIED",
+  "preserve_existing_history": [
+    "20260928064906",
+    "20260929063328",
+    "20261007041102",
+    "20261012043225"
+  ],
+  "migrations": [
+    {
+      "file": "20261013043423_customer_auth_foundation.sql",
+      "sha256": "353939f428e1847973b5f9a37ae95e74ff842e0cf481d55f4e1a224b5a95223e",
+      "phase": "foundation_before_bootstrap"
+    },
+    {
+      "file": "20261013050900_customer_admin_management.sql",
+      "sha256": "1291dfe77598b20a28a780b08d0129ef62e360eeed30d1ac814c603e16588d5c",
+      "phase": "foundation_before_bootstrap"
+    },
+    {
+      "file": "20261013062556_article_application_only.sql",
+      "sha256": "05ce859bb85188780e9db7c5efe8930ec4af76ca4a819b6969dc648877f2257b",
+      "phase": "late_after_application_qa"
+    }
+  ]
+}

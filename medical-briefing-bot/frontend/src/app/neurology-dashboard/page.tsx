@@ -1,3 +1,6 @@
+import { requireUser, protectionEnabled } from '@/lib/customer-auth/general';
+import CustomerSession from '@/components/CustomerSession';
+export const dynamic='force-dynamic';
 import Link from "next/link";
 import { ArrowLeft, Activity, Info } from "lucide-react";
 
@@ -6,7 +9,8 @@ export const metadata = {
   description: "신경과 다빈도 상병 기준 처방 지표 분석 대시보드",
 };
 
-export default function NeurologyDashboard() {
+export default async function NeurologyDashboard() {
+  await requireUser('/neurology-dashboard');
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#333333] font-sans pb-20">
       {/* Header */}
@@ -21,6 +25,7 @@ export default function NeurologyDashboard() {
           </Link>
           📊 NU 신경과 처방건당 약품목수
         </h1>
+        {protectionEnabled()&&<CustomerSession />}
       </header>
 
       {/* Main Content */}

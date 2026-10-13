@@ -1,34 +1,27 @@
-import { supabase } from '@/lib/supabase';
+import { requireUser, protectionEnabled } from '@/lib/customer-auth/general';
+import { readArticles } from '@/lib/articlesServer';
+import CustomerSession from '@/components/CustomerSession';
 import { Sparkles } from 'lucide-react';
 import Image from 'next/image';
 import Link from "next/link";
 
 import ArticleList from '@/components/ArticleList';
 import CollectionStatusBanner, { CollectionLastCheck, CollectionStatusProvider } from '@/components/CollectionStatusBanner';
-import { COLLECTION_DISPLAY_SCHEDULE_KST, getCollectionCutoffIso, getKstDateKey, getLatestCollectionRuntimeTime, getLatestCollectionTime, shiftKstDate } from '@/lib/collectionStatus';
+import { COLLECTION_DISPLAY_SCHEDULE_KST, getKstDateKey, getLatestCollectionRuntimeTime, getLatestCollectionTime, shiftKstDate } from '@/lib/collectionStatus';
 
 export const dynamic = 'force-dynamic';
 
 export default async function Dashboard() {
+  await requireUser('/');
   const now = new Date();
   const initialDate = getKstDateKey(now);
   const initialTime = getLatestCollectionRuntimeTime(now);
   // 초기 화면도 클라이언트와 동일한 KST 브리핑 마감 시각/삭제 제외 기준을 적용합니다.
   // 초기 조회 범위는 14일 전 KST 자정부터이며 최대 500건을 유지합니다.
   const fourteenDaysAgo = new Date(`${shiftKstDate(initialDate, -14)}T00:00:00+09:00`);
-  const { data: articles, error } = await supabase
-    .from('articles')
-    .select('*')
-    .gte('published_date', fourteenDaysAgo.toISOString())
-    .lte('published_date', getCollectionCutoffIso(initialDate, initialTime))
-    .neq('status', 'DELETED')
-    .order('published_date', { ascending: false })
-    .limit(500);
-
-  if (error) {
-    console.error(error);
-    return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;
-  }
+  let articles;
+  try {articles=await readArticles(new URLSearchParams({date:initialDate,time:initialTime}),fourteenDaysAgo.toISOString());}
+  catch {return <div className="p-10 text-center text-red-500">데이터를 불러오는 중 오류가 발생했습니다.</div>;}
 
   return (
     <CollectionStatusProvider>
@@ -40,7 +33,7 @@ export default async function Dashboard() {
             <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#FEE500] text-xl shadow-sm">✦</span>
             <span><span className="block text-xs font-bold uppercase tracking-[0.22em] text-[#1D4ED8]">Medical Briefing</span><span className="text-sm font-bold text-[#191919] md:text-base">병원·보건의료 종합 브리핑</span></span>
           </Link>
-          <CollectionLastCheck />
+          <div className="flex items-center gap-3"><CollectionLastCheck />{protectionEnabled()&&<CustomerSession />}</div>
         </div>
       </header>
 
