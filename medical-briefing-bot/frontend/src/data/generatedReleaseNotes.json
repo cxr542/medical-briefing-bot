@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-13-pr-79",
+    "date": "2026.10.13",
+    "category": "UI",
+    "title": "기관 안내에서 공지 제목 복사 지원",
+    "summary": "PR #79 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "직접링크를 제공하지 않는 네 기관의 정상 fallback 정책을 문서화합니다.",
+      "안내창에서 제목 복사와 복사 결과 안내, 명확한 기관 페이지 열기를 제공합니다.",
+      "기존 원문 direct routing과 Collector identity는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #79",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/79"
+      }
+    ]
+  },
+  {
     "id": "2026-10-12-pr-78",
     "date": "2026.10.12",
     "category": "Fix",
