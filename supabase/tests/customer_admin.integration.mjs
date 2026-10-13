@@ -98,6 +98,13 @@ await test('general protected pages/API, role boundaries and late article lockdo
   assert.equal((await req(path,'GET',undefined,null)).status,401);
   assert.equal((await req(path,'GET',undefined,adminCookie)).status,401);
  }
+ sql("UPDATE customer_auth.customer_users SET active=false WHERE employee_number='E-004';");
+ const failures=[];
+ for(const [identifier,password] of [['unknown-fixture','synthetic-new-shared'],['E-004','synthetic-new-shared'],['E-005','wrong-fixture']]) {
+  const rejected=await req('/api/customer-auth/login','POST',{identifier,password},null);assert.equal(rejected.status,401);failures.push(await rejected.json());
+ }
+ assert.deepEqual(failures[0],failures[1]);assert.deepEqual(failures[1],failures[2]);
+ assert.equal((await req('/api/articles','GET',undefined,userCookie)).status,401);
  const cookie=await login('user','E-003','synthetic-new-shared');
  const article=await req('/api/articles?date=2026-10-13&time=15:07','GET',undefined,cookie);assert.equal(article.status,200);assert.match(article.headers.get('cache-control'),/no-store/);
  assert.equal((await req('/neurology-dashboard','GET',undefined,cookie)).status,200);
@@ -130,17 +137,24 @@ if(process.env.CUSTOMER_ADMIN_PLAYWRIGHT_PATH){
 if(process.env.CUSTOMER_ADMIN_PLAYWRIGHT_PATH)await test('general browser login/deep link/refresh/search/logout/back/expiry at three widths',async()=>{
  const failed=[];
  for(const width of [375,768,1440]) {
+  const employee={375:'ui-0001',768:'ui-0002',1440:'ui-0003'}[width];
   const context=await browser.newContext({viewport:{width,height:1000}});const page=await context.newPage();
   page.on('pageerror',e=>failed.push(e.message));page.on('request',r=>{if(r.url().includes('/rest/v1/articles'))failed.push('Direct browser DB query');});
   await page.goto(origin+'/neurology-dashboard');assert.match(page.url(),/login\?next=/);
-  await page.getByLabel('사번',{exact:true}).fill('ui-0001');await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/neurology-dashboard');await page.reload();await page.getByRole('button',{name:'로그아웃',exact:true}).waitFor();
+  await page.getByLabel('사번',{exact:true}).fill(employee);await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/neurology-dashboard');await page.reload();await page.getByRole('button',{name:'로그아웃',exact:true}).waitFor();
   await page.goto(origin+'/');await page.getByText('Synthetic article 1',{exact:true}).first().waitFor();
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.equal((await page.content()).includes('must-not-serialize'),false);
+  const notices=page.locator('section').filter({has:page.getByRole('heading',{name:/7일 이내 주요 공지/})});
+  await notices.locator('button').last().click();await page.getByText('Synthetic article 6',{exact:true}).waitFor();
+
   await page.getByPlaceholder('기사 제목, 키워드 검색...').fill('Synthetic');await page.waitForResponse(r=>r.url().includes('/api/articles?')&&r.url().includes('search=Synthetic'));
+  await page.getByText('Synthetic article 1',{exact:true}).first().waitFor();
+  await context.route('https://example.com/**',route=>route.fulfill({body:'Synthetic external article'}));
+  const opened=context.waitForEvent('page');await page.locator('a[href="https://example.com/article/1"]').first().click();const articlePage=await opened;await articlePage.waitForURL('https://example.com/article/1');await articlePage.close();
   await page.getByRole('button',{name:'로그아웃',exact:true}).click();await page.waitForURL('**/login');await page.goBack();await page.waitForURL('**/login**');
   assert.equal(await page.getByText('Synthetic article 1',{exact:true}).count(),0);
-  await page.getByLabel('사번',{exact:true}).fill('ui-0001');await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/');
+  await page.getByLabel('사번',{exact:true}).fill(employee);await page.getByLabel('공용 비밀번호').fill('synthetic-ui-shared');await page.getByRole('button',{name:'로그인',exact:true}).click();await page.waitForURL('**/');
   sql("UPDATE customer_auth.customer_sessions SET issued_at=now()-interval '9 hours',expires_at=now()-interval '1 hour' WHERE kind='user';");await page.reload();await page.waitForURL('**/login**');
   await context.close();
  }
