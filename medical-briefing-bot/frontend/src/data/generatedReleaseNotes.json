@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-13-pr-83",
+    "date": "2026.10.13",
+    "category": "Security",
+    "title": "Customer authentication and server article access",
+    "summary": "PR #83 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Add employee login, logout and protected article/dashboard access.",
+      "Move browser article reads to an authorized server API.",
+      "Gate article permissions lockdown on verified application access and Collector safety."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #83",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/83"
+      }
+    ]
+  },
+  {
     "id": "2026-10-13-pr-79",
     "date": "2026.10.13",
     "category": "UI",
