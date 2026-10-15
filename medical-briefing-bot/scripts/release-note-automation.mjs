@@ -12,7 +12,16 @@ const optionalRef = async (api, repo, branch) => {
   try { return await refHead(api, repo, branch); } catch (e) { if (e.status === 404) return null; throw e; }
 };
 const eligible = pr => pr.merged_at && pr.base?.ref === 'main' && !pr.head?.ref?.startsWith(AUTOMATION_PREFIX) && pr.labels?.some(x => x.name === 'release-note');
-const safeFailure = message => { throw new Error(message); };
+const safeFailure = message => {
+  const error = new Error(message);
+  error.code = 'NEEDS_REVIEW';
+  throw error;
+};
+
+const validateCandidate = (...args) => {
+  try { return validateAddition(...args); }
+  catch { safeFailure('Note data/source must be preserved; inspect and resolve manually.'); }
+};
 
 export async function generateNotePR({ github, repository, number, dryRun = true }) {
   const api = github.rest;
@@ -30,6 +39,12 @@ export async function generateNotePR({ github, repository, number, dryRun = true
   const open = await listPRs('open');
   if (open.length > 1) safeFailure('Multiple note PRs require manual review.');
   let head = await optionalRef(api, target, branch);
+  const checkedResult = async (status, notePR) => {
+    if (await refHead(api, target, 'main') !== base || await refHead(api, target, branch) !== head) {
+      return { status: 'needs-review', reason: 'refs-moved-after-pr-check', number, pr: notePR.number };
+    }
+    return { status, number, pr: notePR.number };
+  };
   if (open.length && !head) safeFailure('Existing note PR branch is unavailable.');
   if (head) {
     const { data: commit } = await api.git.getCommit({ ...target, commit_sha: head });
@@ -37,11 +52,11 @@ export async function generateNotePR({ github, repository, number, dryRun = true
     if (commit.parents.length !== 1 || commit.parents[0].sha !== base) safeFailure('Main/branch moved; reconcile the note PR manually.');
     const { data: diff } = await api.repos.compareCommitsWithBasehead({ ...target, basehead: `${base}...${head}` });
     if (diff.files?.length !== 1 || diff.files[0].filename !== NOTE_PATH || diff.files[0].status !== 'modified') safeFailure('Automation branch contains unexpected changes.');
-    validateAddition(existing, await readNotes(api, target, head), pr, repository);
+    validateCandidate(existing, await readNotes(api, target, head), pr, repository);
     if (open.length) {
       const notePR = open[0];
       if (!notePR.body?.includes(marker(number)) || notePR.labels.some(x => x.name === 'release-note')) safeFailure('Existing note PR metadata requires manual review.');
-      return { status: 'existing-pr', number, pr: notePR.number };
+      return checkedResult('existing-pr', notePR);
     }
     if ((await listPRs('closed')).length) safeFailure('Closed note PR requires explicit operator review before retry.');
   }
@@ -59,11 +74,11 @@ export async function generateNotePR({ github, repository, number, dryRun = true
   if (await refHead(api, target, 'main') !== base || await refHead(api, target, branch) !== head) safeFailure('Main/automation branch moved; existing branch preserved for review.');
   try {
     const { data: created } = await api.pulls.create({ ...target, head: branch, base: 'main', title: `docs: release note for PR #${number}`, body: noteBody(pr), maintainer_can_modify: false });
-    return { status: 'created-pr', number, pr: created.number };
+    return checkedResult('created-pr', created);
   } catch (error) {
     if (error.status !== 422) throw error;
     const raced = await listPRs('open');
-    if (raced.length === 1 && raced[0].body?.includes(marker(number)) && !raced[0].labels.some(x => x.name === 'release-note')) return { status: 'existing-pr', number, pr: raced[0].number };
+    if (raced.length === 1 && raced[0].body?.includes(marker(number)) && !raced[0].labels.some(x => x.name === 'release-note')) return checkedResult('existing-pr', raced[0]);
     safeFailure('PR creation failed; branch preserved for safe retry.');
   }
 }
@@ -94,6 +109,9 @@ export async function validateNotePullRequest({ github, repository, number }) {
   if (files.length !== 1 || files[0].filename !== NOTE_PATH || files[0].status !== 'modified') safeFailure('Note PR may modify only generated release notes.');
   const { data: source } = await github.rest.pulls.get({ ...target, pull_number: sourceNumber });
   sourceIdentity(source, repository);
-  validateAddition(await readNotes(github.rest, target, pr.base.sha), await readNotes(github.rest, target, pr.head.sha), source, repository);
+  const currentMain = await refHead(github.rest, target, 'main');
+  if (currentMain !== pr.base.sha) safeFailure('Note PR base is stale; refresh and validate against current main.');
+  validateCandidate(await readNotes(github.rest, target, currentMain), await readNotes(github.rest, target, pr.head.sha), source, repository);
+  if (await refHead(github.rest, target, 'main') !== currentMain || await refHead(github.rest, target, pr.head.ref) !== pr.head.sha) safeFailure('Main/note head moved during validation; rerun on the current PR head.');
   return { status: 'valid-note-pr', number, sourceNumber, head: pr.head.sha };
 }

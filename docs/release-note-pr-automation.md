@@ -70,3 +70,51 @@ If generation fails, preserve data/branches and pause automation; use reviewed
 manual note PRs. After protection is enabled, do not restore main direct push as
 a rollback. Reverting the implementation requires review of that unsafe legacy
 behavior. Existing notes are never deleted as a recovery measure.
+
+## Publication delay and multiple pending notes
+
+A source PR merge deploys the application change, not the pending release note.
+The note becomes visible only after its separate note PR is reviewed, merged,
+and the resulting main deployment succeeds. Unmerged/failed/approval-pending
+note PRs delay the operations screen indefinitely; there is no publication SLA
+or automatic merge. The operator should check pending notes at each release
+review. UTC merge dates identify the source change, not the eventual display time.
+
+Two source PRs may each open a note PR against different main snapshots. A later
+source merge can make the older automation branch parent stale even if the JSON
+is unchanged. The generator reports NEEDS REVIEW without rewriting it; read-only
+note CI may still validate it against current main if all existing data is intact.
+When one note PR merges first, another note PR's old JSON may omit that newly
+published note. Preservation validation must reject it, never replace main data.
+Generation also rechecks refs after PR creation/reuse, so a last-moment main/head
+move is reported as needs-review with the created PR number instead of success.
+These checks narrow races but are not a GitHub atomic transaction. Require fresh
+head checks and up-to-date base validation before an eventual protected merge.
+
+### Manual recovery (separate operator authorization required)
+
+1. Record current main SHA, automation head SHA, source PR number, note ID, pending
+   PR URL, and any manual edits before making recovery changes. Retain the branch.
+2. If main already contains the source ID, generation is a no-op. Compare content
+   and close any redundant pending PR only with approval; do not delete data.
+3. If a pending note PR contains exactly one valid new note and loses no main
+   entries, review fresh CI on its current head. A generator retry is unnecessary.
+4. Otherwise, use a normal forward commit/merge on that same note branch to bring
+   in current main while retaining its manually refined new note. Resolve JSON as
+   `[that one new note, ...all current main notes]`; preserve every existing object
+   and its order. No reset, rebase/force push, main push, or new replacement PR.
+5. Re-run the note PR's normal CI under separate authorization. Verify exact file
+   scope, source ID/date/link, schema, and deep preservation against current main.
+   A manually recovered multi-parent branch can pass this read-only CI, while the
+   conservative generator still refuses to mutate it. Review/merge manually only.
+6. If the source identity, manual intent, or preservation cannot be established,
+   leave branch/PR unchanged and classify NEEDS REVIEW. Never fix by dropping an
+   existing entry, changing a historical ID/date/link, or restoring direct push.
+
+After approved rollout, inspect reconciliation dry-run output with the recorded
+cutover: `already-recorded` is in main; `existing-pr` is pending, not published;
+`would-create-pr` is missing a note PR; `needs-review` requires inspection. Also
+inspect closed/unmerged note PRs. Only authorize write-enabled retry for known
+missing records after checking current source labels/body and preserved branches.
+Pending-main movement or a review-needed record must not prevent discovery of
+other missing source PRs; reconciliation reports each source independently.

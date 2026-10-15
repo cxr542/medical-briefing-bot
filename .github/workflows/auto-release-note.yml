@@ -74,6 +74,7 @@ jobs:
               // Never print API exception bodies, tokens, PR bodies, or request headers.
               for (const result of results) core.info(JSON.stringify(result));
               if (results.some(result => result.status === 'needs-review')) core.setFailed('Some source PRs need operator review.');
-            } catch {
+            } catch (error) {
+              if (error.code === 'NEEDS_REVIEW') core.info('NEEDS REVIEW: source/branch state requires operator inspection; no reset or overwrite attempted.');
               core.setFailed('Release note generation stopped safely. Inspect source metadata and branch state; retry without resetting branches.');
             }
