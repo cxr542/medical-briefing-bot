@@ -6,6 +6,10 @@ on:
       - 'medical-briefing-bot/frontend/src/lib/articleKeywords.ts'
       - 'medical-briefing-bot/frontend/src/components/ArticleList.tsx'
       - 'medical-briefing-bot/frontend/tests/**'
+      - 'medical-briefing-bot/frontend/src/data/generatedReleaseNotes.json'
+      - 'medical-briefing-bot/scripts/release-note-*.mjs'
+      - 'medical-briefing-bot/scripts/validate_release_note.mjs'
+      - 'medical-briefing-bot/tests/test_release_note*.mjs'
       - 'medical-briefing-bot/frontend/package*.json'
       - '.github/workflows/keyword-quality-tests.yml'
 
