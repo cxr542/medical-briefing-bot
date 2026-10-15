@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-15-pr-87",
+    "date": "2026.10.15",
+    "category": "운영",
+    "title": "Release Note PR 자동 생성 검증",
+    "summary": "PR #87 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Release Note 자동 생성 및 검토 절차를 검증했습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #87",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/87"
+      }
+    ]
+  },
+  {
     "id": "2026-10-13-pr-84",
     "date": "2026.10.13",
     "category": "개선",
