@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-15-pr-89",
+    "date": "2026.10.15",
+    "category": "개선",
+    "title": "출처별 건수 카드를 주요 기관과 의료전문지로 그룹화",
+    "summary": "PR #89 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "주요 기관 15개와 의료전문지 7개를 구분하고 그룹별 출처 수를 표시합니다.",
+      "기존 카드 클릭과 건수 표시를 유지하며 미분류 신규 출처도 누락하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #89",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/89"
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-pr-87",
     "date": "2026.10.15",
     "category": "운영",
