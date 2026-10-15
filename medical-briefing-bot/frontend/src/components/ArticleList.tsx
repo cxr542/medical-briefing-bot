@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import type { Article } from '@/lib/articleTypes';
+import { groupSourceCards } from '@/lib/sourceCardGroups';
 import { SourceLink } from './SourceLink';
 import { getArticleKeywords } from '@/lib/articleKeywords';
 import { formatDateKst, getDisplayedArticleStatus, getRecentNotices } from '@/lib/articleDisplay';
@@ -101,6 +102,7 @@ export default function ArticleList({
     const combined = Array.from(new Set([...KNOWN_SOURCES, ...dbSources]));
     return combined.sort();
   }, [articles]);
+  const sourceCardGroups = useMemo(() => groupSourceCards(allSources), [allSources]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   const [showAllNotices, setShowAllNotices] = useState(false);
@@ -421,8 +423,15 @@ export default function ArticleList({
       </div>
 
       {/* 0. 기관별 수집 건수 요약 대시보드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 print:hidden">
-        {allSources.map(source => {
+      <div className="space-y-6 print:hidden" aria-label="출처별 수집 건수">
+        {sourceCardGroups.map(group => (
+          <section key={group.id} aria-labelledby={`source-cards-${group.id}`}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h3 id={`source-cards-${group.id}`} className="font-bold text-[#191919]">{group.title}</h3>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{group.sources.length}개 출처</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {group.sources.map(source => {
           const count = sourceCounts[source] || 0;
           // 이 카드 하나만 단독으로 선택되어 있는지 확인
           const isSelected = selectedSources.length === 1 && selectedSources[0] === source;
@@ -456,6 +465,9 @@ export default function ArticleList({
             </button>
           );
         })}
+            </div>
+          </section>
+        ))}
       </div>
 
       {/* 메인 콘텐츠 영역 */}
