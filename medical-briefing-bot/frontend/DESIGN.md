@@ -64,6 +64,13 @@ inside their own overflow container.
 
 ### Customer password visibility
 
+The customer login uses the same Eye/EyeOff visibility control inside the
+shared-password field. It preserves the login's slate/blue palette, rounded-xl
+corners and 44px input height. A 44px right-hand button has reserved pr-12 input
+space, an action label, aria-controls, aria-pressed and a keyboard focus ring.
+The password starts masked and is masked again when login is submitted.
+The toggle preserves the typed value and never submits the form.
+
 The shared-password dialog reuses the 44px `ca-input` and `ca-icon-button`
 primitives. Each password input reserves the existing `pr-12` spacing scale
 for a right-aligned Eye/EyeOff button without changing its height. Inputs start
