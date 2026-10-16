@@ -303,6 +303,7 @@ export default function AdminPage() {
       <main className="mx-auto mt-6 w-full min-w-0 max-w-6xl px-4 sm:px-6 md:mt-8">
         {adminError && <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700" role="alert">{adminError}</p>}
         <nav className="mb-6 flex flex-wrap gap-2" aria-label="관리자 메뉴">
+          <Link href="/admin/support" className="inline-flex min-h-11 items-center rounded-lg border border-[#E8DCCB] bg-white px-4 py-2 text-sm font-bold text-gray-600 hover:bg-gray-50 focus-visible:outline-2 focus-visible:outline-offset-2">기술지원 관리</Link>
           <button
             onClick={() => setAdminView('monitoring')}
             aria-current={adminView === 'monitoring' ? 'page' : undefined}

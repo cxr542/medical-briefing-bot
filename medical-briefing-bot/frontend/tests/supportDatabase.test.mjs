@@ -156,8 +156,11 @@ test('completion reopening and cancellation maintain closed timestamps and trans
   const detail = await rpc(db,'internal','detail',internalPayload({request_id:request.id}));
   assert.equal(detail.history_total,9);
   assert.equal(detail.audit_total,9);
-  assert.equal(detail.history[0].reason,'Move to cancelled');
-  assert.equal(detail.history[0].previous_status,'in_progress');
-  assert.equal(detail.history[0].actor_type,'internal_admin');
+  const moves = detail.history.filter(item => item.actor_type === 'internal_admin');
+  assert.equal(moves.length,8);
+  for (const item of moves) assert.equal(item.reason,`Move to ${item.new_status}`);
+  const cancellation = moves.find(item => item.new_status === 'cancelled');
+  assert.ok(cancellation);
+  assert.equal(cancellation.previous_status,'in_progress');
   await assert.rejects(rpc(db,'internal','status',internalPayload({request_id:request.id,status:'reviewing',reason:'reopen',version:current.version})),{code:'22023'});
 });

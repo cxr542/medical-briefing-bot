@@ -9,6 +9,7 @@
 .customer-admin .ca-text-button { color: #64748b; font-size: .75rem; }
 .customer-admin .ca-text-button:hover { color: #1d4ed8; }
 .customer-admin button:focus-visible, .customer-admin input:focus-visible, .customer-admin textarea:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.customer-admin nav a:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
 .customer-admin button:disabled { opacity: .35; cursor: not-allowed; }
 .customer-admin .ca-input { width: 100%; min-height: 44px; border: 1px solid #dbe2ea; border-radius: .65rem; background: white; padding: .625rem .75rem; font-size: .875rem; color: #334155; }
 .customer-admin .ca-input.pl-10 { padding-left: 2.5rem; }
