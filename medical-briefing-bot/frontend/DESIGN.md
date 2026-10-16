@@ -114,3 +114,44 @@ New monitoring content must retain semantic headings and table markup, readable
 text contrast, and a textual label for each status. Narrow screens may scroll
 the source table horizontally without causing page-level overflow. No new
 accessibility debt is accepted by this change.
+
+## 9. Support center (MB-006 Phase 2)
+
+Preserve the existing customer-admin slate/blue system and internal-admin warm
+brown system. Customer pages use #F7F9FC, slate-800/500, blue-600/700,
+white surfaces, slate-200 borders and the existing ca-card/ca-input geometry.
+Internal support uses the same reusable primitives with page #FDFBF7,
+brand #5C2D0C, border #E8DCCB and white surfaces. No separate visual theme is
+introduced. Both are deliberately light workspaces even when the OS is dark,
+matching the existing admin pages; page colors are explicitly scoped.
+
+The document owns vertical scroll. A centered max-w-6xl content column contains
+navigation, title, list or detail. List rows become stacked cards on phones;
+detail content and management forms stack below lg and use a supporting rail
+above lg. Min-width:0, break-keep and overflow-wrap:anywhere contain long Korean
+and unbroken input. Structural reference: StyleGallery supporting-pane and
+pagination, https://github.com/changeroa/StyleGallery (adapted, no copied prose).
+
+Reusable support primitives: branded button (idle/hover/focus/disabled/saving),
+labelled status badge, request list, state panel (loading/empty/error/disabled),
+pagination, labelled input/textarea/select, public response feed and internal
+history feed. Use 4px spacing, text-xs/sm/base, 24px/30px page heading,
+rounded-xl surfaces, rounded-full badges, subtle shadow-sm. All actions have
+44px targets and a visible 2px accent focus ring. Status always includes text.
+Danger is red-50/red-800; information blue-50/blue-800; secondary slate-50/700.
+
+New-request dialog uses the existing native Dialog primitive: Escape close,
+focus containment/restoration, first field focus, viewport-contained scrolling.
+Detail navigation focuses its heading; returning focuses the selected row.
+Conflict keeps edits, reloads current data, and requires explicit acknowledgement
+before resubmission. Forms announce saving, success and errors; duplicate saves
+are blocked. Motion is limited to existing 150ms background-color transitions
+and removed with prefers-reduced-motion. No hero, animation library or runtime
+debug overlay is added to these existing authenticated operations surfaces.
+
+Personas: customer administrator filing/reading requests, internal operator
+triaging and replying, keyboard/screen-reader users, and phone users. Customer
+detail never renders internal notes, actor IDs or audit data. Plain React text
+renders all submitted content. Accepted limitations: no attachment UI, named
+operator account redesign or customer reply composer in this phase. Managed
+Supabase rollout remains independently gated; test mocks are tests-only.

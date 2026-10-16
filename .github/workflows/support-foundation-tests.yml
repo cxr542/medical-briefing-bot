@@ -30,3 +30,5 @@ jobs:
       - run: npm run test:support:http
       - run: npx tsc --noEmit
       - run: npm run lint
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:support:ui
