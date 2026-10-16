@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
+    "test:support:http": "node --experimental-strip-types --test tests/support-http.mjs",
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
@@ -15,9 +16,11 @@
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.10",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
