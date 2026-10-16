@@ -9,9 +9,7 @@ export const TOKEN_B = 'b'.repeat(43);
 export const ACTOR = 'c'.repeat(64);
 export const migration = await readFile(new URL('../../../supabase/migrations/20261016014502_support_foundation.sql', import.meta.url), 'utf8');
 
-export async function createDatabase({ apply = true } = {}) {
-  const db = new PGlite();
-  await db.exec(`
+export const authFoundation = `
     CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
     CREATE SCHEMA customer_auth;
     CREATE TABLE customer_auth.customer_admins (
@@ -35,7 +33,11 @@ export async function createDatabase({ apply = true } = {}) {
     GRANT UPDATE ON customer_auth.customer_admins,customer_auth.customer_sessions TO service_role;
     REVOKE EXECUTE ON FUNCTION customer_auth.validate_session(text,text) FROM PUBLIC;
     GRANT EXECUTE ON FUNCTION customer_auth.validate_session(text,text) TO service_role;
-  `);
+  `;
+
+export async function createDatabase({ apply = true } = {}) {
+  const db = new PGlite();
+  await db.exec(authFoundation);
   await db.query('INSERT INTO customer_auth.customer_admins(id) VALUES ($1),($2)', [ADMIN_A, ADMIN_B]);
   await db.query("INSERT INTO customer_auth.customer_sessions(token_hash,kind,admin_id,expires_at) VALUES ($1,'admin',$2,now()+interval '1 hour'),($3,'admin',$4,now()+interval '1 hour')", [tokenHash(TOKEN_A), ADMIN_A, tokenHash(TOKEN_B), ADMIN_B]);
   if (apply) await db.exec(migration);

@@ -1,4 +1,9 @@
-BEGIN;
+BEGIN ISOLATION LEVEL READ COMMITTED;
+-- Fail closed if any support transaction is still using these tables.
+-- Hold the same locks DROP needs before taking the emptiness snapshot.
+LOCK TABLE support.support_requests,support.support_comments,
+  support.support_status_history,support.support_internal_notes,
+  support.support_audit_events IN ACCESS EXCLUSIVE MODE NOWAIT;
 DO $$
 BEGIN
   IF EXISTS(SELECT 1 FROM support.support_requests) THEN

@@ -26,6 +26,7 @@ jobs:
           cache-dependency-path: medical-briefing-bot/frontend/package-lock.json
       - run: npm ci
       - run: npm test
+      - run: node --experimental-strip-types --test tests/support-rollback-native.mjs
       - run: npm run test:support:http
       - run: npx tsc --noEmit
       - run: npm run lint

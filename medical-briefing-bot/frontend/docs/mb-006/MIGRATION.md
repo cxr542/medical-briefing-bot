@@ -34,6 +34,7 @@ From `medical-briefing-bot/frontend`:
 ```sh
 npm ci
 npm test
+node --experimental-strip-types --test tests/support-rollback-native.mjs
 npm run test:support:http
 ```
 
@@ -47,6 +48,8 @@ The migration has explicit BEGIN/COMMIT and aborts if prerequisite auth objects 
 
 Primary rollback: set SUPPORT_ENABLED=false under separately approved environment change, then revert application commits as needed. Preserve support tables and history once data exists. Disabled endpoints still authenticate and return no support data.
 
-`supabase/rollback/support_foundation_empty_only.sql` is a separately approved, destructive removal option only for a deployment with zero requests. It rejects populated support data. It drops only support RPCs/schema; it does not touch customer_auth. Test databases exercise both the empty rollback and populated refusal. Do not run it on Production in this phase. Before future removal, check dependencies/backups and reconcile the recorded migration version; do not blindly rerun the creation migration.
+`supabase/rollback/support_foundation_empty_only.sql` is a separately approved, destructive removal option only for a deployment with zero requests. In a READ COMMITTED transaction it acquires ACCESS EXCLUSIVE locks on all five support tables with NOWAIT **before** checking emptiness, and retains them through DROP/COMMIT. An existing reader/writer causes immediate lock failure (55P03); new writes cannot enter after the empty check. Populated data causes an exception before any DROP. Any error requires ROLLBACK on the same connection; never continue the remaining statements in a new transaction. Stop/drain support traffic before a separately approved removal; lock failures must not trigger an automatic retry. It drops only support RPCs/schema; it does not touch customer_auth. Do not run it on Production in this phase. Before future removal, check dependencies/backups and reconcile the recorded migration version; do not blindly rerun the creation migration.
+
+The native rollback suite requires a running Docker engine. It creates and removes its own PostgreSQL 17.6 container with no network, host port, persistent volume or production credentials. It runs the actual migration/rollback SQL and proves empty removal, populated refusal, an in-flight INSERT surviving failed removal, and a later INSERT blocked between the empty check and DROP using separate native connections. The same suite runs in PR CI. These focused native rollback checks do not replace managed Supabase/PostgREST or concurrent support RPC staging acceptance.
 
 No automatic hard-delete API or retention job is provided in Phase 1. Request, history and audit FKs restrict deletion. Retention/anonymization requires a later approved policy and migration.
