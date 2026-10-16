@@ -15,5 +15,5 @@ export default async function CustomerSupportPage() {
   try { authorized = Boolean(await createCustomerAuthService().authorize('admin', token)); }
   catch (error) { if (!(error instanceof Error)) throw error; }
   if (!authorized) redirect('/customer-admin/login');
-  return <SupportCenter audience="customer" enabled={process.env.SUPPORT_ENABLED === 'true'}/>;
+  return <SupportCenter audience="customer" enabled={process.env.SUPPORT_ENABLED === 'true'} attachmentsEnabled={process.env.SUPPORT_ATTACHMENTS_ENABLED === 'true'}/>;
 }
