@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-16-pr-91",
+    "date": "2026.10.16",
+    "category": "기능",
+    "title": "기술지원 센터 DB·인증·API 기반 추가",
+    "summary": "PR #91 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "고객 담당자와 내부 운영자 인증을 분리한 기술지원 API 기반을 추가합니다.",
+      "요청·공개 답변·내부 메모·상태 이력·감사 로그를 분리하고 동시 변경 충돌을 검증합니다.",
+      "기능은 기본 비활성 상태이며 운영 DB 적용과 활성화는 별도 승인 후 진행합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #91",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/91"
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-pr-87",
     "date": "2026.10.15",
     "category": "운영",
