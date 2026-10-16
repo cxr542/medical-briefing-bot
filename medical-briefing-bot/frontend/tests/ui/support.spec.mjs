@@ -22,6 +22,7 @@ async function mock(page, { failure = 0, conflict = false, empty = false, holdCr
   await page.route(/\/api\/(?:customer-admin|admin)\/support\/requests/, async route => {
     const input = route.request(); const url = new URL(input.url());
     calls.push({ method: input.method(), url, body: input.postDataJSON() });
+    if (url.pathname.includes('/attachments')) return route.fulfill({ json: { attachments: [] } });
     if (failure) return route.fulfill({ status: failure, json: { error: failure === 503 ? 'SUPPORT_DISABLED' : 'TEST_ERROR' } });
     const internal = url.pathname.startsWith('/api/admin/');
     const item = () => internal ? { ...current, requester_admin_id: ADMIN_A } : current;

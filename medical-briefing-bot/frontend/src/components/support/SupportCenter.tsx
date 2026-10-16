@@ -11,7 +11,7 @@ import { SupportRequestDetail } from './SupportRequestDetail';
 import '../customer-admin/customer-admin.css';
 import './support.css';
 
-export function SupportCenter({ audience, enabled }: { readonly audience: Audience; readonly enabled: boolean }) {
+export function SupportCenter({ audience, enabled, attachmentsEnabled = false }: { readonly audience: Audience; readonly enabled: boolean; readonly attachmentsEnabled?: boolean }) {
   const customer = audience === 'customer';
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -51,13 +51,13 @@ export function SupportCenter({ audience, enabled }: { readonly audience: Audien
       </div>
       <div role="status" aria-live="polite" aria-atomic="true">{notice && <p className="support-notice mb-5">{notice}</p>}</div>
       {!enabled ? <section className="support-card support-empty"><LifeBuoy size={32} aria-hidden="true"/><h2>기술지원 기능 준비 중</h2><p>기술지원 기능이 아직 활성화되지 않았습니다.</p><p>{customer ? '기존 계정 관리 기능은 계속 이용할 수 있습니다.' : '서비스 준비가 완료되면 요청을 관리할 수 있습니다.'}</p></section>
-        : selected ? <SupportRequestDetail key={selected} id={selected} audience={audience} onBack={() => { lastSelected.current = selected; setSelected(null); setNotice(''); reload(); }}/>
+        : selected ? <SupportRequestDetail key={selected} id={selected} audience={audience} attachmentsEnabled={attachmentsEnabled} onBack={() => { lastSelected.current = selected; setSelected(null); setNotice(''); reload(); }}/>
         : <section className="support-card" aria-label="지원 요청 목록" aria-busy={loading}>
           <div className="mb-5 flex flex-wrap items-end justify-between gap-4"><div><label className="ca-label" htmlFor="support-filter">처리 상태</label><select id="support-filter" className="ca-input min-w-40" value={filter} disabled={loading} onChange={event => { setFilter(event.target.value); setPage(1); setLoading(true); setList(null); }}><option value="">전체 상태</option>{statuses.map(status => <option value={status} key={status}>{statusLabels[status]}</option>)}</select></div><button className="support-button support-secondary" onClick={reload} disabled={loading}><RefreshCw size={16} aria-hidden="true"/>새로고침</button></div>
           {loading ? <p className="support-empty" role="status">요청 목록을 불러오는 중…</p> : error ? <SupportFailure error={error} audience={audience} retry={reload}/> : !list?.requests.length ? <div className="support-empty"><h2>등록된 요청이 없습니다</h2><p>{filter ? '다른 상태를 선택해 주세요.' : customer ? '새 요청을 등록하면 이곳에서 처리 현황을 확인할 수 있습니다.' : '고객이 등록한 기술지원 요청이 이곳에 표시됩니다.'}</p></div> : <ul className="support-list">{list.requests.map(request => <li key={request.id}><div className="min-w-0"><div className="mb-2 flex flex-wrap items-center gap-2"><span className="support-number">#{request.request_number}</span><StatusBadge status={request.status}/><span className="support-priority">우선순위 {priorityLabels[request.priority]}</span></div><button id={`support-row-${request.id}`} className="support-title" onClick={() => { setSelected(request.id); setNotice(''); }}>{request.title}<span className="sr-only"> 상세 보기</span></button><p className="mt-2 text-xs leading-6 text-slate-500">접수 {formatSupportDate(request.created_at)}{!customer && <span className="block sm:ml-4 sm:inline">최근 수정 {formatSupportDate(request.updated_at)}</span>}</p></div><button className="support-button support-secondary shrink-0" onClick={() => setSelected(request.id)} aria-label={`요청 #${request.request_number} 상세 보기`}>상세 보기<ArrowUpRight size={16} aria-hidden="true"/></button></li>)}</ul>}
           {list && <Pagination page={page} total={list.total} busy={loading} onPage={value => { setPage(value); setLoading(true); setList(null); }}/ >}
         </section>}
     </main>
-    {creating && <NewRequestDialog onClose={() => setCreating(false)} onCreated={id => { setCreating(false); setSelected(id); setNotice('기술지원 요청을 등록했습니다.'); }}/ >}
+    {creating && <NewRequestDialog attachmentsEnabled={attachmentsEnabled} onClose={() => setCreating(false)} onCreated={id => { setCreating(false); setSelected(id); setNotice('기술지원 요청을 등록했습니다.'); }}/ >}
   </div>;
 }

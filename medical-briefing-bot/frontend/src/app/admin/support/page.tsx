@@ -9,5 +9,5 @@ export const metadata: Metadata = { title: '기술지원 관리 | Medical Briefi
 export default async function InternalSupportPage() {
   const request = new Request('https://admin.invalid', { headers: await headers() });
   if (!isAdminRequestAuthorized(request)) redirect('/admin');
-  return <SupportCenter audience="internal" enabled={process.env.SUPPORT_ENABLED === 'true'}/>;
+  return <SupportCenter audience="internal" enabled={process.env.SUPPORT_ENABLED === 'true'} attachmentsEnabled={process.env.SUPPORT_ATTACHMENTS_ENABLED === 'true'}/>;
 }
