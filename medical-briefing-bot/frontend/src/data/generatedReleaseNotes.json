@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-19-pr-97",
+    "date": "2026.10.19",
+    "category": "버그 수정",
+    "title": "기술지원 중복·충돌 요청의 응답 지연 수정",
+    "summary": "PR #97 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "PostgREST 14에서 중복 첨부파일과 상태 변경 충돌이 반복 재시도로 지연되는 문제를 수정합니다.",
+      "별도 승인된 DB 보완 Migration 적용이 필요하며 기술지원 기능을 자동 활성화하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #97",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/97"
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-pr-87",
     "date": "2026.10.15",
     "category": "운영",
