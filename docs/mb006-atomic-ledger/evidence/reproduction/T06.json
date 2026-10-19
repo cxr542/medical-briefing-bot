@@ -1,0 +1,148 @@
+{
+  "name": "T06 fail midway through SQL and retry",
+  "result": "PASS",
+  "target": {
+    "container": "bfaf16d26d9db478f16dd8b8ba042313cb0c1ebf3879f825d92163e61261fc0f",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285675015049258",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225",
+      "20261016014502"
+    ],
+    "support_tables": 5
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T08:00:10.285Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "bfaf16d26d9db478f16dd8b8ba042313cb0c1ebf3879f825d92163e61261fc0f",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285675015049258",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:10.344Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "bfaf16d26d9db478f16dd8b8ba042313cb0c1ebf3879f825d92163e61261fc0f",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285675015049258",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "FAILED_RECONCILE_BEFORE_RETRY"
+    },
+    {
+      "at": "2026-10-19T08:00:10.836Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "bfaf16d26d9db478f16dd8b8ba042313cb0c1ebf3879f825d92163e61261fc0f",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285675015049258",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:11.080Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "bfaf16d26d9db478f16dd8b8ba042313cb0c1ebf3879f825d92163e61261fc0f",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285675015049258",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "COMMIT_CONFIRMED",
+      "history": {
+        "count": 5,
+        "applied": [
+          "20261016014502"
+        ],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}

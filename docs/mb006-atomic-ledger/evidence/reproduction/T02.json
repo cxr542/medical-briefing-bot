@@ -1,0 +1,94 @@
+{
+  "name": "T02 ledger source checksum and audit",
+  "result": "PASS",
+  "target": {
+    "container": "a5a0f20cb9cd562636df90aef160deb5fc99d7d5a4e6b1a7296eba61c0716498",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285626907930666",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225",
+      "20261016014502"
+    ],
+    "support_tables": 5
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T07:59:58.955Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "a5a0f20cb9cd562636df90aef160deb5fc99d7d5a4e6b1a7296eba61c0716498",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285626907930666",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T07:59:59.194Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "a5a0f20cb9cd562636df90aef160deb5fc99d7d5a4e6b1a7296eba61c0716498",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285626907930666",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "COMMIT_CONFIRMED",
+      "history": {
+        "count": 5,
+        "applied": [
+          "20261016014502"
+        ],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}

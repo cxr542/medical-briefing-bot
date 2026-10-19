@@ -1,0 +1,50 @@
+{
+  "name": "T12 reject unexpected existing objects",
+  "result": "PASS",
+  "target": {
+    "container": "b24cf45f760d48ef5e30db6184b0312a80cf9c2bc495a574f4b390e16784550b",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285748172582954",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225"
+    ],
+    "support_tables": 1
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T08:00:27.303Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "b24cf45f760d48ef5e30db6184b0312a80cf9c2bc495a574f4b390e16784550b",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285748172582954",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "REJECTED_STATE",
+      "code": "OBJECT_LEDGER_MISMATCH"
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}
