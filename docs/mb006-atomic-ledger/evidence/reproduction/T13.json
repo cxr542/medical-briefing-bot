@@ -1,0 +1,26 @@
+{
+  "name": "T13 reject production IDs and forged server identity",
+  "result": "PASS",
+  "target": {
+    "container": "390e3d8968425c03b49cfdbfbb5cf14b63a5e0f4e2c5d7a207806fbc6dc95a57",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285757946208296",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225"
+    ],
+    "support_tables": 0
+  },
+  "audit": [],
+  "cleanup": "own container and volume removed"
+}

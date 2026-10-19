@@ -1,0 +1,26 @@
+{
+  "name": "T11 reject checksum mismatch without editing migrations",
+  "result": "PASS",
+  "target": {
+    "container": "0519b938d6b4794316d1d44fea3363043b396e6aac0127203b5d85e3d4bda432",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285739421786154",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225"
+    ],
+    "support_tables": 0
+  },
+  "audit": [],
+  "cleanup": "own container and volume removed"
+}

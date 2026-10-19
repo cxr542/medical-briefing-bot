@@ -1,0 +1,29 @@
+EVIDENCE_DIRECTORY /private/tmp/mb006-atomic-ledger-evidence-reviewed-20261019
+✔ T01 normal migration and default dry-run (2859.144125ms)
+✔ T02 ledger source checksum and audit (2273.385583ms)
+✔ T03 preserve four complete legacy rows (3340.25625ms)
+✔ T04 refuse duplicate version (2696.748416ms)
+✔ T05 refuse reverse order (2534.007375ms)
+✔ T06 fail midway through SQL and retry (3194.628959ms)
+✔ T07 ledger INSERT failure rolls back DDL (2344.248791ms)
+✔ T08 connection termination before COMMIT (2449.025083ms)
+✔ T09 concurrent identical and different migrations (4576.010458ms)
+✔ T10 fail closed when advisory lock held (2463.173458ms)
+✔ T11 reject checksum mismatch without editing migrations (1993.16125ms)
+✔ T12 reject unexpected existing objects (2198.944458ms)
+✔ T13 reject production IDs and forged server identity (2088.865666ms)
+✔ T14 reject connection strings and ignore production environment (2419.856042ms)
+✔ T15 preserve full authentication functions and synthetic sessions (3350.930292ms)
+✔ T16 preserve Collector and article objects and data (3409.928459ms)
+✔ T17 execute complete ordered chain (3826.129291ms)
+✔ T18 exactly seven ledger rows and drift rejection (3853.662333ms)
+✔ P01 SQL lexer preserves comments, quoted bodies and embedded COMMIT text (0.225208ms)
+✔ P02 reject inner top-level transaction control and malformed SQL (0.237167ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 51978.249709

@@ -1,0 +1,150 @@
+{
+  "name": "T04 refuse duplicate version",
+  "result": "PASS",
+  "target": {
+    "container": "196b53593f5998bbe7bf6ee3befd435442f139a032b65b30285974558db5c03c",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285653014626346",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225",
+      "20261016014502"
+    ],
+    "support_tables": 5
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T08:00:05.096Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "196b53593f5998bbe7bf6ee3befd435442f139a032b65b30285974558db5c03c",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285653014626346",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:05.343Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "196b53593f5998bbe7bf6ee3befd435442f139a032b65b30285974558db5c03c",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285653014626346",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "COMMIT_CONFIRMED",
+      "history": {
+        "count": 5,
+        "applied": [
+          "20261016014502"
+        ],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:05.593Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "196b53593f5998bbe7bf6ee3befd435442f139a032b65b30285974558db5c03c",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285653014626346",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 5,
+        "applied": [
+          "20261016014502"
+        ],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:05.594Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "196b53593f5998bbe7bf6ee3befd435442f139a032b65b30285974558db5c03c",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285653014626346",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "REJECTED_DUPLICATE"
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}
