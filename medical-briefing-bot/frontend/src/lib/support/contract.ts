@@ -53,7 +53,7 @@ export function databaseError(code: string): SupportError {
   switch (code) {
     case '42501': return new SupportError(401, 'UNAUTHORIZED');
     case 'P0002': return new SupportError(404, 'NOT_FOUND');
-    case '40001': return new SupportError(409, 'VERSION_CONFLICT');
+    case '40001': case 'PT409': return new SupportError(409, 'VERSION_CONFLICT');
     case '22023': case '23514': case '22P02': return new SupportError(400, 'INVALID_INPUT');
     default: return new SupportError(503, 'SUPPORT_UNAVAILABLE');
   }

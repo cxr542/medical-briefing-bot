@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { customerPayload } from './supportDatabase.mjs';
 export const attachmentMigration = await readFile(new URL('../../../supabase/migrations/20261016035115_support_attachments.sql', import.meta.url), 'utf8');
+export const conflictMigration = await readFile(new URL('../../../supabase/migrations/20261019041429_support_conflict_sqlstate.sql', import.meta.url), 'utf8');
 export const sha = data => createHash('sha256').update(data).digest('hex');
 export const pdf = Buffer.from('%PDF-1.7\nTest document\n%%EOF\n');
 export function metadata(request_id, data = pdf) { return customerPayload({ request_id, client_key: randomUUID(), original_name: 'test.pdf', mime: 'application/pdf', bytes: data.length, sha256: sha(data), token_hash: sha('token') }); }
