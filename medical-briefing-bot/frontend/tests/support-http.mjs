@@ -6,7 +6,7 @@ import { after, before, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDatabase, rpc, create, TOKEN_A, TOKEN_B, ADMIN_A } from './fixtures/supportDatabase.mjs';
 import { tokenHash, cookieName } from '../src/lib/customer-auth/core.mjs';
-import { attachmentMigration, attachmentRpc, workerRpc, metadata, sha, pdf, MockStorage } from './fixtures/supportAttachments.mjs';
+import { attachmentMigration, conflictMigration, attachmentRpc, workerRpc, metadata, sha, pdf, MockStorage } from './fixtures/supportAttachments.mjs';
 
 const CUSTOMER = '/api/customer-admin/support/requests';
 const INTERNAL = '/api/admin/support/requests';
@@ -69,6 +69,7 @@ async function call(path, { cookie, method = 'GET', body, requestOrigin = origin
 before(async () => {
   db = await createDatabase();
   await db.exec(attachmentMigration);
+  await db.exec(conflictMigration);
   databaseServer = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
     if (request.headers.apikey !== TEST_KEY) { response.writeHead(401).end('{}'); return; }

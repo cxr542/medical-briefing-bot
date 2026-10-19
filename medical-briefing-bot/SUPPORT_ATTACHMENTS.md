@@ -73,6 +73,14 @@ Apply only after a separately approved staging trial and migration-history revie
 
 Rollback preference: disable the new attachment flag, stop workers, revert application commit; retain DB/Storage data and audit for investigation. No destructive down migration is supplied. Do not run the Phase 1 empty-only rollback with attachment objects installed: dependent objects cause refusal. Any future destructive rollback must separately lock/check all attachment tables and account for bucket contents under explicit approval.
 
+## Conflict-code correction
+
+`supabase/migrations/20261019041429_support_conflict_sqlstate.sql` must follow the foundation and attachment migrations, before activation. It changes deliberate business-conflict errors in four existing functions from SQLSTATE `40001` to `PT409`. PostgREST 14 can repeatedly retry `40001` transactions instead of returning the conflict; `PT409` returns HTTP 409 immediately. The application maps both codes to the existing `VERSION_CONFLICT` response, so application rollout can precede the separately approved database update. Genuine PostgreSQL serialization failures retain their original handling.
+
+The correction uses the four exact function signatures and replaces only the existing error-code literal through `CREATE OR REPLACE FUNCTION`. Function OIDs, grants, invoker security, search paths, locks and data remain unchanged. If a function is missing or lacks the expected literal, the entire transaction aborts for drift review. Existing migrations are immutable. The native CI test uses an isolated PostgreSQL 17 database and real PostgREST 14.5 to verify stale versions, duplicate requests/files, chunk/scan leases, reservation limits and public access denial; it does not provision production resources.
+
+No destructive rollback is needed. Keep support disabled and retain the corrected SQL when reverting application code: the previous application may surface conflicts as 503 until the compatible application is restored. Do not restore `40001` for business conflicts on PostgREST 14. Before any target migration, review history and backups under separate approval. See the [Supabase PostgREST 14 retry advisory](https://supabase.com/docs/guides/troubleshooting/high-cpu-and-infinite-transaction-retries-when-using-custom-error-codes-in-rpc-functions-77326b).
+
 ## Activation gates and validation limits
 
 Operational feature completion is BLOCKED until a real approved malware service and secure connection are available and tested. Also required: non-production Supabase Storage/PostgREST acceptance, migration-history procedure, private bucket provisioning, worker/cleanup supervisor, monitoring, approved retention, target serverless chunk/stream limits, iOS Safari acceptance and an explicit activation approval.

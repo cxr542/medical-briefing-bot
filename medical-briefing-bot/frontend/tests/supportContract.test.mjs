@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createRequest, listQuery, statusChange, message, customerDetail } from '../src/lib/support/contract.ts';
+import { createRequest, listQuery, statusChange, message, customerDetail, databaseError } from '../src/lib/support/contract.ts';
+
+test('business and database serialization conflicts preserve the public 409 contract', () => {
+  for (const code of ['PT409', '40001']) {
+    const error = databaseError(code);
+    assert.equal(error.status, 409);
+    assert.equal(error.code, 'VERSION_CONFLICT');
+  }
+  assert.equal(databaseError('XX000').status, 503);
+});
 
 test('request parsing rejects owner injection and invalid body boundaries', () => {
   for (const input of [

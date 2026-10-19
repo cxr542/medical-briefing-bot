@@ -5,7 +5,7 @@ import { mkdtemp, writeFile, rm, readFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createDatabase, create, customerPayload, TOKEN_B, internalPayload } from './fixtures/supportDatabase.mjs';
-import { attachmentMigration, attachmentRpc as rpc, workerRpc, metadata, sha, pdf, MockStorage, mockScanner, uploaded } from './fixtures/supportAttachments.mjs';
+import { attachmentMigration, conflictMigration, attachmentRpc as rpc, workerRpc, metadata, sha, pdf, MockStorage, mockScanner, uploaded } from './fixtures/supportAttachments.mjs';
 import { scanNext } from '../src/lib/support/attachments/worker.mjs';
 import { validateFile } from '../src/lib/support/attachments/validation.mjs';
 import { checkedPath, storageAdapter } from '../src/lib/support/attachments/storage.mjs';
@@ -13,7 +13,7 @@ import { clamAvScanner } from '../src/lib/support/attachments/scanner.mjs';
 import { prepareAttachment } from '../src/lib/support/attachments/contract.ts';
 import { cleanupAttachments } from '../src/lib/support/attachments/cleanup.mjs';
 let db;
-before(async () => { db = await createDatabase(); await db.exec(attachmentMigration); });
+before(async () => { db = await createDatabase(); await db.exec(attachmentMigration); await db.exec(conflictMigration); });
 after(async () => { await db?.close(); });
 test('metadata validates size, extension, MIME, path and control characters', () => {
   const good = metadata(randomUUID()); delete good.request_id; delete good.admin_token_hash; delete good.token_hash;
@@ -24,8 +24,8 @@ test('reservation is idempotent, rejects mismatch and enforces five active slots
   const { request } = await create(db); const payload = metadata(request.id);
   const first = await rpc(db, 'customer', 'prepare', payload);
   assert.equal((await rpc(db, 'customer', 'prepare', { ...payload, token_hash: sha('new') })).id, first.id);
-  await assert.rejects(rpc(db, 'customer', 'prepare', { ...payload, bytes: 5 }), { code: '40001' });
-  await assert.rejects(rpc(db, 'customer', 'prepare', { ...payload, client_key: randomUUID() }), { code: '40001' });
+  await assert.rejects(rpc(db, 'customer', 'prepare', { ...payload, bytes: 5 }), { code: 'PT409' });
+  await assert.rejects(rpc(db, 'customer', 'prepare', { ...payload, client_key: randomUUID() }), { code: 'PT409' });
   for (let i = 0; i < 4; i++) await rpc(db, 'customer', 'prepare', metadata(request.id, Buffer.from(`file-${i}`)));
   await assert.rejects(rpc(db, 'customer', 'prepare', metadata(request.id, Buffer.from('sixth'))), { code: '22023' });
 });
@@ -43,11 +43,11 @@ test('expired and rotated grants fail, incomplete uploads fail and part leases p
   await assert.rejects(rpc(db, 'customer', 'complete', payload), { code: '22023' });
   const partPayload = { ...payload, part: 0, bytes: pdf.length, sha256: sha(pdf) };
   const part = await rpc(db, 'customer', 'part', partPayload);
-  await assert.rejects(rpc(db, 'customer', 'part', partPayload), { code: '40001' });
-  await assert.rejects(rpc(db, 'customer', 'part_done', { ...partPayload, lease: randomUUID() }), { code: '40001' });
+  await assert.rejects(rpc(db, 'customer', 'part', partPayload), { code: 'PT409' });
+  await assert.rejects(rpc(db, 'customer', 'part_done', { ...partPayload, lease: randomUUID() }), { code: 'PT409' });
   await rpc(db, 'customer', 'part_done', { ...partPayload, lease: part.lease });
   assert.deepEqual(await rpc(db, 'customer', 'part', partPayload), { ready: true });
-  await assert.rejects(rpc(db, 'customer', 'part', { ...partPayload, sha256: sha('different') }), { code: '40001' });
+  await assert.rejects(rpc(db, 'customer', 'part', { ...partPayload, sha256: sha('different') }), { code: 'PT409' });
   await db.query("UPDATE support.support_attachments SET expires_at=now()-interval '1 second' WHERE id=$1", [item.id]);
   await assert.rejects(rpc(db, 'customer', 'complete', payload), { code: '42501' });
   await rpc(db, 'customer', 'prepare', { ...payload, token_hash: sha('rotated') });
@@ -77,11 +77,11 @@ test('forged and duplicate scanner results are rejected', async () => {
   const storage = new MockStorage(); const { request } = await create(db); const payload = await uploaded(db, request.id, storage);
   const job = await workerRpc(db, 'claim');
   assert.equal(job.id, payload.attachment_id);
-  await assert.rejects(workerRpc(db, 'finish', { attachment_id: job.id, lease: randomUUID(), sha256: job.sha256, status: 'clean' }), { code: '40001' });
+  await assert.rejects(workerRpc(db, 'finish', { attachment_id: job.id, lease: randomUUID(), sha256: job.sha256, status: 'clean' }), { code: 'PT409' });
   await assert.rejects(workerRpc(db, 'finish', { attachment_id: job.id, lease: job.scan_lease, sha256: sha('forged'), status: 'clean' }), { code: '22023' });
   const result = { attachment_id: job.id, lease: job.scan_lease, sha256: job.sha256, status: 'failed' };
   await workerRpc(db, 'finish', result);
-  await assert.rejects(workerRpc(db, 'finish', result), { code: '40001' });
+  await assert.rejects(workerRpc(db, 'finish', result), { code: 'PT409' });
 });
 test('part integrity failure never promotes a file', async () => {
   const storage = new MockStorage(); const { request } = await create(db); const payload = await uploaded(db, request.id, storage);
