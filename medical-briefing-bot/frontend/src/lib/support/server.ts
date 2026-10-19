@@ -36,6 +36,8 @@ async function credentials(request: Request, audience: Audience): Promise<Record
   }
 }
 
+export { credentials as supportCredentials };
+
 function dto(audience: Audience, operation: Operation, data: unknown): unknown {
   const schema = (() => {
     switch (operation) {
@@ -71,9 +73,10 @@ export async function supportApi(request: Request, audience: Audience, operation
       case 'comment': case 'note': Object.assign(payload, message.parse(await readBody(request, 49152))); break;
     }
     const client = createAdminSupabaseClient();
-    const { data, error } = await client.rpc(audience === 'customer' ? 'customer_support_rpc' : 'admin_support_rpc', {
-      operation, payload: { ...payload, ...auth },
-    });
+    const retryKey = request.headers.get('x-support-request-key');
+    const { data, error } = audience === 'customer' && operation === 'create' && retryKey && process.env.SUPPORT_ATTACHMENTS_ENABLED === 'true'
+      ? await client.rpc('support_attachment_create_rpc', { payload: { ...payload, ...auth }, client_key: z.uuid().parse(retryKey) })
+      : await client.rpc(audience === 'customer' ? 'customer_support_rpc' : 'admin_support_rpc', { operation, payload: { ...payload, ...auth } });
     if (error) throw databaseError(error.code);
     return json(dto(audience, operation, data), operation === 'create' || operation === 'comment' || operation === 'note' ? 201 : 200);
   } catch (error) {

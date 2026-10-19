@@ -22,12 +22,12 @@ const env = { ...process.env, NODE_ENV: 'production', CUSTOMER_AUTH_FOUNDATION_E
   CUSTOMER_AUTH_ENFORCEMENT_ENABLED: 'false', NEXT_PUBLIC_SUPABASE_URL: databaseOrigin,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'ui-local-anon', SUPABASE_SERVICE_ROLE_KEY: 'ui-local-service',
   ADMIN_PASSWORD: 'ui-local-internal-password-123456' };
-const build = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build'], { stdio: 'inherit', env });
+const build = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build', ...(process.env.SUPPORT_TEST_WEBPACK === '1' ? ['--webpack'] : [])], { stdio: 'inherit', env });
 const [code] = await once(build, 'exit');
 if (code !== 0) { auth.close(); process.exit(code || 1); }
 for (const [port, flag] of [[3027, 'true'], [3028, 'false']]) {
   apps.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(port)], {
-    stdio: 'inherit', env: { ...env, SUPPORT_ENABLED: flag },
+    stdio: 'inherit', env: { ...env, SUPPORT_ENABLED: flag, SUPPORT_ATTACHMENTS_ENABLED: flag },
   }));
 }
 async function stop() {

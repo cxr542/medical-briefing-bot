@@ -155,3 +155,19 @@ detail never renders internal notes, actor IDs or audit data. Plain React text
 renders all submitted content. Accepted limitations: no attachment UI, named
 operator account redesign or customer reply composer in this phase. Managed
 Supabase rollout remains independently gated; test mocks are tests-only.
+
+## 10. Support attachments (Phase 3)
+
+Reuse support-card, ca-input, support-button, text badges and the blue/brown
+audience accents. Attachment rows wrap filename/size/state/actions on phones;
+image thumbnails occupy a fixed 96px square with object-fit:contain. The
+document owns scrolling. A labelled multiple file input remains the Safari
+fallback for paste; every image has an alt label and a removal button with a
+44px target. Pending/scanning/clean/infected/failed are always written in text.
+Progress uses a named native progress element and polite announcements. Keep
+request text and selected files after partial failure; retain the created request
+ID for upload retry instead of POSTing another request. Revoke object URLs on
+removal/unmount. Remote thumbnails load only from authenticated clean-image API
+responses. No unscanned remote image or public Storage link is rendered.
+Feature remains independently disabled until storage and a real scanner pass
+acceptance. Test clean results never substitute for production scanning.

@@ -6,6 +6,7 @@ import { after, before, test } from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
 import { createDatabase, rpc, create, TOKEN_A, TOKEN_B, ADMIN_A } from './fixtures/supportDatabase.mjs';
 import { tokenHash, cookieName } from '../src/lib/customer-auth/core.mjs';
+import { attachmentMigration, attachmentRpc, workerRpc, metadata, sha, pdf, MockStorage } from './fixtures/supportAttachments.mjs';
 
 const CUSTOMER = '/api/customer-admin/support/requests';
 const INTERNAL = '/api/admin/support/requests';
@@ -16,6 +17,7 @@ const cookieB = `${cookieName('admin', true)}=${TOKEN_B}`;
 const ordinary = `${cookieName('user', true)}=${'u'.repeat(43)}`;
 let db, databaseServer, app, origin, databaseOrigin, internalCookie;
 let databaseFailure = false;
+const storage = new MockStorage();
 
 async function listen(server) {
   server.listen(0, '127.0.0.1');
@@ -31,7 +33,7 @@ async function stopApp() {
   }
 }
 
-async function startApp(support = 'true', foundation = 'true', enforcement = 'false') {
+async function startApp(support = 'true', foundation = 'true', enforcement = 'false', attachments = 'true') {
   await stopApp();
   const reservation = createServer();
   origin = await listen(reservation);
@@ -39,7 +41,7 @@ async function startApp(support = 'true', foundation = 'true', enforcement = 'fa
   await new Promise(resolve => reservation.close(resolve));
   app = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', port], {
     cwd: new URL('..', import.meta.url), stdio: 'ignore',
-    env: { ...process.env, NODE_ENV: 'production', SUPPORT_ENABLED: support,
+    env: { ...process.env, NODE_ENV: 'production', SUPPORT_ENABLED: support, SUPPORT_ATTACHMENTS_ENABLED: attachments,
       CUSTOMER_AUTH_FOUNDATION_ENABLED: foundation, CUSTOMER_AUTH_ENFORCEMENT_ENABLED: enforcement,
       NEXT_PUBLIC_SUPABASE_URL: databaseOrigin, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-only-anon',
       SUPABASE_SERVICE_ROLE_KEY: TEST_KEY, ADMIN_PASSWORD: TEST_PASSWORD },
@@ -66,14 +68,26 @@ async function call(path, { cookie, method = 'GET', body, requestOrigin = origin
 
 before(async () => {
   db = await createDatabase();
+  await db.exec(attachmentMigration);
   databaseServer = createServer(async (request, response) => {
     response.setHeader('Content-Type', 'application/json');
     if (request.headers.apikey !== TEST_KEY) { response.writeHead(401).end('{}'); return; }
     if (databaseFailure) { response.writeHead(500).end(JSON.stringify({ code: 'XX000', message: 'PRIVATE_DATABASE_SENTINEL' })); return; }
     try {
+      if (request.url.startsWith('/storage/v1/object/')) {
+        const [bucket, ...segments] = request.url.slice('/storage/v1/object/'.length).split('/');
+        if (request.method === 'POST') {
+          await storage.put(bucket, segments.join('/'), request);
+          response.end('{}');
+        } else {
+          const object = await storage.get(bucket, segments.join('/'));
+          response.end(Buffer.from(await object.arrayBuffer()));
+        }
+        return;
+      }
       const chunks = [];
       for await (const chunk of request) chunks.push(chunk);
-      const { operation, payload } = JSON.parse(Buffer.concat(chunks).toString());
+      const { audience, operation, payload, client_key } = JSON.parse(Buffer.concat(chunks).toString());
       let result;
       switch (request.url) {
         case '/rest/v1/rpc/customer_auth_rpc': {
@@ -87,6 +101,8 @@ before(async () => {
         }
         case '/rest/v1/rpc/customer_support_rpc': result = await rpc(db, 'customer', operation, payload); break;
         case '/rest/v1/rpc/admin_support_rpc': result = await rpc(db, 'internal', operation, payload); break;
+        case '/rest/v1/rpc/support_attachment_rpc': result = await attachmentRpc(db, audience, operation, payload); break;
+        case '/rest/v1/rpc/support_attachment_create_rpc': result = await db.transaction(async tx => { await tx.exec('SET LOCAL ROLE service_role'); return (await tx.query('SELECT public.support_attachment_create_rpc($1::jsonb,$2::uuid) AS data',[JSON.stringify(payload),client_key])).rows[0].data; }); break;
         default: throw new Error('Unexpected database route');
       }
       response.end(JSON.stringify(result));
@@ -95,7 +111,7 @@ before(async () => {
     }
   });
   databaseOrigin = await listen(databaseServer);
-  const build = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build'], {
+  const build = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build', ...(process.env.SUPPORT_TEST_WEBPACK === '1' ? ['--webpack'] : [])], {
     cwd: new URL('..', import.meta.url), stdio: 'inherit',
     env: { ...process.env, NEXT_PUBLIC_SUPABASE_URL: databaseOrigin, NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-only-anon' },
   });
@@ -202,6 +218,64 @@ test('HTTP database failures return generic errors without credentials or intern
     const result = await call(INTERNAL,{cookie:internalCookie});
     assert.deepEqual(result,{status:503,data:{error:'SUPPORT_UNAVAILABLE'}});
   } finally { databaseFailure = false; }
+});
+
+test('HTTP attachment upload quarantine clean download ownership and headers', async () => {
+  const { request } = await create(db); const base = `${CUSTOMER}/${request.id}/attachments`;
+  const data = metadata(request.id); delete data.request_id; delete data.admin_token_hash; delete data.token_hash;
+  for (const [cookie, expected] of [[undefined,401],[ordinary,403],[cookieB,404],[internalCookie,403]]) assert.equal((await call(base, { cookie })).status, expected);
+  assert.equal((await call(base, { cookie: cookieA, method: 'POST', body: data, requestOrigin: 'https://attacker.invalid' })).status,403);
+  assert.equal((await call(base, { cookie: cookieA, method: 'POST', body: { ...data, bytes: 10485761 } })).status,400);
+  const prepared = await call(base, { cookie: cookieA, method: 'POST', body: data }); assert.equal(prepared.status,201);
+  const { id, token } = prepared.data; const partUrl = `${base}/${id}/parts/0`;
+  async function upload(body, uploadToken = token) {
+    return fetch(origin + partUrl, { method: 'POST', headers: { cookie: cookieA, Origin: origin.replace('http:', 'https:'), 'Content-Type': 'application/octet-stream', 'x-support-upload-token': uploadToken }, body });
+  }
+  assert.equal((await upload(pdf, 'z'.repeat(43))).status,403);
+  assert.equal((await upload(Buffer.alloc(1048577))).status,413);
+  assert.equal((await upload(pdf)).status,200);
+  assert.equal((await upload(pdf)).status,200);
+  assert.equal((await call(`${base}/${id}/complete`, { cookie: cookieA, method: 'POST', headers: { 'x-support-upload-token': token } })).status,200);
+  assert.equal((await call(`${base}/${id}/download`, { cookie: cookieA })).status,423);
+  assert.equal((await call(`${INTERNAL}/${request.id}/attachments/${id}/download`, { cookie: internalCookie })).status,423);
+  const job = await workerRpc(db, 'claim'); assert.equal(job.id,id);
+  const cleanPath = `${request.id}/${id}/${job.scan_lease}`;
+  await storage.put('support-clean', cleanPath, pdf);
+  await workerRpc(db, 'finish', { attachment_id:id, lease:job.scan_lease, sha256:sha(pdf), status:'clean', clean_path:cleanPath });
+  const download = await fetch(origin + `${base}/${id}/download?preview=1`, { headers: { cookie:cookieA } });
+  assert.equal(download.status,200); assert.match(download.headers.get('content-disposition'), /^attachment;/);
+  assert.equal(download.headers.get('x-content-type-options'),'nosniff'); assert.match(download.headers.get('content-security-policy'),/sandbox/);
+  assert.deepEqual(Buffer.from(await download.arrayBuffer()),pdf);
+  assert.equal((await call(`${base}/${id}/download`, { cookie:cookieB })).status,404);
+  assert.equal((await call(`${base}/${id}`, { cookie:cookieA, method:'DELETE' })).status,200);
+  assert.equal((await call(`${base}/${id}/download`, { cookie:cookieA })).status,404);
+});
+
+test('HTTP attachment grants expire and error responses do not expose Storage keys', async () => {
+  const { request } = await create(db); const base = `${CUSTOMER}/${request.id}/attachments`;
+  const data = metadata(request.id); delete data.request_id; delete data.admin_token_hash; delete data.token_hash;
+  const { data: grant } = await call(base, { cookie:cookieA, method:'POST', body:data });
+  await db.query("UPDATE support.support_attachments SET expires_at=now()-interval '1 second' WHERE id=$1", [grant.id]);
+  const result = await call(`${base}/${grant.id}/complete`, { cookie:cookieA, method:'POST', headers:{'x-support-upload-token':grant.token} });
+  assert.equal(result.status,403); assert.equal(JSON.stringify(result).includes(TEST_KEY),false);
+});
+
+test('HTTP request creation retry key recovers a lost response without duplicate requests',async()=>{
+  const key=metadata('33333333-3333-4333-8333-333333333333').client_key;
+  const options={cookie:cookieA,method:'POST',headers:{'x-support-request-key':key},body:{title:'Retryable request',description:'Same content'}};
+  const first=await call(CUSTOMER,options);assert.equal(first.status,201);
+  const retry=await call(CUSTOMER,options);assert.equal(retry.status,201);assert.equal(retry.data.request.id,first.data.request.id);
+  assert.equal((await call(CUSTOMER,{...options,body:{...options.body,title:'Changed content'}})).status,409);
+  const other=await call(CUSTOMER,{...options,cookie:cookieB});assert.equal(other.status,201);assert.notEqual(other.data.request.id,first.data.request.id);
+});
+
+test('HTTP attachment flag defaults disabled while existing support stays available',async()=>{
+  await startApp('true','true','false','');const {request}=await create(db);
+  const base=`${CUSTOMER}/${request.id}/attachments`;
+  assert.equal((await call(base)).status,401);
+  assert.equal((await call(base,{cookie:ordinary})).status,403);
+  assert.equal((await call(base,{cookie:cookieA})).status,503);
+  assert.equal((await call(`${CUSTOMER}/${request.id}`,{cookie:cookieA})).status,200);
 });
 
 test('HTTP disabled support still authenticates and does not change existing internal monitoring auth', async () => {
