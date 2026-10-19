@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-19-pr-95",
+    "date": "2026.10.19",
+    "category": "기능",
+    "title": "기술지원 첨부파일 기반 추가 (기본 비활성화)",
+    "summary": "PR #95 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "고객·운영자 기술지원 화면에 격리 업로드, 검사 상태와 clean 파일 다운로드 기반을 추가했습니다.",
+      "실제 검사 서비스와 운영 Storage 검증 및 별도 승인 전에는 기능을 활성화하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #95",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/95"
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-pr-87",
     "date": "2026.10.15",
     "category": "운영",
