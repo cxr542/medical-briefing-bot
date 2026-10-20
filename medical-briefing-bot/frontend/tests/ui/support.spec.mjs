@@ -12,8 +12,9 @@ async function login(context, audience = 'customer') {
   await context.addCookies([{ name: internal ? ADMIN_SESSION_COOKIE_NAME : cookieName('admin', true),
     value: internal ? createAdminSessionToken('ui-local-internal-password-123456') : TOKEN_A, url: internal ? 'http://127.0.0.1:3027' : 'https://127.0.0.1/', secure: !internal, httpOnly: true }]);
 }
-async function mock(page, { failure = 0, conflict = false, empty = false, holdCreate, failAfterSave = false } = {}) {
-  let current = { ...request };
+async function mock(page, { failure = 0, conflict = false, empty = false, holdCreate, failAfterSave = false, failStatusStep = 0, initialStatus = 'received' } = {}) {
+  let current = { ...request, status: initialStatus };
+  let statusSteps = 0;
   let comments = [];
   let notes = [];
   let history = [{ id: ID, previous_status: null, new_status: 'received', reason: '요청 접수', changed_by: ADMIN_A, actor_type: 'customer_admin', created_at: when }];
@@ -47,7 +48,10 @@ async function mock(page, { failure = 0, conflict = false, empty = false, holdCr
     if (body.version !== current.version) return route.fulfill({ status: 409, json: { error: 'VERSION_CONFLICT' } });
     const operation = url.pathname.split('/').at(-1);
     if (operation === 'status') {
-      if (current.status === 'received' && body.status === 'completed') return route.fulfill({ status: 400, json: { error: 'INVALID_INPUT' } });
+      statusSteps++;
+      if (statusSteps === failStatusStep) return route.fulfill({ status: 400, json: { error: 'INVALID_INPUT' } });
+      const transitions = { received: ['reviewing','on_hold','cancelled'], reviewing: ['in_progress','waiting_customer','on_hold','cancelled'], in_progress: ['waiting_customer','completed','on_hold','cancelled'], waiting_customer: ['in_progress','completed','on_hold','cancelled'], on_hold: ['reviewing','in_progress','cancelled'], completed: ['reviewing'], cancelled: [] };
+      if (!transitions[current.status].includes(body.status)) return route.fulfill({ status: 400, json: { error: 'INVALID_INPUT' } });
       history = [{ ...history[0], id: crypto.randomUUID(), previous_status: current.status, new_status: body.status, reason: body.reason }, ...history];
       current = { ...current, status: body.status };
     } else if (operation === 'comments') comments = [{ id: crypto.randomUUID(), author_type: 'internal_admin', body: body.body, created_at: when }, ...comments];
@@ -65,7 +69,7 @@ async function openDetail(page, audience = 'customer') {
   await expect(page.getByRole('heading', { name: request.title })).toBeVisible();
 }
 
-test('customer list, filter, pagination, safe detail and no internal controls', async ({ page, context }) => {
+test('customer board pagination, safe detail and no internal controls', async ({ page, context }) => {
   await login(context); const calls = await mock(page);
   await openDetail(page);
   await expect(page.getByText(request.description)).toBeVisible();
@@ -75,8 +79,8 @@ test('customer list, filter, pagination, safe detail and no internal controls', 
   await page.getByRole('button', { name: '목록으로' }).click();
   await page.getByRole('button', { name: '다음', exact: true }).click();
   await expect(page.getByText('등록된 요청이 없습니다')).toBeVisible();
-  await page.getByLabel('처리 상태', { exact: true }).selectOption('completed');
-  await expect.poll(() => calls.at(-1)?.url.searchParams.get('status')).toBe('completed');
+  await expect(page.getByLabel('처리 상태', { exact: true })).toHaveCount(0);
+  expect(calls.filter(call => call.method === 'GET').some(call => call.url.searchParams.get('page') === '2')).toBe(true);
   expect(calls.every(call => call.url.pathname.startsWith('/api/customer-admin/'))).toBe(true);
 });
 
@@ -87,41 +91,40 @@ test('customer creates request with validation, focus and duplicate submission p
   await expect(page.getByLabel('제목 (필수)')).toBeFocused();
   await page.getByLabel('제목 (필수)').fill('새 지원 요청');
   await page.getByLabel('상세 내용 (필수)').fill('문제 발생 상황입니다.');
-  await page.getByLabel('우선순위', { exact: true }).selectOption('high');
+  await expect(page.getByLabel('우선순위', { exact: true })).toHaveCount(0);
   await page.getByRole('button', { name: '요청 등록', exact: true }).click();
   await expect(page.getByText('기술지원 요청을 등록했습니다.')).toBeVisible();
   await expect(page.getByRole('heading', { name: '새 지원 요청' })).toBeVisible();
   expect(calls.filter(call => call.method === 'POST')).toHaveLength(1);
-  expect(calls.find(call => call.method === 'POST').body).toEqual({ title: '새 지원 요청', description: '문제 발생 상황입니다.', priority: 'high' });
+  expect(calls.find(call => call.method === 'POST').body).toEqual({ title: '새 지원 요청', description: '문제 발생 상황입니다.', priority: 'normal' });
 });
 
-test('internal changes status, rejects invalid transition, adds public answer and private note', async ({ page, context }) => {
-  await login(context, 'internal'); await mock(page); await openDetail(page, 'internal');
+test('internal completes through valid versioned transitions and adds a public answer', async ({ page, context }) => {
+  await login(context, 'internal'); const calls = await mock(page); await openDetail(page, 'internal');
   await page.getByLabel('변경할 상태').selectOption('completed');
-  await page.getByLabel('변경 사유').fill('직접 완료 시도');
-  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
-  await expect(page.locator('main').getByRole('alert')).toContainText('입력 내용 또는 상태 변경');
-  await page.getByLabel('변경할 상태').selectOption('reviewing');
   await page.getByRole('button', { name: '상태 변경', exact: true }).click();
   await expect(page.getByText('처리 상태를 변경했습니다.')).toBeVisible();
+  expect(calls.filter(call => call.method === 'PATCH').map(call => [call.body.status, call.body.version])).toEqual([['reviewing',1],['in_progress',2],['completed',3]]);
+  await expect(page.locator('.support-badge')).toHaveText('완료');
   await page.getByLabel('답변 내용').fill('공개 답변입니다.');
   await page.getByRole('button', { name: '공개 답변 등록', exact: true }).click();
   await expect(page.getByText('공개 답변입니다.', { exact: true })).toBeVisible();
-  await page.getByLabel('메모 내용').fill('내부 전용 메모입니다.');
-  await page.getByRole('button', { name: '내부 메모 등록', exact: true }).click();
-  await expect(page.getByText('내부 전용 메모입니다.', { exact: true })).toBeVisible();
-  await expect(page.getByRole('heading', { name: '감사 이력' })).toBeVisible();
+  await expect(page.getByLabel('메모 내용')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: '감사 이력' })).toHaveCount(0);
+  await page.getByLabel('변경할 상태').selectOption('processing');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.locator('.support-badge')).toHaveText('처리 중');
 });
 
 test('409 reloads latest state, preserves input and requires acknowledgement', async ({ page, context }) => {
   await login(context, 'internal'); const calls = await mock(page, { conflict: true }); await openDetail(page, 'internal');
-  await page.getByLabel('메모 내용').fill('보존할 입력');
-  await page.getByRole('button', { name: '내부 메모 등록', exact: true }).click();
+  await page.getByLabel('답변 내용').fill('보존할 입력');
+  await page.getByRole('button', { name: '공개 답변 등록', exact: true }).click();
   await expect(page.locator('main').getByRole('alert')).toContainText('입력 내용은 보존했습니다');
-  await expect(page.getByLabel('메모 내용')).toHaveValue('보존할 입력');
-  await expect(page.getByRole('button', { name: '내부 메모 등록', exact: true })).toBeDisabled();
+  await expect(page.getByLabel('답변 내용')).toHaveValue('보존할 입력');
+  await expect(page.getByRole('button', { name: '공개 답변 등록', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: '최신 내용을 확인했습니다' }).click();
-  await page.getByRole('button', { name: '내부 메모 등록', exact: true }).click();
+  await page.getByRole('button', { name: '공개 답변 등록', exact: true }).click();
   await expect(page.getByText('보존할 입력', { exact: true })).toBeVisible();
   expect(calls.filter(call => call.method === 'POST').at(-1).body.version).toBe(2);
 });
@@ -199,17 +202,81 @@ test('customer account management stays usable with the new support navigation',
   await page.getByRole('button', { name: '사번 추가', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeVisible(); await page.keyboard.press('Escape');
   await page.getByRole('link', { name: '기술지원 요청', exact: true }).click();
-  await expect(page.getByRole('heading', { name: '기술지원 요청', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '문의 게시판', exact: true })).toBeVisible();
 });
 
 test('successful save followed by failed refresh is not reported as a failed save', async ({ page, context }) => {
   await login(context, 'internal'); const calls = await mock(page, { failAfterSave: true });
   await openDetail(page, 'internal');
-  await page.getByLabel('메모 내용').fill('저장은 성공한 메모');
-  await page.getByRole('button', { name: '내부 메모 등록', exact: true }).click();
-  await expect(page.getByText('저장했습니다. 최신 내용을 다시 불러와 주세요.')).toBeVisible();
-  await expect(page.getByLabel('메모 내용')).toHaveCount(0);
+  await page.getByLabel('답변 내용').fill('저장은 성공한 답변');
+  await page.getByRole('button', { name: '공개 답변 등록', exact: true }).click();
+  await expect(page.getByText('저장된 변경이 있습니다. 최신 내용을 다시 불러와 주세요.')).toBeVisible();
+  await expect(page.getByLabel('답변 내용')).toHaveCount(0);
   await page.getByRole('button', { name: '다시 시도' }).click();
   await expect(page.locator('main').getByRole('alert')).toBeVisible();
   expect(calls.filter(call => call.method === 'POST')).toHaveLength(1);
 });
+
+test('interrupted status chain reloads saved state and retry continues without replaying steps', async ({ page, context }) => {
+  await login(context, 'internal'); const calls = await mock(page, { failStatusStep: 2 }); await openDetail(page, 'internal');
+  await page.getByLabel('답변 내용').fill('보존할 답변');
+  await page.getByLabel('변경할 상태').selectOption('completed');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.getByText('저장된 변경이 있습니다. 최신 내용을 다시 불러와 주세요.')).toBeVisible();
+  await expect(page.locator('.support-badge')).toHaveText('처리 중');
+  await expect(page.getByLabel('답변 내용')).toHaveValue('보존할 답변');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.locator('.support-badge')).toHaveText('완료');
+  expect(calls.filter(call => call.method === 'PATCH').map(call => [call.body.status, call.body.version])).toEqual([['reviewing',1],['in_progress',2],['in_progress',2],['completed',3]]);
+});
+
+test('cancelled requests display complete and cannot be reopened', async ({ page, context }) => {
+  await login(context, 'internal'); await mock(page, { initialStatus: 'cancelled' }); await openDetail(page, 'internal');
+  await expect(page.locator('.support-badge')).toHaveText('완료');
+  await expect(page.getByText('취소되어 종료된 문의입니다.')).toBeVisible();
+  await expect(page.getByLabel('변경할 상태')).toHaveCount(0);
+});
+
+test('attachment-disabled environment explains unavailable upload without attachment API calls', async ({ page, context }) => {
+  await login(context); const calls = await mock(page);
+  await page.goto('http://127.0.0.1:3029/customer-admin/support');
+  await page.getByRole('button', { name: '새 요청 등록' }).click();
+  await expect(page.getByRole('dialog')).toContainText('첨부파일 업로드는 아직 사용할 수 없습니다');
+  await expect(page.getByLabel('첨부파일', { exact: true })).toHaveCount(0);
+  await page.getByLabel('제목 (필수)').fill('첨부 없는 문의');
+  await page.getByLabel('상세 내용 (필수)').fill('파일 없이 등록');
+  await page.getByRole('button', { name: '요청 등록', exact: true }).click();
+  await expect(page.getByRole('heading', { name: '첨부 없는 문의' })).toBeVisible();
+  await expect(page.getByRole('note')).toContainText('첨부파일 업로드는 아직 사용할 수 없습니다');
+  expect(calls.some(call => call.url.pathname.includes('/attachments'))).toBe(false);
+});
+
+for (const audience of ['customer', 'internal']) for (const width of [390, 1440, 1920]) for (const colorScheme of ['light', 'dark']) {
+  test.describe(`${audience} ${width} ${colorScheme}`, () => {
+  test.use({ isMobile: width === 390, hasTouch: width === 390, deviceScaleFactor: width === 390 ? 3 : 1 });
+  test(`board visual QA ${audience} ${width} ${colorScheme}`, async ({ page, context }, testInfo) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.emulateMedia({ colorScheme, reducedMotion: 'reduce' });
+    await login(context, audience); await mock(page);
+    await page.goto(audience === 'customer' ? '/customer-admin/support' : '/admin/support');
+    await expect(page.getByRole('button', { name: '요청 #6 상세 보기' })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('list.png'), fullPage: true });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole('button', { name: '요청 #6 상세 보기' }).click();
+    await expect(page.getByRole('heading', { name: request.title })).toBeVisible();
+    await page.screenshot({ path: testInfo.outputPath('detail.png'), fullPage: true });
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    await page.screenshot({ path: testInfo.outputPath('detail-end.png') });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+    await page.getByRole('button', { name: '목록으로' }).click();
+    await expect(page.locator(`#support-row-${ID}`)).toBeFocused();
+    if (audience === 'customer') {
+      await page.getByRole('button', { name: '새 요청 등록' }).click();
+      await expect(page.getByLabel('제목 (필수)')).toBeFocused();
+      await page.screenshot({ path: testInfo.outputPath('compose.png') });
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('button', { name: '새 요청 등록' })).toBeFocused();
+    }
+  });
+  });
+}

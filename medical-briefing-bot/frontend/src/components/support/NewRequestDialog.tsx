@@ -2,8 +2,9 @@
 import { useRef, useState, type FormEvent } from 'react';
 import Dialog from '@/components/customer-admin/Dialog';
 import { createRequest, customerCreated } from '@/lib/support/contract';
-import { endpoint, priorityLabels, supportFetch } from '@/lib/support/client';
+import { endpoint, supportFetch } from '@/lib/support/client';
 import { AttachmentPicker, uploadAttachments, type SelectedAttachment } from './AttachmentPicker';
+import { AttachmentUnavailable } from './SupportPrimitives';
 
 export function NewRequestDialog({ onClose, onCreated, attachmentsEnabled = false }: { readonly onClose: () => void; readonly onCreated: (id: string) => void; readonly attachmentsEnabled?: boolean }) {
   const created = useRef<string | null>(null);
@@ -34,13 +35,12 @@ export function NewRequestDialog({ onClose, onCreated, attachmentsEnabled = fals
     finally { submitting.current = false; setBusy(false); }
   }
   function close() { if (!submitting.current) { if (created.current) onCreated(created.current); else onClose(); } }
-  return <Dialog title="새 기술지원 요청" description="문제가 발생한 상황과 기대하는 동작을 알려 주세요." onClose={close}>
+  return <Dialog title="새 문의 등록" description="궁금한 점이나 불편한 내용을 남겨 주세요." onClose={close}>
     <form className="mt-6 space-y-5" onSubmit={submit} aria-busy={busy}>
       <div><label htmlFor="support-title" className="ca-label">제목 <span className="text-slate-500">(필수)</span></label><input id="support-title" name="title" className="ca-input" required maxLength={200} disabled={busy} readOnly={Boolean(createdId)}/></div>
       <div><label htmlFor="support-description" className="ca-label">상세 내용 <span className="text-slate-500">(필수)</span></label><textarea id="support-description" name="description" className="ca-input" rows={7} required maxLength={10000} disabled={busy} readOnly={Boolean(createdId)}/><p className="mt-2 text-xs text-slate-500">비밀번호와 개인정보는 입력하지 마세요. 최대 10,000자</p></div>
-      <div><label htmlFor="support-priority" className="ca-label">우선순위</label><select id="support-priority" name="priority" className="ca-input" defaultValue="normal" disabled={busy || Boolean(createdId)}>{Object.entries(priorityLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></div>
       {error && <p role="alert" className="text-sm text-red-800">{error}</p>}
-      {attachmentsEnabled && <AttachmentPicker files={files} onChange={setFiles} busy={busy}/>}
+      {attachmentsEnabled ? <AttachmentPicker files={files} onChange={setFiles} busy={busy}/> : <AttachmentUnavailable/>}
       <p role="status" aria-live="polite" className="text-sm text-slate-500">{progress}{createdId && error ? ' · 요청은 등록되었습니다. 첨부만 다시 시도하거나 상세 화면에서 이어서 처리할 수 있습니다.' : ''}</p>
       <div className="flex justify-end gap-2"><button type="button" className="ca-secondary" onClick={close} disabled={busy}>{createdId ? '요청 상세로' : '취소'}</button><button className="ca-primary" disabled={busy}>{busy ? '등록 중…' : createdId ? '첨부 재시도' : '요청 등록'}</button></div>
     </form>

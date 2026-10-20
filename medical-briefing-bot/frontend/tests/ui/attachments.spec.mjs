@@ -64,6 +64,23 @@ test('request response loss reuses the creation key before uploading',async({pag
   await page.getByRole('button',{name:'요청 등록',exact:true}).click();await expect(page.getByRole('region',{name:'요청 첨부파일'})).toContainText('검사 대기');
   expect(mock.counts()).toEqual({creates:1,parts:1});
 });
+for (const [extension, mimeType] of [['pdf','application/pdf'], ['docx','application/vnd.openxmlformats-officedocument.wordprocessingml.document'], ['xlsx','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']]) test(`customer selects and uploads ${extension} document through the existing uploader`, async ({page,context}) => {
+  const mock=await setup(page,context);
+  const reservations=[];
+  page.on('request', request => { if(request.method()==='POST' && request.url().endsWith('/attachments')) reservations.push(request.postDataJSON()); });
+  await page.getByRole('button',{name:'새 요청 등록'}).click();
+  await page.getByLabel('제목 (필수)').fill('문서 첨부 문의');
+  await page.getByLabel('상세 내용 (필수)').fill('선택한 문서를 첨부합니다.');
+  await page.getByLabel('첨부파일',{exact:true}).setInputFiles({name:`문의자료.${extension}`,mimeType,buffer:Buffer.from('mock storage content')});
+  await expect(page.getByRole('region',{name:'파일 첨부'})).toContainText(`문의자료.${extension}`);
+  await expect(page.getByRole('dialog').locator('img')).toHaveCount(0);
+  await page.getByRole('button',{name:'요청 등록',exact:true}).click();
+  await expect(page.getByRole('region',{name:'요청 첨부파일'})).toBeVisible();
+  expect(mock.counts()).toEqual({creates:1,parts:1});
+  expect(reservations).toHaveLength(1);
+  expect(reservations[0].original_name).toBe(`문의자료.${extension}`);
+  expect(reservations[0].mime).toBe(mimeType);
+});
 for(const status of ['pending','scanning','infected','failed','clean']) test(`internal attachment ${status} exposes downloads only for clean`,async({page,context})=>{
   await setup(page,context,{internal:true,status}); await page.getByRole('button',{name:'요청 #6 상세 보기'}).click();
   await expect(page.getByRole('region',{name:'요청 첨부파일'})).toContainText('screen.png');
