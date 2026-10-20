@@ -61,17 +61,19 @@ export function SupportRequestDetail({ id, audience, onBack, attachmentsEnabled 
       setNotice(operation === 'status' ? '처리 상태를 변경했습니다.' : '공개 답변을 등록했습니다.');
     } catch (error) {
       if (saved) { setDetail(null); setNotice('저장된 변경이 있습니다. 최신 내용을 다시 불러와 주세요.'); }
+      else if (operation === 'status') { setDetail(null); setNotice('상태 변경을 완료하지 못했습니다. 일부 변경이 저장됐을 수 있으니 최신 상태를 확인한 뒤 다시 시도해 주세요.'); }
       if (error instanceof SupportClientError && error.status === 409) {
         setConflict(true); setDetail(null);
         try { setDetail(await loadDetail(audience, id, page)); }
         catch (refreshError) { setError(refreshError instanceof Error ? refreshError : new Error('최신 내용을 불러올 수 없습니다.')); }
       } else {
         setError(error instanceof Error ? error : new Error('저장할 수 없습니다.'));
-        if (saved) {
+        if (error instanceof SupportClientError && [401, 403, 404].includes(error.status)) setDetail(null);
+        else if (saved || operation === 'status') {
           try { setDetail(await loadDetail(audience, id, page)); }
           catch { setDetail(null); }
         }
-        if (error instanceof SupportClientError && [401, 403, 404, 503].includes(error.status)) setDetail(null);
+        else if (error instanceof SupportClientError && error.status === 503) setDetail(null);
       }
     } finally { submitting.current = false; setBusy(false); }
   }

@@ -12,7 +12,7 @@ async function login(context, audience = 'customer') {
   await context.addCookies([{ name: internal ? ADMIN_SESSION_COOKIE_NAME : cookieName('admin', true),
     value: internal ? createAdminSessionToken('ui-local-internal-password-123456') : TOKEN_A, url: internal ? 'http://127.0.0.1:3027' : 'https://127.0.0.1/', secure: !internal, httpOnly: true }]);
 }
-async function mock(page, { failure = 0, conflict = false, empty = false, holdCreate, failAfterSave = false, failStatusStep = 0, initialStatus = 'received' } = {}) {
+async function mock(page, { failure = 0, conflict = false, empty = false, holdCreate, failAfterSave = false, failStatusStep = 0, lostStatusResponse = 0, conflictStatusStep = 0, initialStatus = 'received' } = {}) {
   let current = { ...request, status: initialStatus };
   let statusSteps = 0;
   let comments = [];
@@ -41,8 +41,8 @@ async function mock(page, { failure = 0, conflict = false, empty = false, holdCr
       current = { ...current, ...body };
       return route.fulfill({ status: 201, json: { request: current } });
     }
-    if (conflict) {
-      conflict = false; current = { ...current, status: 'reviewing', version: 2 };
+    if (conflict || (url.pathname.endsWith('/status') && statusSteps + 1 === conflictStatusStep)) {
+      conflict = false; conflictStatusStep = 0; current = { ...current, status: current.status === 'received' ? 'reviewing' : 'in_progress', version: current.version + 1 };
       return route.fulfill({ status: 409, json: { error: 'VERSION_CONFLICT' } });
     }
     if (body.version !== current.version) return route.fulfill({ status: 409, json: { error: 'VERSION_CONFLICT' } });
@@ -58,6 +58,7 @@ async function mock(page, { failure = 0, conflict = false, empty = false, holdCr
     else notes = [{ id: crypto.randomUUID(), body: body.body, actor_id: 'synthetic-session', created_at: when }, ...notes];
     audit = [{ ...audit[0], id: crypto.randomUUID(), action: operation === 'status' ? 'status_changed' : operation === 'comments' ? 'comment_created' : 'note_created' }, ...audit];
     current = { ...current, version: current.version + 1 };
+    if (operation === 'status' && statusSteps === lostStatusResponse) return route.abort('failed');
     if (failAfterSave) failure = 503;
     return route.fulfill({ status: operation === 'status' ? 200 : 201, json: { request: item() } });
   });
@@ -230,11 +231,41 @@ test('interrupted status chain reloads saved state and retry continues without r
   expect(calls.filter(call => call.method === 'PATCH').map(call => [call.body.status, call.body.version])).toEqual([['reviewing',1],['in_progress',2],['in_progress',2],['completed',3]]);
 });
 
-test('cancelled requests display complete and cannot be reopened', async ({ page, context }) => {
-  await login(context, 'internal'); await mock(page, { initialStatus: 'cancelled' }); await openDetail(page, 'internal');
-  await expect(page.locator('.support-badge')).toHaveText('완료');
+for (const audience of ['customer', 'internal']) test(`cancelled request is distinguished in ${audience} list and detail and cannot be reopened`, async ({ page, context }) => {
+  await login(context, audience); await mock(page, { initialStatus: 'cancelled' });
+  await page.goto(audience === 'customer' ? '/customer-admin/support' : '/admin/support');
+  await expect(page.locator('.support-badge')).toHaveText('완료 · 취소');
+  await page.getByRole('button', { name: '요청 #6 상세 보기' }).click();
+  await expect(page.locator('.support-badge')).toHaveText('완료 · 취소');
   await expect(page.getByText('취소되어 종료된 문의입니다.')).toBeVisible();
   await expect(page.getByLabel('변경할 상태')).toHaveCount(0);
+});
+
+test('lost first status response reloads committed state before retry', async ({ page, context }) => {
+  await login(context, 'internal'); const calls = await mock(page, { lostStatusResponse: 1 }); await openDetail(page, 'internal');
+  await page.getByLabel('답변 내용').fill('보존할 답변');
+  await page.getByLabel('변경할 상태').selectOption('completed');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.getByText(/일부 변경이 저장됐을 수 있으니/)).toBeVisible();
+  await expect(page.locator('.support-badge')).toHaveText('처리 중');
+  await expect(page.getByLabel('답변 내용')).toHaveValue('보존할 답변');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.locator('.support-badge')).toHaveText('완료');
+  expect(calls.filter(call => call.method === 'PATCH').map(call => [call.body.status, call.body.version])).toEqual([['reviewing',1],['in_progress',2],['completed',3]]);
+});
+
+test('409 between status steps preserves reply and target until acknowledgement', async ({ page, context }) => {
+  await login(context, 'internal'); const calls = await mock(page, { conflictStatusStep: 2 }); await openDetail(page, 'internal');
+  await page.getByLabel('답변 내용').fill('충돌 후에도 보존할 답변');
+  await page.getByLabel('변경할 상태').selectOption('completed');
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.getByLabel('답변 내용')).toHaveValue('충돌 후에도 보존할 답변');
+  await expect(page.getByLabel('변경할 상태')).toHaveValue('completed');
+  await expect(page.getByRole('button', { name: '상태 변경', exact: true })).toBeDisabled();
+  await page.getByRole('button', { name: '최신 내용을 확인했습니다' }).click();
+  await page.getByRole('button', { name: '상태 변경', exact: true }).click();
+  await expect(page.locator('.support-badge')).toHaveText('완료');
+  expect(calls.filter(call => call.method === 'PATCH').map(call => [call.body.status, call.body.version])).toEqual([['reviewing',1],['in_progress',2],['completed',3]]);
 });
 
 test('attachment-disabled environment explains unavailable upload without attachment API calls', async ({ page, context }) => {
