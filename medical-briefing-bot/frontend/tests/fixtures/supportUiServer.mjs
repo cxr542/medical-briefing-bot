@@ -25,9 +25,9 @@ const env = { ...process.env, NODE_ENV: 'production', CUSTOMER_AUTH_FOUNDATION_E
 const build = spawn(process.execPath, ['node_modules/next/dist/bin/next', 'build', ...(process.env.SUPPORT_TEST_WEBPACK === '1' ? ['--webpack'] : [])], { stdio: 'inherit', env });
 const [code] = await once(build, 'exit');
 if (code !== 0) { auth.close(); process.exit(code || 1); }
-for (const [port, flag] of [[3027, 'true'], [3028, 'false']]) {
+for (const [port, flag, attachments] of [[3027, 'true', 'true'], [3028, 'false', 'false'], [3029, 'true', 'false']]) {
   apps.push(spawn(process.execPath, ['node_modules/next/dist/bin/next', 'start', '--hostname', '127.0.0.1', '--port', String(port)], {
-    stdio: 'inherit', env: { ...env, SUPPORT_ENABLED: flag, SUPPORT_ATTACHMENTS_ENABLED: flag },
+    stdio: 'inherit', env: { ...env, SUPPORT_ENABLED: flag, SUPPORT_ATTACHMENTS_ENABLED: attachments },
   }));
 }
 async function stop() {

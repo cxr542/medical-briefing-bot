@@ -1,10 +1,15 @@
 import Link from 'next/link';
 import { AlertCircle } from 'lucide-react';
-import { statusLabels, type SupportStatus, SupportClientError } from '@/lib/support/client';
+import { type SupportStatus, SupportClientError } from '@/lib/support/client';
+import { boardLabels, displayStatus } from '@/lib/support/board';
 import type { Audience } from '@/lib/support/contract';
 
 export function StatusBadge({ status }: { readonly status: SupportStatus }) {
-  return <span className={`support-badge support-status-${status}`}>{statusLabels[status]}</span>;
+  const group = displayStatus(status);
+  return <span className={`support-badge support-status-${group}`}>{boardLabels[group]}{status === 'cancelled' ? ' · 취소' : ''}</span>;
+}
+export function AttachmentUnavailable() {
+  return <p className="support-notice" role="note">첨부파일 업로드는 아직 사용할 수 없습니다. 현재 첨부 기능이 비활성화되어 제목과 내용만 등록할 수 있습니다.</p>;
 }
 export function SupportFailure({ error, audience, retry }: { readonly error: Error; readonly audience: Audience; readonly retry?: () => void }) {
   const auth = error instanceof SupportClientError && error.status === 401;

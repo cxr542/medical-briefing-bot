@@ -171,3 +171,17 @@ removal/unmount. Remote thumbnails load only from authenticated clean-image API
 responses. No unscanned remote image or public Storage link is rendered.
 Feature remains independently disabled until storage and a real scanner pass
 acceptance. Test clean results never substitute for production scanning.
+
+## 11. CSR board MVP
+
+Use the existing support surfaces as a simple list, compose dialog and detail
+with replies. The edu-team-tms CSR card is a structural reference only; keep
+this application's private attachments and authentication. Remove priority,
+internal notes and audit/history controls from this UI. Their API and DB remain.
+Reuse all existing spacing, audience colors, typography and accessible controls.
+Display received as 접수; reviewing/in_progress/waiting_customer/on_hold as
+처리 중; completed/cancelled as 완료. Cancelled requests remain terminal.
+Status changes follow the existing DB transition graph with version checks at
+each step. Interrupted changes reload the current state before another save.
+Show an explicit attachment-unavailable message when uploads are disabled.
+Replies alone determine detail pagination. Keep phone stacking and desktop rail.
