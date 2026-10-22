@@ -1,5 +1,26 @@
 [
   {
+    "id": "2026-10-16-pr-93",
+    "date": "2026.10.16",
+    "category": "기능",
+    "title": "고객 및 내부 관리자 기술지원 UI 추가",
+    "summary": "PR #93 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "고객 요청 등록·조회와 내부 답변·메모·상태 관리 UI를 추가했습니다.",
+      "운영 활성화는 별도 DB Migration과 검증 후 진행하며 현재는 비활성 상태를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #93",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/93"
+      }
+    ]
+  },
+  {
     "id": "2026-10-15-pr-87",
     "date": "2026.10.15",
     "category": "운영",
