@@ -1,0 +1,84 @@
+name: Frontend CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.scope.outputs.frontend }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Detect frontend changes
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git cat-file -e "$BASE_SHA^{commit}"
+          if git diff --quiet "$BASE_SHA" HEAD -- medical-briefing-bot/frontend/ .github/workflows/frontend-ci.yml; then
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          else
+            result=$?
+            if [ "$result" -ne 1 ]; then
+              exit "$result"
+            fi
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  frontend-checks:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: medical-briefing-bot/frontend
+    env:
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:43191
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: offline-qa-placeholder
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: medical-briefing-bot/frontend/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm run build
+      - run: npx tsc --noEmit
+      - run: npm run lint
+
+  frontend-ci:
+    if: always()
+    needs: [changes, frontend-checks]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require successful frontend validation when applicable
+        env:
+          SCOPE_RESULT: ${{ needs.changes.result }}
+          FRONTEND_CHANGED: ${{ needs.changes.outputs.frontend }}
+          CHECKS_RESULT: ${{ needs.frontend-checks.result }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$SCOPE_RESULT" != success ]; then
+            echo "Frontend change detection did not succeed."
+            exit 1
+          fi
+          case "$FRONTEND_CHANGED:$CHECKS_RESULT" in
+            true:success) echo "Frontend checks passed." ;;
+            false:skipped) echo "No frontend changes; checks are not required." ;;
+            *) echo "Required frontend validation did not succeed."; exit 1 ;;
+          esac

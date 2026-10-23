@@ -70,6 +70,10 @@ corners and 44px input height. A 44px right-hand button has reserved pr-12 input
 space, an action label, aria-controls, aria-pressed and a keyboard focus ring.
 The password starts masked and is masked again when login is submitted.
 The toggle preserves the typed value and never submits the form.
+Explicit reveal/hide replaces the input element while preserving its controlled
+value. This lets the visible text input accept Korean IME on Mac Chrome rather
+than inheriting the previous password element's secure-input history. Hidden
+mode remains a native password input. Typing itself never replaces the element.
 
 The shared-password dialog reuses the 44px `ca-input` and `ca-icon-button`
 primitives. Each password input reserves the existing `pr-12` spacing scale
