@@ -7,6 +7,7 @@ import re
 from typing import Optional
 
 from collector_lifecycle import find_absent_article_urls
+from collector_failure_diagnostics import hira_failure_fields
 from collector_detail_links import primary_article_payload, save_source_detail_urls
 from collector_keyword_boundary import KeywordBoundaryClient
 from collector_keyword_enrichment import SavedArticle, enrich_saved_article
@@ -496,7 +497,7 @@ def fetch_hira_biz_notices():
     articles_to_save = []
     
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright, Error as PlaywrightError
         import json
     except ImportError:
         raise RuntimeError("Playwright 라이브러리가 없습니다.")
@@ -537,6 +538,13 @@ def fetch_hira_biz_notices():
             try:
                 page.get_by_text('자보알림방', exact=True).first.click()
             except Exception as e:
+                diagnostic = {"source": "hira_biz", "stage": "auto_insurance_click",
+                              "exception_type": type(e).__name__}
+                try:
+                    diagnostic.update(hira_failure_fields(page))
+                except PlaywrightError as observation_error:
+                    diagnostic["observation_error_type"] = type(observation_error).__name__
+                print("HIRA navigation diagnostic: " + json.dumps(diagnostic, sort_keys=True))
                 raise RuntimeError(f"자보알림방 클릭 실패: {e}") from e
 
             # 클릭 뒤 첫 dsBoard 응답이 공지사항일 수 있으므로, 실제 자보알림방
