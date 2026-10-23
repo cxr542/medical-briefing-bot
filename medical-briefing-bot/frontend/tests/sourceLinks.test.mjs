@@ -40,6 +40,15 @@ test('KDCA mapping remains source-specific and rejects unsafe hosts and credenti
   }
 });
 
+test('legacy KDCA mappings never infer a detail from a similar or normalized title', () => {
+  for (const notice of kdcaNotices.slice(3)) {
+    assert.equal(resolveSourceLink(storedKdcaArticle({ title: `${notice.title} 수정` })).kind, 'institution');
+    assert.equal(resolveSourceLink({ ...storedKdcaArticle(notice), title: kdcaNotices[0].title }).kind, 'institution');
+  }
+  const doubleSpaceTitle = kdcaNotices.find(notice => notice.id === '312829').title;
+  assert.equal(resolveSourceLink(storedKdcaArticle({ title: doubleSpaceTitle.replace('  ', ' ') })).kind, 'institution');
+});
+
 test('KDCA related-link resolution preserves parent and related stored identities', () => {
   const related = Object.freeze(storedKdcaArticle(kdcaNotices[1]));
   const parent = Object.freeze({ source: '다른 기관', title: '통합 공지', url: 'https://example.org/article', related_links: Object.freeze([related]) });
