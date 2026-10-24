@@ -536,6 +536,10 @@ def fetch_hira_biz_notices():
             readiness["error"] = None
             before_count = len(articles_to_save)
             try:
+                inspection = page.locator('[id$="MainFrame_Inspect"]')
+                if inspection.is_visible():
+                    inspection.locator('[id$="_form_btn_close"]').click(timeout=5000)
+                    inspection.wait_for(state="hidden", timeout=5000)
                 page.get_by_text('자보알림방', exact=True).first.click()
             except Exception as e:
                 diagnostic = {"source": "hira_biz", "stage": "auto_insurance_click",
