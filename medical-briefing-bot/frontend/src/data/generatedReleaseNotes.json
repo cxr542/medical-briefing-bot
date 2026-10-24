@@ -1,5 +1,25 @@
 [
   {
+    "id": "2026-10-24-pr-107",
+    "date": "2026.10.24",
+    "category": "버그 수정",
+    "title": "심평원 자보알림방 수집 시 점검 안내 팝업 처리",
+    "summary": "PR #107 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "공개 포털의 점검 안내가 수집을 가로막으면 정상 닫기 버튼으로 처리한 후 게시판을 조회합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #107",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/107"
+      }
+    ]
+  },
+  {
     "id": "2026-10-23-pr-103",
     "date": "2026.10.23",
     "category": "운영",
