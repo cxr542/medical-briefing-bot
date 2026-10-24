@@ -105,6 +105,7 @@ before(async () => {
     cwd: FRONTEND,
     env: {
       ...process.env,
+      CUSTOMER_AUTH_ENFORCEMENT_ENABLED: 'false',
       NODE_ENV: 'development',
       ADMIN_PASSWORD: TEST_PASSWORD,
       SUPABASE_SERVICE_ROLE_KEY: TEST_SERVICE_ROLE_KEY,

@@ -1,11 +1,14 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { supabase } from '@/lib/supabase';
+import type { Article } from '@/lib/articleTypes';
+import { groupSourceCards } from '@/lib/sourceCardGroups';
+import { SourceLink } from './SourceLink';
+import { getArticleKeywords } from '@/lib/articleKeywords';
+import { formatDateKst, getDisplayedArticleStatus, getRecentNotices } from '@/lib/articleDisplay';
 import {
   COLLECTION_DISPLAY_SCHEDULE_KST,
   COLLECTION_RUNTIME_SCHEDULE_KST,
-  getCollectionCutoffIso,
   getKstDateKey,
   getLatestCollectionRuntimeTime,
   shiftKstDate,
@@ -16,30 +19,10 @@ import {
   formatMedicalPressDateKst,
   getLastSevenCalendarDaysStartIso,
   MEDICAL_PRESS_PAGE_SIZE,
-  MEDICAL_PRESS_SOURCES,
   type MedicalPressRange,
 } from '@/lib/medicalPress';
 
 import { ExternalLink, Layers, Download, Printer, ChevronLeft, ChevronRight, Star, Megaphone, FileText, Building2, Calendar, X, Search } from 'lucide-react';
-
-interface RelatedLink {
-  title: string;
-  url: string;
-  source: string;
-}
-
-interface Article {
-  id: number;
-  source: string;
-  title: string;
-  url: string;
-  published_date: string;
-  status: string;
-  category?: string;
-  keywords?: string;
-  is_merged?: boolean;
-  related_links?: RelatedLink[];
-}
 
 interface BriefingAnalysis {
   category: string;
@@ -55,14 +38,6 @@ const KNOWN_SOURCES = [
 
 const PRESS_SOURCES: readonly string[] = ['메디게이트뉴스', '데일리메디', '메디컬타임즈', '청년의사', '의협신문', '의학신문', '보건신문'];
 
-
-const formatLocalYYYYMMDD = (dateStr: string | Date | number) => {
-  const d = new Date(dateStr);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${yyyy}-${mm}-${dd}`;
-};
 
 export default function ArticleList({
   initialArticles,
@@ -100,41 +75,23 @@ export default function ArticleList({
 
   // 선택된 날짜와 시간, 검색어에 맞춰 동적으로 데이터 페칭 (서버 사이드 필터링)
   useEffect(() => {
+    const controller=new AbortController();
     const fetchData = async () => {
       setIsLoading(true);
-      let query = supabase.from('articles').select('*').neq('status', 'DELETED').order('published_date', { ascending: false });
+      try {
+        const params=new URLSearchParams({date:selectedDate,time:selectedTime,search:searchTerm,group:medicalPressGroupActive?'medical':'notice',range:medicalPressRange});
+        const response=await fetch(`/api/articles?${params}`,{cache:'no-store',signal:controller.signal});
+        if(response.status===401){setArticles([]);window.location.replace('/login');return;}
+        if(response.ok){const body=await response.json();if(!controller.signal.aborted)setArticles(body.articles as Article[]);}
+      } catch { /* Cancellation keeps the current results. */ }
 
-      if (medicalPressGroupActive) {
-         const now = new Date();
-         query = query.in('source', [...MEDICAL_PRESS_SOURCES]).lte('published_date', now.toISOString());
-         if (medicalPressRange === 'last-seven-days') {
-           query = query.gte('published_date', getLastSevenCalendarDaysStartIso(now));
-         }
-         if (searchTerm.trim()) {
-           const term = searchTerm.trim();
-           query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
-         }
-         query = query.limit(500);
-      } else if (searchTerm.trim()) {
-         const term = searchTerm.trim();
-         query = query.or(`title.ilike.%${term}%,category.ilike.%${term}%,keywords.ilike.%${term}%`);
-         query = query.limit(500);
-      } else {
-         query = query.lte('published_date', getCollectionCutoffIso(selectedDate, selectedTime));
-         query = query.limit(500);
-      }
-      
-      const { data, error } = await query;
-      if (!error && data) {
-         setArticles(data as Article[]);
-      }
       setIsLoading(false);
     };
 
     const timer = setTimeout(() => {
       fetchData();
     }, 300); // 300ms 디바운스
-    return () => clearTimeout(timer);
+    return () => {clearTimeout(timer);controller.abort();};
   }, [selectedDate, selectedTime, searchTerm, medicalPressGroupActive, medicalPressRange]);
 
   // timeFilteredArticles는 이제 백엔드에서 필터링되어 온 articles를 그대로 사용하되, 검색어 입력 시 미래 데이터도 포함되도록 허용
@@ -145,6 +102,7 @@ export default function ArticleList({
     const combined = Array.from(new Set([...KNOWN_SOURCES, ...dbSources]));
     return combined.sort();
   }, [articles]);
+  const sourceCardGroups = useMemo(() => groupSourceCards(allSources), [allSources]);
   const [selectedSources, setSelectedSources] = useState<string[]>(() => allSources.filter(s => s !== '국가법령정보센터'));
   const [showStatusTooltip, setShowStatusTooltip] = useState(false);
   const [showAllNotices, setShowAllNotices] = useState(false);
@@ -175,13 +133,10 @@ export default function ArticleList({
   );
 
   // 1. 7일 이내 주요 공지 (선택한 날짜 기준 7일 필터링)
-  const recentNotices = useMemo(() => {
-    const targetEndKst = new Date(`${selectedDate}T23:59:59+09:00`);
-    const sevenDaysAgo = new Date(targetEndKst);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    sevenDaysAgo.setHours(0, 0, 0, 0);
-    return publicArticles.filter(a => new Date(a.published_date) >= sevenDaysAgo);
-  }, [publicArticles, selectedDate]);
+  const recentNotices = useMemo(
+    () => getRecentNotices(publicArticles, selectedDate, selectedTime),
+    [publicArticles, selectedDate, selectedTime],
+  );
   
   const topNotices = [...recentNotices].sort((a, b) => new Date(b.published_date).getTime() - new Date(a.published_date).getTime());
   
@@ -224,14 +179,14 @@ export default function ArticleList({
     let csvContent = "상태,출처,발행일,제목,URL\n";
     filteredInitialArticles.forEach(a => {
       const title = `"${a.title.replace(/"/g, '""')}"`;
-      const date = formatLocalYYYYMMDD(a.published_date);
-      csvContent += `${a.status},"${a.source}",${date},${title},"${a.url}"\n`;
+      const date = formatDateKst(a.published_date);
+      csvContent += `${getDisplayedArticleStatus(a, selectedDate)},"${a.source}",${date},${title},"${a.url}"\n`;
     });
     const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `의료브리핑_${formatLocalYYYYMMDD(new Date())}.csv`;
+    link.download = `의료브리핑_${formatDateKst(new Date())}.csv`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -291,15 +246,15 @@ export default function ArticleList({
           <ul className="space-y-4">
             {articles.slice(0, 3).map(article => (
               <li key={article.id} className="group">
-                <a href={article.url} target="_blank" rel="noopener noreferrer" className="block" title={article.title}>
-                  <div className={`text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
+                <SourceLink article={article} className="block">
+                  <span className={`block text-sm font-medium text-gray-700 group-hover:underline truncate ${theme.groupHoverText}`}>
                     <span className={`text-sm mr-1.5 ${theme.bullet}`}>•</span>
                     {article.title}
-                  </div>
-                  <div className="text-[11px] text-gray-400 mt-1 ml-3 font-medium">
-                    {formatLocalYYYYMMDD(article.published_date)}
-                  </div>
-                </a>
+                  </span>
+                  <span className="block text-[11px] text-gray-400 mt-1 ml-3 font-medium">
+                    {formatDateKst(article.published_date)}
+                  </span>
+                </SourceLink>
               </li>
             ))}
           </ul>
@@ -329,7 +284,7 @@ export default function ArticleList({
   }, [initialArticles]);
 
   const analyzeArticle = (article: Article): BriefingAnalysis => {
-    // AI가 추출한 진짜 카테고리와 키워드가 DB에 있다면 우선 사용
+    const keywords = getArticleKeywords(article);
     if (article.category || article.keywords) {
       let categoryClassName = "bg-gray-100 text-gray-700";
       const cat = article.category || "일반공지";
@@ -341,52 +296,11 @@ export default function ArticleList({
       return {
         category: cat,
         categoryClassName,
-        keywords: article.keywords || ""
+        keywords,
       };
     }
 
-    const text = `${article.source} ${article.title}`;
-    const matchedKeywords = [
-      ['의료질평가', ['의료질평가', '지표', '정정신청']],
-      ['적정성평가', ['적정성평가', '평가지표', '요양기관']],
-      ['평가', ['평가', '지표', '결과']],
-      ['수가', ['수가', '건강보험', '급여']],
-      ['급여', ['급여기준', '청구', '건강보험']],
-      ['심사', ['심사기준', '청구', '심평원']],
-      ['개인정보', ['개인정보', '제3자 제공', '공개내역']],
-      ['자동이체', ['보험료', '자동이체', '납부']],
-      ['검진', ['검진기관', '장비현황', '건강검진']],
-      ['공모', ['공모', '신청', '마감']],
-      ['교육', ['교육', '안내', '참여']],
-      ['설명회', ['설명회', '정책안내', '참여']],
-      ['시스템', ['시스템', '점검', '업무중단']],
-      ['법률', ['법령', '개정', '시행']],
-      ['법령', ['법령', '개정', '시행']],
-      ['의료법', ['의료법', '개정', '의료기관']],
-      ['연명의료', ['연명의료', '계획서', '입법']],
-      ['환자안전', ['환자안전', '자율규제', '의료계']],
-      ['의료기사', ['의료기사법', '원격지도', '쟁점']],
-      ['당뇨병', ['당뇨병', 'CGM', '급여확대']],
-      ['보직', ['기관인사', '임원', '공백']],
-      ['임명', ['기관인사', '임명', '보직']],
-    ] as const;
-
-    const keywordSet = new Set<string>();
-    matchedKeywords.forEach(([needle, keywords]) => {
-      if (text.includes(needle)) {
-        keywords.forEach(keyword => keywordSet.add(keyword));
-      }
-    });
-
-    if (keywordSet.size === 0) {
-      if (article.source.includes('국가법령')) {
-        ['법령', '보건의료', '제도'].forEach(keyword => keywordSet.add(keyword));
-      } else if (PRESS_SOURCES.includes(article.source)) {
-        ['의료계', '정책동향', '뉴스'].forEach(keyword => keywordSet.add(keyword));
-      } else {
-        ['공지', '기관안내', '확인필요'].forEach(keyword => keywordSet.add(keyword));
-      }
-    }
+    const text = article.title;
 
     let category = '일반공지';
     let categoryClassName = 'text-gray-600 border-gray-200 bg-gray-50';
@@ -413,7 +327,7 @@ export default function ArticleList({
     return {
       category: article.category || category,
       categoryClassName,
-      keywords: article.keywords || Array.from(keywordSet).slice(0, 3).join(', '),
+      keywords,
     };
   };
 
@@ -462,6 +376,9 @@ export default function ArticleList({
             placeholder="기사 제목, 키워드 검색..."
             value={searchTerm}
             onChange={(e) => {
+              // Search can shrink the major-notice result set below the current page.
+              // Reset both paginated views so a matching result never renders as an empty table.
+              setCurrentPage(1);
               setMedicalPressPage(1);
               setSearchTerm(e.target.value);
             }}
@@ -506,8 +423,15 @@ export default function ArticleList({
       </div>
 
       {/* 0. 기관별 수집 건수 요약 대시보드 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 print:hidden">
-        {allSources.map(source => {
+      <div className="space-y-6 print:hidden" aria-label="출처별 수집 건수">
+        {sourceCardGroups.map(group => (
+          <section key={group.id} aria-labelledby={`source-cards-${group.id}`}>
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <h3 id={`source-cards-${group.id}`} className="font-bold text-[#191919]">{group.title}</h3>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{group.sources.length}개 출처</span>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        {group.sources.map(source => {
           const count = sourceCounts[source] || 0;
           // 이 카드 하나만 단독으로 선택되어 있는지 확인
           const isSelected = selectedSources.length === 1 && selectedSources[0] === source;
@@ -541,6 +465,9 @@ export default function ArticleList({
             </button>
           );
         })}
+            </div>
+          </section>
+        ))}
       </div>
 
       {/* 메인 콘텐츠 영역 */}
@@ -623,13 +550,13 @@ export default function ArticleList({
                           <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#1D4ED8]">{article.source}</span>
                           <time dateTime={article.published_date} className="text-xs font-medium text-slate-500">{formatMedicalPressDateKst(article.published_date)}</time>
                         </div>
-                        <a href={article.url} target="_blank" rel="noopener noreferrer" className="break-keep text-base font-bold leading-6 text-[#191919] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                        <SourceLink article={article} className="break-keep text-base font-bold leading-6 text-[#191919] hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
                           {article.title}
-                        </a>
+                        </SourceLink>
                       </div>
-                      <a href={article.url} target="_blank" rel="noopener noreferrer" aria-label={`${article.source} 원문 열기`} className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
+                      <SourceLink article={article} className="inline-flex min-h-11 w-fit shrink-0 items-center gap-2 rounded-full bg-slate-100 px-4 text-sm font-semibold text-slate-700 transition-colors hover:bg-blue-50 hover:text-[#1D4ED8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1D4ED8]">
                         원문 보기 <ExternalLink className="h-4 w-4" />
-                      </a>
+                      </SourceLink>
                     </article>
                   ))}
                 </div>
@@ -676,10 +603,10 @@ export default function ArticleList({
                             <div className="absolute top-10 left-4 z-50 w-64 p-3 bg-white border border-gray-200 shadow-lg rounded-lg text-xs font-normal text-gray-700 animate-in fade-in zoom-in-95">
                               <p className="font-bold text-[#5C2D0C] mb-2 border-b pb-1">데이터 상태 안내</p>
                               <ul className="space-y-1.5">
-                                <li><span className="inline-block w-12 font-bold text-red-600">NEW</span>: 오늘 새로 수집된 기사</li>
-                                <li><span className="inline-block w-12 font-bold text-yellow-600">UPDATE</span>: 내용이 수정되거나 통합된 기사</li>
-                                <li><span className="inline-block w-12 font-bold text-gray-500 line-through">DELETED</span>: 원본 사이트에서 삭제된 기사</li>
-                                <li><span className="inline-block w-12 font-bold text-gray-600">유지</span>: 내용 변경 없이 어제와 동일한 기사</li>
+                                <li><span className="inline-block w-12 font-bold text-red-600">NEW</span>: 선택한 날짜(KST)에 처음 수집·저장된 기사 중 신규 상태인 기사</li>
+                                <li><span className="inline-block w-12 font-bold text-yellow-600">UPDATE</span>: 수집 과정에서 내용·분류·키워드·통합 여부의 변경이 감지된 기사 (변경일 기준 아님)</li>
+                                <li><span className="inline-block w-12 font-bold text-gray-500 line-through">DELETED</span>: 수집 목록에서 누락되어 삭제 상태로 분류된 기사 (목록에서 제외)</li>
+                                <li><span className="inline-block w-12 font-bold text-gray-600">유지</span>: 신규 상태이지만 선택한 날짜의 최초 수집·저장이 확인되지 않는 기사</li>
                               </ul>
                             </div>
                           )}
@@ -695,29 +622,30 @@ export default function ArticleList({
                     <tbody className="divide-y divide-gray-100 bg-white">
                       {currentNotices.map((article) => {
                         const isDeleted = article.status === 'DELETED';
+                        const displayStatus = getDisplayedArticleStatus(article, selectedDate);
                         const analysis = analyzeArticle(article);
 
                         return (
                           <tr key={article.id} className={`hover:bg-gray-50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
                             <td className="px-4 py-4 align-middle whitespace-nowrap">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                                article.status === 'NEW' ? 'text-red-500 border border-red-200' : 
+                                displayStatus === 'NEW' ? 'text-red-500 border border-red-200' :
                                 article.status === 'UPDATE' ? 'text-yellow-600 border border-yellow-200' :
                                 article.status === 'DELETED' ? 'text-gray-500 border border-gray-200 line-through' :
                                 'text-gray-500 border border-gray-200'
                               }`}>
-                                {article.status}
+                                {displayStatus}
                               </span>
                               {article.is_merged && (
                                 <span className="block mt-1 text-[10px] text-blue-600 font-semibold">↳ AI 통합됨</span>
                               )}
                             </td>
                             <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
-                              {formatLocalYYYYMMDD(article.published_date)}
+                              {formatDateKst(article.published_date)}
                             </td>
                             <td className="px-4 py-4 align-middle font-medium text-gray-700">{article.source}</td>
                             <td className="px-4 py-4 align-middle">
-                              <span className={`text-gray-800 font-medium ${isDeleted ? 'line-through' : ''}`}>
+                              <span className={`break-keep text-gray-800 font-medium ${isDeleted ? 'line-through' : ''}`}>
                                 {article.title}
                               </span>
                               {article.is_merged && article.related_links && article.related_links.length > 0 && (
@@ -725,9 +653,9 @@ export default function ArticleList({
                                   <ul className="space-y-1">
                                     {article.related_links.map((link, idx) => (
                                       <li key={idx}>
-                                        <a href={link.url} target="_blank" rel="noopener noreferrer" className="text-xs text-gray-500 hover:text-[#C05A12] flex items-center gap-1">
+                                        <SourceLink article={link} className="text-xs text-gray-500 hover:text-[#C05A12] flex items-center gap-1">
                                           <span className="font-semibold">[{link.source}]</span>{link.title}
-                                        </a>
+                                        </SourceLink>
                                       </li>
                                     ))}
                                   </ul>
@@ -743,9 +671,7 @@ export default function ArticleList({
                               {analysis.keywords}
                             </td>
                             <td className="px-4 py-4 align-middle text-center whitespace-nowrap">
-                              <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 transition-colors p-2 rounded-lg shadow-sm border border-blue-100" title="원문 바로가기">
-                                <ExternalLink className="w-4 h-4" />
-                              </a>
+                              <SourceLink article={article} variant="icon" />
                             </td>
                           </tr>
                         );
@@ -858,24 +784,25 @@ export default function ArticleList({
                 <tbody className="divide-y divide-gray-100 bg-white">
                   {currentModalArticles.map((article) => {
                     const isDeleted = article.status === 'DELETED';
+                    const displayStatus = getDisplayedArticleStatus(article, selectedDate);
                     const analysis = analyzeArticle(article);
                     return (
                       <tr key={article.id} className={`hover:bg-gray-50 transition-colors ${isDeleted ? 'opacity-50' : ''}`}>
                         <td className="px-4 py-4 align-middle whitespace-nowrap">
                           <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold ${
-                            article.status === 'NEW' ? 'text-red-500 border border-red-200' : 
+                            displayStatus === 'NEW' ? 'text-red-500 border border-red-200' :
                             article.status === 'UPDATE' ? 'text-yellow-600 border border-yellow-200' :
                             article.status === 'DELETED' ? 'text-gray-500 border border-gray-200 line-through' :
                             'text-gray-500 border border-gray-200'
                           }`}>
-                            {article.status}
+                            {displayStatus}
                           </span>
                         </td>
                         <td className="px-4 py-4 align-middle text-gray-600 text-center text-sm font-medium whitespace-nowrap">
-                          {formatLocalYYYYMMDD(article.published_date)}
+                          {formatDateKst(article.published_date)}
                         </td>
                         <td className="px-4 py-4 align-middle">
-                          <div className={`text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
+                          <div className={`break-keep text-base font-bold text-gray-800 ${isDeleted ? 'line-through' : ''}`}>
                             {article.title}
                           </div>
                         </td>
@@ -888,9 +815,7 @@ export default function ArticleList({
                           {analysis.keywords}
                         </td>
                         <td className="px-4 py-4 align-middle text-center">
-                          <a href={article.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center justify-center p-2 text-blue-500 bg-blue-50 rounded hover:bg-blue-100 transition-colors group">
-                            <ExternalLink className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                          </a>
+                          <SourceLink article={article} variant="icon" />
                         </td>
                       </tr>
                     );

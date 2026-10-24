@@ -1,0 +1,19 @@
+.customer-admin .ca-card { border: 1px solid #e8edf4; border-radius: 1.25rem; background: white; padding: 1.5rem; box-shadow: 0 3px 18px rgb(15 23 42 / 3%); }
+.customer-admin .ca-card-title { display: flex; align-items: center; gap: .625rem; font-size: 1.125rem; font-weight: 700; }
+.customer-admin .ca-primary, .customer-admin .ca-secondary, .customer-admin .ca-icon-button, .customer-admin .ca-text-button { display: inline-flex; align-items: center; justify-content: center; gap: .5rem; min-height: 44px; border-radius: .65rem; font-size: .875rem; font-weight: 600; cursor: pointer; transition: background-color .15s; }
+.customer-admin .ca-primary { background: #2563eb; color: white; padding: .625rem 1rem; }
+.customer-admin .ca-primary:hover { background: #1d4ed8; }
+.customer-admin .ca-secondary { border: 1px solid #e2e8f0; background: white; color: #475569; padding: .625rem 1rem; }
+.customer-admin .ca-secondary:hover, .customer-admin .ca-icon-button:hover { background: #f1f5f9; }
+.customer-admin .ca-icon-button { min-width: 44px; color: #64748b; }
+.customer-admin .ca-text-button { color: #64748b; font-size: .75rem; }
+.customer-admin .ca-text-button:hover { color: #1d4ed8; }
+.customer-admin button:focus-visible, .customer-admin input:focus-visible, .customer-admin textarea:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.customer-admin nav a:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+.customer-admin button:disabled { opacity: .35; cursor: not-allowed; }
+.customer-admin .ca-input { width: 100%; min-height: 44px; border: 1px solid #dbe2ea; border-radius: .65rem; background: white; padding: .625rem .75rem; font-size: .875rem; color: #334155; }
+.customer-admin .ca-input.pl-10 { padding-left: 2.5rem; }
+.customer-admin .ca-input.pr-12 { padding-right: 3rem; }
+.customer-admin .ca-label { display: block; margin-bottom: .5rem; font-size: .875rem; font-weight: 600; }
+@media (max-width: 639px) { .customer-admin .ca-card { padding: 1.125rem; } }
+@media (prefers-reduced-motion: reduce) { .customer-admin button { transition: none; } }

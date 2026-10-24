@@ -2,77 +2,79 @@ name: Auto release note
 
 on:
   pull_request_target:
+    branches: [main]
     types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Source PR number to retry (leave empty when reconciling)
+        type: string
+        required: false
+      since:
+        description: Reconcile merged PRs since UTC timestamp YYYY-MM-DDTHH:MM:SSZ
+        type: string
+        required: false
+      dry_run:
+        description: Read metadata only; do not create branches or PRs
+        type: boolean
+        default: true
 
 permissions:
   contents: write
+  pull-requests: write
+
+concurrency:
+  group: release-note-pr-generation
+  cancel-in-progress: false
 
 jobs:
   append-release-note:
-    if: >
-      github.event.pull_request.merged == true &&
-      contains(github.event.pull_request.labels.*.name, 'release-note')
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+      contains(github.event.pull_request.labels.*.name, 'release-note') &&
+      !startsWith(github.event.pull_request.head.ref, 'automation/release-note/pr-')))
     runs-on: ubuntu-latest
-    concurrency:
-      group: release-notes-main
-      cancel-in-progress: false
+    timeout-minutes: 10
     steps:
+      # Never check out or execute a pull_request_target head or PR artifact.
       - uses: actions/checkout@v4
         with:
           ref: main
-          fetch-depth: 0
-
-      - name: Append release note
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate or reconcile release note PRs
+        uses: actions/github-script@v7
         env:
-          PR_BODY: ${{ github.event.pull_request.body }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_URL: ${{ github.event.pull_request.html_url }}
-          MERGED_AT: ${{ github.event.pull_request.merged_at }}
-        run: |
-          python - <<'PY'
-          import json, os, re
-          from pathlib import Path
-          body = os.environ.get("PR_BODY", "")
-          match = re.search(r"^## Release Note\s*$([\s\S]*?)(?=^## |\Z)", body, re.M)
-          if not match:
-              raise SystemExit("Release Note section not found")
-          section = match.group(1).strip()
-          category = re.search(r"^Category:\s*(.+)$", section, re.M)
-          title = re.search(r"^Title:\s*(.+)$", section, re.M)
-          if not category or not title:
-              raise SystemExit("Category/Title missing")
-          bullets = [re.sub(r"^-\s*", "", line).strip() for line in section.splitlines() if line.strip().startswith("- ")]
-          date = os.environ["MERGED_AT"][:10].replace("-", ".")
-          pr = int(os.environ["PR_NUMBER"])
-          item = {
-              "id": f"{date.replace('.', '-')}-pr-{pr}",
-              "date": date,
-              "category": category.group(1).strip(),
-              "title": title.group(1).strip(),
-              "summary": f"PR #{pr} merge로 반영된 변경입니다.",
-              "issues": [],
-              "changes": bullets or ["PR의 Release Note 메타데이터로 자동 등록"],
-              "verification": ["PR merge 완료"],
-              "links": [{"label": f"PR #{pr}", "url": os.environ["PR_URL"]}],
-          }
-          out = Path("medical-briefing-bot/frontend/src/data/generatedReleaseNotes.json")
-          existing = json.loads(out.read_text()) if out.exists() else []
-          if any(x.get("id") == item["id"] for x in existing):
-              print("already exists")
-              raise SystemExit(0)
-          existing.insert(0, item)
-          out.write_text(json.dumps(existing, ensure_ascii=False, indent=2) + "\n")
-          PY
-
-      - name: Commit generated release note
-        run: |
-          if git diff --quiet; then
-            echo "No release note changes"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add medical-briefing-bot/frontend/src/data/generatedReleaseNotes.json
-          git commit -m "docs: add release note for PR #${{ github.event.pull_request.number }}"
-          git pull --rebase origin main
-          git push origin HEAD:main
+          SOURCE_PR_NUMBER: ${{ inputs.pr_number }}
+          RECONCILE_SINCE: ${{ inputs.since }}
+          RELEASE_DRY_RUN: ${{ inputs.dry_run }}
+        with:
+          script: |
+            const { pathToFileURL } = require('node:url');
+            const { generateNotePR, reconcile } = await import(pathToFileURL(`${process.env.GITHUB_WORKSPACE}/medical-briefing-bot/scripts/release-note-automation.mjs`).href);
+            const repository = `${context.repo.owner}/${context.repo.repo}`;
+            try {
+              let results;
+              if (context.eventName === 'pull_request_target') {
+                results = [await generateNotePR({ github, repository, number: context.payload.pull_request.number, dryRun: false })];
+              } else {
+                const rawNumber = process.env.SOURCE_PR_NUMBER || '';
+                const since = process.env.RECONCILE_SINCE || '';
+                if (Boolean(rawNumber) === Boolean(since)) throw new Error('Choose exactly one source PR number or cutover timestamp.');
+                if (rawNumber && !/^[1-9]\d*$/.test(rawNumber)) throw new Error('Invalid source PR number.');
+                const dryRun = process.env.RELEASE_DRY_RUN !== 'false';
+                results = rawNumber
+                  ? [await generateNotePR({ github, repository, number: Number(rawNumber), dryRun })]
+                  : await reconcile({ github, repository, since, dryRun });
+              }
+              // Never print API exception bodies, tokens, PR bodies, or request headers.
+              for (const result of results) core.info(JSON.stringify(result));
+              if (results.some(result => result.status === 'needs-review')) core.setFailed('Some source PRs need operator review.');
+            } catch (error) {
+              if (error.code === 'NEEDS_REVIEW') core.info('NEEDS REVIEW: source/branch state requires operator inspection; no reset or overwrite attempted.');
+              core.setFailed('Release note generation stopped safely. Inspect source metadata and branch state; retry without resetting branches.');
+            }

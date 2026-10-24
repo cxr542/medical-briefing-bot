@@ -4,14 +4,23 @@ import os
 import time
 from urllib.parse import urlparse
 import re
+from typing import Optional
 
+from collector_lifecycle import find_absent_article_urls
+from collector_failure_diagnostics import hira_failure_fields
+from collector_detail_links import primary_article_payload, save_source_detail_urls
+from collector_keyword_boundary import KeywordBoundaryClient
+from collector_keyword_enrichment import SavedArticle, enrich_saved_article
+from keyword_boundary_contract import Metadata
 import feedparser
 import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from postgrest.exceptions import APIError
+from httpx import HTTPError
 from collector_sources.comwel import source_collection_diagnostics
-from collector_sources.dailymedi import fetch_dailymedi_articles
+from collector_sources.dailymedi import DailyMediCollection, fetch_dailymedi_articles
 from collector_sources.medigate import (
     ENDPOINT as MEDIGATE_DATE_ENDPOINT,
     MedigateArticleRecord,
@@ -33,7 +42,6 @@ load_dotenv()
 
 url: str = os.environ.get("SUPABASE_URL")
 key: str = os.environ.get("SUPABASE_KEY")
-law_api_key: str = os.environ.get("LAW_API_KEY", "yhkimBriefing2026") # 사용자가 발급받은 키
 
 supabase: Client = create_client(url, key)
 
@@ -87,6 +95,7 @@ def get_with_transient_retry(
     headers=None,
     verify: bool = True,
     allow_redirects: bool = True,
+    params: Optional[dict[str, str]] = None,
     sleep_fn=time.sleep,
 ):
     # 정부기관 사이트는 GitHub Actions 구간에서 일시적인 connect timeout이 종종 발생합니다.
@@ -94,13 +103,23 @@ def get_with_transient_retry(
     backoffs = (3, 8, 15)
     for attempt in range(1, 5):
         try:
-            response = requests.get(
-                url,
-                headers=headers,
-                timeout=timeout,
-                verify=verify,
-                allow_redirects=allow_redirects,
-            )
+            if params is None:
+                response = requests.get(
+                    url,
+                    headers=headers,
+                    timeout=timeout,
+                    verify=verify,
+                    allow_redirects=allow_redirects,
+                )
+            else:
+                response = requests.get(
+                    url,
+                    params=params,
+                    headers=headers,
+                    timeout=timeout,
+                    verify=verify,
+                    allow_redirects=allow_redirects,
+                )
             if attempt > 1:
                 print(f"✅ Recovered after retry: source={source_name} attempt={attempt}/4")
             return response
@@ -343,38 +362,77 @@ def fetch_kha_notices():
     return articles_to_save
 
 # 3. 국가법령정보센터 오픈 API
+class LawApiError(RuntimeError):
+    pass
+
 def fetch_law_api():
     source_name = "국가법령정보센터"
     print(f"🔄 오픈 API 수집: {source_name}")
     articles_to_save = []
-    
+
+    api_key = os.environ.get("LAW_API_KEY")
+    if not api_key or not api_key.strip():
+        raise LawApiError("LAW_API_KEY is not configured")
+
     try:
-        # 최근 제정/개정된 의료법 등을 검색
-        url = f"https://www.law.go.kr/DRF/lawSearch.do?OC={law_api_key}&target=law&type=JSON&query=의료법"
-        headers = {'Referer': 'https://medical-briefing-bot.vercel.app'} # Referer 검증 통과용
         response = get_with_transient_retry(
-            url, source_name=source_name, headers=headers, timeout=10
+            "https://www.law.go.kr/DRF/lawSearch.do",
+            source_name=source_name,
+            headers={"Referer": "https://medical-briefing-bot.vercel.app"},
+            timeout=10,
+            params={
+                "OC": api_key,
+                "target": "law",
+                "type": "JSON",
+                "query": "의료법",
+            },
         )
-        if response.status_code != 200:
-            raise ValueError(f"국가법령정보센터 API HTTP 오류: status={response.status_code}")
+    except requests.exceptions.RequestException as error:
+        raise LawApiError(
+            f"LAW API request failed: {type(error).__name__}"
+        ) from None
+
+    if response.status_code != 200:
+        raise LawApiError(
+            f"LAW API returned HTTP status {response.status_code}"
+        )
+
+    try:
         data = response.json()
-        # 데이터 추출 (LawSearch > law 객체 배열)
-        if "LawSearch" in data and "law" in data["LawSearch"]:
-            for law in data["LawSearch"]["law"]:
-                articles_to_save.append({
-                    "source": source_name,
-                    "title": f"[법령] {law.get('법령명한글', '의료법')}",
-                    "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law.get('법령일련번호')}",
-                    "published_date": datetime.now(timezone.utc).isoformat(),
-                    "content_hash": get_content_hash(law.get('법령일련번호', '0')),
-                    "status": "NEW"
-                })
-        else:
-            raise ValueError("국가법령정보센터 API 응답에 LawSearch.law가 없습니다")
-    except Exception as e:
-        print(f"API 에러 ({source_name}): {e}")
-        raise
-        
+    except ValueError:
+        raise LawApiError("LAW API returned invalid JSON") from None
+
+    if not isinstance(data, dict):
+        raise LawApiError("LAW API returned an unexpected response")
+    if data.get("error") or data.get("errors"):
+        raise LawApiError("LAW API returned an error response")
+    law_search = data.get("LawSearch")
+    if not isinstance(law_search, dict):
+        raise LawApiError("LAW API returned an unexpected response")
+    if law_search.get("error") or law_search.get("errors"):
+        raise LawApiError("LAW API returned an error response")
+    laws = law_search.get("law")
+    if not isinstance(laws, list):
+        raise LawApiError("LAW API returned an unexpected response")
+
+    for law in laws:
+        if not isinstance(law, dict):
+            raise LawApiError("LAW API returned an invalid law record")
+        title = law.get("법령명한글")
+        law_id = law.get("법령일련번호")
+        if not isinstance(title, str) or not title.strip():
+            raise LawApiError("LAW API returned an invalid law record")
+        if law_id is None or not str(law_id).strip():
+            raise LawApiError("LAW API returned an invalid law record")
+        articles_to_save.append({
+            "source": source_name,
+            "title": f"[법령] {title}",
+            "url": f"https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq={law_id}",
+            "published_date": datetime.now(timezone.utc).isoformat(),
+            "content_hash": get_content_hash(str(law_id)),
+            "status": "NEW"
+        })
+
     return articles_to_save
 
 import urllib3
@@ -439,7 +497,7 @@ def fetch_hira_biz_notices():
     articles_to_save = []
     
     try:
-        from playwright.sync_api import sync_playwright
+        from playwright.sync_api import sync_playwright, Error as PlaywrightError
         import json
     except ImportError:
         raise RuntimeError("Playwright 라이브러리가 없습니다.")
@@ -480,6 +538,13 @@ def fetch_hira_biz_notices():
             try:
                 page.get_by_text('자보알림방', exact=True).first.click()
             except Exception as e:
+                diagnostic = {"source": "hira_biz", "stage": "auto_insurance_click",
+                              "exception_type": type(e).__name__}
+                try:
+                    diagnostic.update(hira_failure_fields(page))
+                except PlaywrightError as observation_error:
+                    diagnostic["observation_error_type"] = type(observation_error).__name__
+                print("HIRA navigation diagnostic: " + json.dumps(diagnostic, sort_keys=True))
                 raise RuntimeError(f"자보알림방 클릭 실패: {e}") from e
 
             # 클릭 뒤 첫 dsBoard 응답이 공지사항일 수 있으므로, 실제 자보알림방
@@ -597,7 +662,7 @@ def fetch_nhis_public_notices():
     return articles_to_save
 
 
-def track_states(new_articles: list, supabase: Client):
+def track_states(new_articles: list, supabase: Client, incomplete_sources=None, *, detail_snapshots=None):
     """
     기존 DB 데이터와 비교하여 NEW, UPDATE, DELETED 상태를 판별합니다.
     """
@@ -612,19 +677,18 @@ def track_states(new_articles: list, supabase: Client):
         print(f"DB 데이터 조회 실패: {e}")
         db_articles = []
 
+    if detail_snapshots is not None:
+        detail_snapshots.extend(dict(article) for article in db_articles)
+
     # url을 키로 하는 딕셔너리로 변환
     db_dict = {a['url']: a for a in db_articles}
+    incomplete_sources = incomplete_sources or set()
     
     final_articles_to_upsert = []
     
-    # 이번에 수집(AI가 통합)한 기사들의 URL 목록
-    new_urls = set()
-
     # 2. 신규(NEW) 및 수정(UPDATE) 판별
     for new_art in new_articles:
         url = new_art['url']
-        new_urls.add(url)
-        
         if url not in db_dict:
             new_art['status'] = 'NEW'
             final_articles_to_upsert.append(new_art)
@@ -651,20 +715,26 @@ def track_states(new_articles: list, supabase: Client):
                 pass
 
     # 3. 삭제(DELETED) 판별
-    # 오늘 수집을 시도한 출처(Source) 목록
-    fetched_sources = set(a['source'] for a in new_articles)
-    
-    for old_url, old_art in db_dict.items():
-        # 오늘 긁어온 출처인데, 목록에 없다면 원본 사이트에서 지워진 것
-        if old_art['source'] in fetched_sources and old_url not in new_urls:
-            if old_art.get('status') != 'DELETED':
-                old_art['status'] = 'DELETED'
-                # 삭제 시간 기록 등 필요시 추가
-                final_articles_to_upsert.append(old_art)
+    absent_urls = find_absent_article_urls(db_articles, new_articles, incomplete_sources)
+    for old_url in absent_urls:
+        old_art = db_dict[old_url]
+        if old_art.get('status') != 'DELETED':
+            old_art['status'] = 'DELETED'
+            final_articles_to_upsert.append(old_art)
 
     return final_articles_to_upsert
 
-def save_to_supabase(articles: list) -> dict[str, int]:
+def save_keyword_boundary(snapshot: SavedArticle, metadata: Metadata) -> bool:
+    try:
+        supabase.table('articles').update({'keyword_boundary': metadata}).eq(
+            'url', snapshot['url']
+        ).eq('title', snapshot['title']).execute()
+        return True
+    except (APIError, HTTPError, OSError, RuntimeError, ValueError):
+        return False
+
+
+def save_to_supabase(articles: list, *, detail_snapshots=None) -> dict[str, int]:
     attempted = len(articles)
     succeeded = 0
     failed = 0
@@ -673,10 +743,16 @@ def save_to_supabase(articles: list) -> dict[str, int]:
         print("✅ 새로 저장하거나 업데이트할 변경사항이 없습니다.")
         return {"attempted": 0, "succeeded": 0, "failed": 0}
 
+    boundary = KeywordBoundaryClient()
+    saved_articles = []
     for article in articles:
         try:
             # upsert를 사용하여 기존 데이터 덮어쓰기 (url이 UNIQUE key라고 가정)
-            supabase.table('articles').upsert(article, on_conflict='url').execute()
+            response = supabase.table('articles').upsert(primary_article_payload(article), on_conflict='url').execute()
+            if isinstance(response.data, list):
+                saved_articles.extend(row for row in response.data if isinstance(row, dict))
+                if detail_snapshots is not None:
+                    detail_snapshots.extend(dict(row) for row in response.data if isinstance(row, dict))
             succeeded += 1
         except Exception as e:
             failed += 1
@@ -692,10 +768,33 @@ def save_to_supabase(articles: list) -> dict[str, int]:
                 f"{schema_hint} error: {e}"
             )
 
+    try:
+        metadata_failures = 0
+        for snapshot in saved_articles:
+            if enrich_saved_article(snapshot, boundary, save_keyword_boundary) is False:
+                metadata_failures += 1
+        if metadata_failures:
+            print(f"Kiwi metadata unavailable: failures={metadata_failures}; baseline retained")
+    finally:
+        boundary.close()
+
     print(f"DB attempted: {attempted}")
     print(f"DB succeeded: {succeeded}")
     print(f"DB failed: {failed}")
     return {"attempted": attempted, "succeeded": succeeded, "failed": failed}
+
+
+def sync_articles(articles: list, incomplete_sources=None) -> dict[str, int]:
+    observed = []
+    changes = track_states(articles, supabase, incomplete_sources, detail_snapshots=observed)
+    saved = []
+    stats = save_to_supabase(changes, detail_snapshots=saved)
+    # Never enrich a failed/unrepresented primary save or an originally DELETED row.
+    blocked = {row['url'] for row in changes} - {row['url'] for row in saved}
+    blocked.update(row['url'] for row in observed if row.get('status') == 'DELETED')
+    # Unlike primary upsert, this also runs when the lifecycle change list is empty.
+    save_source_detail_urls(supabase, articles, observed + saved, blocked_urls=blocked)
+    return stats
 
 
 
@@ -910,10 +1009,24 @@ if __name__ == "__main__":
     
     total_articles = []
     source_health = {}
+    incomplete_sources = set()
 
     def collect_source(name: str, collector) -> None:
         try:
-            collected = collector()
+            collection = collector()
+            if isinstance(collection, DailyMediCollection):
+                collected = list(collection.articles)
+                if not collection.complete:
+                    incomplete_sources.add(name)
+                    source_health[name] = {
+                        "count": len(collected),
+                        "status": "FAILED",
+                        "reason": f"partial snapshot: {collection.reason_code or 'unknown'}",
+                    }
+                    total_articles.extend(collected)
+                    return
+            else:
+                collected = collection
             diagnostic = source_collection_diagnostics.get(name, "")
             source_health[name] = {
                 "count": len(collected),
@@ -969,10 +1082,7 @@ if __name__ == "__main__":
     processed_articles = [a for a in total_articles if is_valid_article_record(a)]
         
     # 5. 기존 DB와 비교하여 상태 감지 (NEW, UPDATE, DELETED)
-    final_sync_articles = track_states(processed_articles, supabase)
-    
-    # DB 저장
-    db_stats = save_to_supabase(final_sync_articles)
+    db_stats = sync_articles(processed_articles, incomplete_sources)
     failed_sources = [name for name, health in source_health.items() if health["status"] == "FAILED"]
 
     if db_stats["failed"] > 0:

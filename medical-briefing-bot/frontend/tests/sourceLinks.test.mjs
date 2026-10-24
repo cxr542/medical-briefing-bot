@@ -1,0 +1,191 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import { resolveSourceLink } from '../src/lib/sourceLinks.ts';
+import { kdcaNotices, storedKdcaArticle } from './fixtures/kdca-verified.mjs';
+
+for (const notice of kdcaNotices) {
+  test(`verified KDCA search identity opens its own official detail: ${notice.id}`, () => {
+    const article = Object.freeze({ ...storedKdcaArticle(notice), id: notice.id, status: 'NEW', content_hash: 'stored-hash', related_links: Object.freeze([]) });
+    const before = JSON.stringify(article);
+    assert.deepEqual(resolveSourceLink(article), {
+      kind: 'direct', label: '원문 바로가기',
+      href: `https://www.kdca.go.kr/bbs/kdca/42/${notice.id}/artclView.do`,
+    });
+    assert.equal(JSON.stringify(article), before);
+  });
+}
+
+test('KDCA mismatched titles, ambiguous query and unverified notices keep guidance', () => {
+  const article = storedKdcaArticle(kdcaNotices[0]);
+  const changed = [
+    { ...article, title: kdcaNotices[1].title },
+    storedKdcaArticle({ title: '확인하지 않은 공지' }),
+    ...['&srchWrd=other', '&page=2', '&other=1', '#312844'].map(extra => ({ ...article, url: article.url + extra })),
+    ...['page=2', 'srchColumn=content', 'srchWrd=other'].map(value => {
+      const url = new URL(article.url);
+      const [key, replacement] = value.split('=');
+      url.searchParams.set(key, replacement);
+      return { ...article, url: url.href };
+    }),
+    { ...article, url: article.url.replace('https:', 'http:') },
+  ];
+  for (const input of changed) assert.equal(resolveSourceLink(input).kind, 'institution');
+});
+
+test('KDCA mapping remains source-specific and rejects unsafe hosts and credentials', () => {
+  const article = storedKdcaArticle(kdcaNotices[0]);
+  assert.equal(resolveSourceLink({ ...article, source: '다른 기관' }).kind, 'unverified');
+  for (const host of ['www.kdca.go.kr.evil.example', 'user:secret@www.kdca.go.kr', 'www.kdca.go.kr:8443']) {
+    assert.equal(resolveSourceLink({ ...article, url: article.url.replace('www.kdca.go.kr', host) }).kind, 'unavailable');
+  }
+});
+
+test('legacy KDCA mappings never infer a detail from a similar or normalized title', () => {
+  for (const notice of kdcaNotices.slice(3)) {
+    assert.equal(resolveSourceLink(storedKdcaArticle({ title: `${notice.title} 수정` })).kind, 'institution');
+    assert.equal(resolveSourceLink({ ...storedKdcaArticle(notice), title: kdcaNotices[0].title }).kind, 'institution');
+  }
+  const doubleSpaceTitle = kdcaNotices.find(notice => notice.id === '312829').title;
+  assert.equal(resolveSourceLink(storedKdcaArticle({ title: doubleSpaceTitle.replace('  ', ' ') })).kind, 'institution');
+});
+
+test('KDCA related-link resolution preserves parent and related stored identities', () => {
+  const related = Object.freeze(storedKdcaArticle(kdcaNotices[1]));
+  const parent = Object.freeze({ source: '다른 기관', title: '통합 공지', url: 'https://example.org/article', related_links: Object.freeze([related]) });
+  const before = JSON.stringify(parent);
+  assert.equal(resolveSourceLink(parent.related_links[0]).href, 'https://www.kdca.go.kr/bbs/kdca/42/312844/artclView.do');
+  assert.equal(JSON.stringify(parent), before);
+});
+
+const portalCases = [
+  ...[2279, 2280, 2281].map(id => ['심평원 e-평가 (평가알림방)', `https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=${id}`, 'https://aq.hira.or.kr/hira_aq/index.jsp', '평가알림방']),
+  ...[2146, 2145, 2142].map(id => ['산재업무포탈', `https://total.comwel.or.kr/#ser=${id}`, 'https://total.comwel.or.kr/', '공지사항']),
+  ['보건의료자원포탈', 'https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok#no=758', 'https://www.hurb.or.kr/hira_sg/index.jsp?sso=ok', '공지사항'],
+  ['건보공단 업무포탈', 'https://medicare.nhis.or.kr/portal/index.do?artiId=unknown', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
+  ['건보공단 업무포탈 (요양기관)', 'https://medicare.nhis.or.kr/portal/index.do', 'https://medicare.nhis.or.kr/portal/index.do', '공지사항'],
+  ['심평원 업무포탈 (자보알림방)', 'http://biz.hira.or.kr/indexS.ndo?PROGRAM_ID=MP00000616&PROGRAM_PARAM=nttId==75941', 'https://biz.hira.or.kr/index.do', '자보알림방'],
+  ['질병관리청 보도자료', 'https://www.kdca.go.kr/bbs/kdca/42/artclList.do?page=1&srchWrd=title', 'https://www.kdca.go.kr/bbs/kdca/42/artclList.do', '보도자료'],
+];
+
+for (const [source, url, destination, board] of portalCases) {
+  test(`institution guidance replaces the unsafe detail claim for ${url}`, () => {
+    const article = Object.freeze({ source, url, title: '확인할 공지 제목' });
+    const result = resolveSourceLink(article);
+    assert.equal(result.kind, 'institution');
+    assert.equal(result.href, destination);
+    assert.equal(result.board, board);
+    assert.ok(result.institution.length > 0);
+    assert.ok(result.steps.length > 0);
+    assert.equal(article.url, url);
+  });
+}
+
+const directCases = [
+  ['식품의약품안전처 보도자료', 'https://www.mfds.go.kr/brd/m_99/view.do?seq=50403'],
+  ['보건복지부 보도자료', 'https://www.mohw.go.kr/board.es?mid=a10503000000&bid=0027&list_no=1492185&act=view'],
+  ['보건복지부 법령', 'https://www.mohw.go.kr/board.es?bid=0026&act=view&list_no=1492183&tag=&nPage=1'],
+  ['대한병원협회 공지사항', 'https://www.kha.or.kr/kha_home/notice_list.do?mode=view&articleNo=47628'],
+  ['심평원 업무포탈 (공지사항)', 'http://biz.hira.or.kr/indexS.ndo?PROGRAM_ID=MP00000616&PROGRAM_PARAM=nttId==76023'],
+  ['심사평가원 공지사항', 'https://www.hira.or.kr/bbsDummy.do?pgmid=HIRAA020002000100&brdScnBltNo=4&brdBltNo=12299'],
+  ['국가법령정보센터', 'https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=290667'],
+  ['국민건강보험공단 공지사항', 'https://www.nhis.or.kr/nhis/together/wbhaea01000m01.do?mode=view&articleNo=11013171'],
+  ['질병관리청 보도자료', 'https://www.kdca.go.kr/bbs/kdca/42/312868/artclView.do'],
+  ['데일리메디', 'https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=941293'],
+  ['데일리메디', 'https://dailymedi.com/news/news_view.php?ca_id=21&wr_id=941293'],
+  ['메디게이트뉴스', 'https://www.medigatenews.com/news/1938565427'],
+  ['보건신문', 'http://www.bokuennews.com/news/article.html?no=285280'],
+  ['의학신문', 'https://www.bosa.co.kr/news/articleView.html?idxno=3013612'],
+  ['의협신문', 'http://www.doctorsnews.co.kr/news/articleView.html?idxno=166691'],
+  ['청년의사', 'http://www.docdocdoc.co.kr/news/articleView.html?idxno=3043479'],
+];
+
+for (const [source, url] of directCases) {
+  test(`verified detail keeps its exact stored destination for ${source}`, () => {
+    const article = Object.freeze({ source, url, title: '공지' });
+    assert.deepEqual(resolveSourceLink(article), { kind: 'direct', href: url, label: '원문 바로가기' });
+  });
+}
+
+for (const url of ['', '/relative', 'javascript:alert(1)', 'data:text/html,hello', 'file:///tmp/a',
+  'https://user:password@aq.hira.or.kr/hira_aq/index.jsp#brdSno=2279',
+  'https://aq.hira.or.kr.evil.example/hira_aq/index.jsp#brdSno=2279',
+  'https://aq.hira.or.kr:8443/hira_aq/index.jsp#brdSno=2279']) {
+  test(`unsafe or mismatched destination is noninteractive: ${url}`, () => {
+    assert.equal(resolveSourceLink({ source: '심평원 e-평가 (평가알림방)', title: '공지', url }).kind, 'unavailable');
+  });
+}
+
+test('missing and malformed fragment identifiers never synthesize a detail URL', () => {
+  for (const fragment of ['', '#brdSno=', '#brdSno=wrong', '#brdSno=2280&brdSno=2279']) {
+    const result = resolveSourceLink({ source: '심평원 e-평가 (평가알림방)', title: '공지', url: `https://aq.hira.or.kr/hira_aq/index.jsp${fragment}` });
+    assert.equal(result.kind, 'institution');
+    assert.equal(result.href, 'https://aq.hira.or.kr/hira_aq/index.jsp');
+  }
+});
+
+test('wrong board and missing identifier are not certified as detail links', () => {
+  for (const url of ['https://www.mohw.go.kr/board.es?bid=0026&list_no=1492185&act=view',
+    'https://www.mohw.go.kr/board.es?bid=0027&list_no=&act=view',
+    'https://www.mohw.go.kr/board.es?bid=0027&list_no=1492185&act=list']) {
+    assert.equal(resolveSourceLink({ source: '보건복지부 보도자료', title: '공지', url }).kind, 'unverified');
+  }
+});
+
+test('unrecognized sources preserve safe links without claiming verification', () => {
+  const url = 'https://example.org/notice/7#section';
+  assert.deepEqual(resolveSourceLink({ source: '추가 기관', title: '공지', url }),
+    { kind: 'unverified', href: url, label: '링크 열기 (상세 미확인)' });
+});
+
+test('a related link is resolved using its own institution and board', () => {
+  const related = { source: '산재업무포탈', title: '연관 공지', url: 'https://total.comwel.or.kr/#ser=2145' };
+  assert.equal(resolveSourceLink(related).href, 'https://total.comwel.or.kr/');
+});
+
+const nhisSamples = [
+  ['건보공단 업무포탈', '26POR0000006000000000000005886'],
+  ['건보공단 업무포탈', '26POR0000006000000000000005884'],
+  ['건보공단 업무포탈', '26POR0000006000000000000005882'],
+  ['건보공단 업무포탈 (요양기관)', '26POR0000006000000000000005477'],
+  ['건보공단 업무포탈 (요양기관)', '25POR0000006000000000000005315'],
+  ['건보공단 업무포탈 (요양기관)', '25POR0000006000000000000005022'],
+];
+
+for (const [source, id] of nhisSamples) {
+  test(`NHIS official public route preserves the stored identity: ${source} ${id}`, () => {
+    const article = Object.freeze({ source, title: '공지', url: `https://medicare.nhis.or.kr/portal/index.do?artiId=${id}` });
+    const result = resolveSourceLink(article);
+    assert.equal(result.kind, 'direct');
+    const href = new URL(result.href);
+    assert.equal(href.origin, 'https://medicare.nhis.or.kr');
+    assert.equal(href.pathname, '/portal/index.do');
+    assert.equal(href.searchParams.get('w2xPath'), '/portal/views/bip/az/a/bipaza410m02.xml');
+    assert.equal(href.searchParams.get('programId'), 'bipaza410m01');
+    const bytes = Buffer.from(href.searchParams.get('brdCtsNo'), 'base64');
+    assert.equal(bytes.subarray(0, 2).toString('hex'), 'feff');
+    assert.equal(bytes.subarray(2).swap16().toString('utf16le'), id);
+    assert.equal(article.url, `https://medicare.nhis.or.kr/portal/index.do?artiId=${id}`);
+    assert.equal(result.label, '원문 바로가기');
+  });
+}
+
+test('NHIS route rejects ambiguous IDs, other boards and extra routing input', () => {
+  const id = nhisSamples[0][1];
+  for (const query of ['artiId=', 'artiId=123', 'artiId=wrong',
+    `artiId=${id}&artiId=${id}`, `artiId=${id}&w2xPath=/other.xml`,
+    `artiId=${id}#other`, `artiId=${id.slice(0, -1)}`, `artiId=${id}0`,
+    `artiId=${id.replace('POR0000006', 'POR0000007')}`]) {
+    assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '공지', url: `https://medicare.nhis.or.kr/portal/index.do?${query}` }).kind, 'institution');
+  }
+  for (const url of [`https://medicare.nhis.or.kr.evil.example/portal/index.do?artiId=${id}`,
+    `https://user:secret@medicare.nhis.or.kr/portal/index.do?artiId=${id}`,
+    `https://medicare.nhis.or.kr:8443/portal/index.do?artiId=${id}`]) {
+    assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '공지', url }).kind, 'unavailable');
+  }
+});
+
+test('NHIS derivation is source-specific and applies to related-link records', () => {
+  const url = `https://medicare.nhis.or.kr/portal/index.do?artiId=${nhisSamples[0][1]}`;
+  assert.deepEqual(resolveSourceLink({ source: '추가 기관', title: '공지', url }), { kind: 'unverified', href: url, label: '링크 열기 (상세 미확인)' });
+  assert.equal(resolveSourceLink({ source: '건보공단 업무포탈', title: '연관 공지', url }).kind, 'direct');
+});

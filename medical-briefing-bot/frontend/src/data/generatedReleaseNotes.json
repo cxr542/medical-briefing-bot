@@ -1,5 +1,488 @@
 [
   {
+    "id": "2026-10-23-pr-103",
+    "date": "2026.10.23",
+    "category": "운영",
+    "title": "수집 오류 원인 분석용 진단 정보 보완",
+    "summary": "PR #103 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "데일리메디 TLS 숫자 오류 코드와 심평원 클릭 실패 시점의 화면 상태 개수를 기록해 후속 원인 분석을 지원합니다.",
+      "수집·재시도·TLS 검증·삭제 보호 정책과 기존 데이터는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #103",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/103"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-23-pr-101",
+    "date": "2026.10.23",
+    "category": "버그 수정",
+    "title": "과거 KDCA 공지 12건의 공식 상세 링크 표시 복구",
+    "summary": "PR #101 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "공식 목록·본문과 대조한 과거 공지의 표시 링크를 복구합니다.",
+      "저장 URL과 기사 식별자를 보존하며 DB Backfill 없이 적용됩니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #101",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/101"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-15-pr-87",
+    "date": "2026.10.15",
+    "category": "운영",
+    "title": "Release Note PR 자동 생성 검증",
+    "summary": "PR #87 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Release Note 자동 생성 및 검토 절차를 검증했습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #87",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/87"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-13-pr-84",
+    "date": "2026.10.13",
+    "category": "개선",
+    "title": "Customer Admin 공용 비밀번호 입력 표시·숨김 지원",
+    "summary": "Customer Admin UI만 개선합니다. DB, 인증 및 세션 정책, Collector 변경은 없으며 실제 공용 비밀번호 변경은 수행하지 않았습니다.",
+    "issues": [],
+    "changes": [
+      "공용 비밀번호 변경 화면의 새 비밀번호, 새 비밀번호 확인, 현재 관리자 비밀번호 입력란에 표시·숨김 버튼을 추가했습니다.",
+      "세 입력란의 표시 상태를 각각 독립적으로 전환할 수 있습니다.",
+      "화면을 닫았다가 다시 열면 세 입력란 모두 기본 숨김 상태로 복귀합니다.",
+      "키보드 조작과 모바일 접근성을 지원하며 기존 입력란 높이와 레이아웃을 유지합니다.",
+      "기존 최소 12자·확인값 일치·관리자 비밀번호 검증 및 비밀번호 변경 API를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #84",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/84"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-13-pr-83",
+    "date": "2026.10.13",
+    "category": "Security",
+    "title": "Customer authentication and server article access",
+    "summary": "PR #83 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "Add employee login, logout and protected article/dashboard access.",
+      "Move browser article reads to an authorized server API.",
+      "Gate article permissions lockdown on verified application access and Collector safety."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #83",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/83"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-13-pr-79",
+    "date": "2026.10.13",
+    "category": "UI",
+    "title": "기관 안내에서 공지 제목 복사 지원",
+    "summary": "PR #79 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "직접링크를 제공하지 않는 네 기관의 정상 fallback 정책을 문서화합니다.",
+      "안내창에서 제목 복사와 복사 결과 안내, 명확한 기관 페이지 열기를 제공합니다.",
+      "기존 원문 direct routing과 Collector identity는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #79",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/79"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-12-pr-78",
+    "date": "2026.10.12",
+    "category": "Fix",
+    "title": "RSS 미래 발행시각 저장 방어",
+    "summary": "PR #78 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "RSS 발행시각이 수집 기준 시각보다 5분을 초과해 미래인 경우 수집 시각으로 대체하고 진단 로그를 남깁니다.",
+      "정상 시간대 변환과 기존 삭제 감지를 유지합니다. 기존 데이터의 날짜를 보정하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #78",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/78"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-12-pr-75",
+    "date": "2026.10.12",
+    "category": "운영",
+    "title": "KDCA 공식 상세 링크 자동 추출",
+    "summary": "PR #75 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "공식 목록의 같은 제목 anchor에서 검증된 게시물 ID를 optional 상세 주소로 전달합니다.",
+      "기존 기사 identity·hash·lifecycle과 원문 fallback을 유지합니다.",
+      "기존 기사 Backfill이나 수동 Collector 실행은 수행하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #75",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/75"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-12-pr-74",
+    "date": "2026.10.12",
+    "category": "표시 개선",
+    "title": "NEW 표시와 기사 날짜를 한국 시간 브리핑 기준으로 통일",
+    "summary": "PR #74 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "선택한 날짜에 처음 수집·저장된 신규 기사에만 NEW를 표시합니다.",
+      "기사 날짜, CSV 및 7일 공지 범위를 한국 시간 기준으로 일치시킵니다.",
+      "상태 안내 문구를 실제 동작에 맞게 수정합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #74",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/74"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-12-pr-73",
+    "date": "2026.10.12",
+    "category": "운영",
+    "title": "공식 원문 상세 주소 저장 기반 추가",
+    "summary": "PR #73 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "기사 URL identity와 분리된 optional 상세 주소 저장·표시 기반을 준비합니다.",
+      "기존 원문 routing과 Collector lifecycle을 유지하고 조건부 metadata 저장을 검증합니다.",
+      "Migration·Backfill은 실행하지 않았으며 KDCA 자동 추출은 후속 PR에서 구현합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #73",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/73"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-10-pr-71",
+    "date": "2026.10.10",
+    "category": "링크 개선",
+    "title": "검증된 KDCA 공지 3건의 공식 상세 연결 복구",
+    "summary": "PR #71 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "기존 저장 URL을 보존하면서 검증된 KDCA 공지의 표시 링크를 개선합니다.",
+      "미검증 공지는 기관 안내를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #71",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/71"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-09-pr-70",
+    "date": "2026.10.09",
+    "category": "링크 개선",
+    "title": "NHIS 공지의 공식 상세 화면 연결 복구",
+    "summary": "PR #70 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "검증된 NHIS 공지를 새 탭에서 바로 열 수 있도록 개선합니다.",
+      "잘못된 식별자·다른 게시판·추가 라우팅 입력은 기존 기관 안내를 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #70",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/70"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-09-pr-69",
+    "date": "2026.10.09",
+    "category": "UI/UX",
+    "title": "원문 링크 버튼 통일 및 기관 안내 개선",
+    "summary": "PR #69 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "원문 버튼의 크기와 정렬을 통일하고, 직접 상세 링크가 확인되지 않은 기관은 안내 아이콘에서 공지 검색 절차를 확인할 수 있도록 개선했습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #69",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/69"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-09-pr-68",
+    "date": "2026.10.09",
+    "category": "Fix",
+    "title": "원문 링크의 기관별 접근 안내 개선",
+    "summary": "PR #68 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "상세 연결이 확인되지 않은 포털 링크는 기관·게시판·공지 제목과 찾는 방법을 안내합니다.",
+      "주요 공지, 기관별 공지, 더보기, 연관 링크에 동일한 표시 정책을 적용하고 정상 원문 주소는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #68",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/68"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-08-pr-67",
+    "date": "2026.10.08",
+    "category": "Improvement",
+    "title": "DailyMedi SSL 및 날짜 실패 진단 로그 보강",
+    "summary": "PR #67 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "SSL 예외 체인과 날짜 미확정 사유를 민감정보 없이 기록합니다. 수집 및 삭제 보호 정책은 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #67",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/67"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-08-pr-66",
+    "date": "2026.10.08",
+    "category": "운영 변경",
+    "title": "Collector 자동 실행 trigger cutover 준비",
+    "summary": "PR #66 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "GitHub Actions의 자동 schedule trigger를 제거하고 수동 `workflow_dispatch`는 유지합니다. 외부 scheduler는 별도 구성 전입니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #66",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/66"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-08-pr-65",
+    "date": "2026.10.08",
+    "category": "운영 개선",
+    "title": "외부 Collector dispatch relay 추가",
+    "summary": "PR #65 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "보호된 Vercel endpoint를 통해 Daily Collector workflow를 호출할 수 있는 relay를 추가했습니다. 외부 scheduler 연결은 아직 하지 않았습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #65",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/65"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-07-pr-63",
+    "date": "2026.10.07",
+    "category": "개선",
+    "title": "Collector의 선택적 Kiwi 키워드 경계 보정 및 프로세스 실패 격리",
+    "summary": "PR #63 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "제목 fallback에만 조사·서술어 경계 보정을 적용하며 저장된 원본 키워드와 기존 중요도 선택 및 복합 표시 규칙을 보존합니다.",
+      "Kiwi child 실패 시 기존 baseline으로 복귀합니다. Nullable metadata migration은 별도 적용이 필요하며 이 PR에서는 Production을 변경하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #63",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/63"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-06-pr-62",
+    "date": "2026.10.06",
+    "category": "개선",
+    "title": "검증된 요양급여 청구 복합 키워드의 표시 보존",
+    "summary": "PR #62 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "제목에 직접 결합 근거가 있는 요양급여·청구 후보를 한 display concept로 표시합니다. DB 원문과 기존 stored keyword 우선순위는 유지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #62",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/62"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-06-pr-61",
+    "date": "2026.10.06",
+    "category": "버그 수정",
+    "title": "기사 제목 기반 주요 키워드 fallback 품질 개선",
+    "summary": "PR #61 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "기관명으로 잘못 추정하던 주요 키워드를 제목 기반으로 생성합니다.",
+      "저장 키워드를 우선하고 전문 용어를 보존하며 일반어와 중복 후보를 줄입니다.",
+      "Production 데이터 재생성이나 DB 변경 없이 frontend 표시 로직만 개선합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #61",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/61"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-04-pr-58",
+    "date": "2026.10.04",
+    "category": "버그 수정",
+    "title": "데일리메디 수집 섹션 호환성 개선",
+    "summary": "PR #58 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "데일리메디 section 21·31의 현재 기사 목록 구조를 지원해 직접 원문 기사 수집을 복구합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #58",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/58"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-03-pr-57",
+    "date": "2026.10.03",
+    "category": "버그 수정",
+    "title": "데일리메디 최근 기사 수집 범위 개선",
+    "summary": "PR #57 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "PR의 Release Note 메타데이터로 자동 등록"
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #57",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/57"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-03-pr-56",
+    "date": "2026.10.03",
+    "category": "버그 수정",
+    "title": "데일리메디 불완전 수집 시 기존 기사 상태 보호",
+    "summary": "PR #56 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "페이지네이션 일부 실패 시 이미 수집한 기사는 보존하고, 확인되지 않은 기존 기사를 삭제 처리하지 않습니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #56",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/56"
+      }
+    ]
+  },
+  {
     "id": "2026-10-02-pr-52",
     "date": "2026.10.02",
     "category": "Fix",

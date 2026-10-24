@@ -1,0 +1,81 @@
+{
+  "name": "T08 connection termination before COMMIT",
+  "result": "PASS",
+  "target": {
+    "container": "decf484e5051a75ef4692a021a9e388b8264fd74c8830cb1efc0cba76e88737e",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285698889269290",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225"
+    ],
+    "support_tables": 0
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T08:00:15.763Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "decf484e5051a75ef4692a021a9e388b8264fd74c8830cb1efc0cba76e88737e",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285698889269290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:15.972Z",
+      "mode": "apply",
+      "version": "20261016014502",
+      "file": "20261016014502_support_foundation.sql",
+      "files": [
+        "20261016014502_support_foundation.sql"
+      ],
+      "sha256": "f9b2b15520eea9686d11703bf6b99a1e1cc33e6b354ec44f0c1a6bfb4bfa8af6",
+      "target": {
+        "container": "decf484e5051a75ef4692a021a9e388b8264fd74c8830cb1efc0cba76e88737e",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285698889269290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "FAILED_RECONCILE_BEFORE_RETRY"
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}

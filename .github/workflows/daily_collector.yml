@@ -2,11 +2,6 @@ name: Daily Medical Briefing Collector
 run-name: Daily Medical Briefing Collector${{ inputs.recovery_slot && format(' recovery_slot={0}', inputs.recovery_slot) || '' }}
 
 on:
-  schedule:
-    # 한국 시간(KST) 오후 12시 7분, 오후 3시 7분, 오후 5시 7분 = UTC 시간 기준 3:07, 6:07, 8:07
-    - cron: '7 3,6,8 * * *'
-    # 한국 시간(KST) 오전 8시 30분 = UTC 시간 기준 전날 23시 30분
-    - cron: '30 23 * * *'
   workflow_dispatch:
     inputs:
       recovery_slot:
@@ -41,6 +36,10 @@ jobs:
         pip install -r medical-briefing-bot/requirements.txt
         python -m playwright install --with-deps chromium
         
+    - name: Install optional keyword boundary dependencies
+      continue-on-error: true
+      run: python -m pip install -r medical-briefing-bot/requirements-keyword-boundary.txt
+
     - name: 데이터 수집 및 Supabase 저장 스크립트 실행
       env:
         SUPABASE_URL: ${{ secrets.SUPABASE_URL }}

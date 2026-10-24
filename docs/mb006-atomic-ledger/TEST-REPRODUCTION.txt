@@ -1,0 +1,29 @@
+EVIDENCE_DIRECTORY /private/tmp/mb006-preservation-test-evidence-20261019
+✔ T01 normal migration and default dry-run (3102.091375ms)
+✔ T02 ledger source checksum and audit (2320.68425ms)
+✔ T03 preserve four complete legacy rows (3779.634167ms)
+✔ T04 refuse duplicate version (2701.315834ms)
+✔ T05 refuse reverse order (2445.770958ms)
+✔ T06 fail midway through SQL and retry (3068.718917ms)
+✔ T07 ledger INSERT failure rolls back DDL (2452.045125ms)
+✔ T08 connection termination before COMMIT (2484.778125ms)
+✔ T09 concurrent identical and different migrations (4210.374792ms)
+✔ T10 fail closed when advisory lock held (2646.631125ms)
+✔ T11 reject checksum mismatch without editing migrations (2140.668125ms)
+✔ T12 reject unexpected existing objects (2241.919458ms)
+✔ T13 reject production IDs and forged server identity (2078.20325ms)
+✔ T14 reject connection strings and ignore production environment (2636.896167ms)
+✔ T15 preserve full authentication functions and synthetic sessions (3420.663875ms)
+✔ T16 preserve Collector and article objects and data (3251.238042ms)
+✔ T17 execute complete ordered chain (3834.105916ms)
+✔ T18 exactly seven ledger rows and drift rejection (4006.66025ms)
+✔ P01 SQL lexer preserves comments, quoted bodies and embedded COMMIT text (0.354541ms)
+✔ P02 reject inner top-level transaction control and malformed SQL (0.261917ms)
+ℹ tests 20
+ℹ suites 0
+ℹ pass 20
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 52933.403916

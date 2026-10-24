@@ -1,0 +1,43 @@
+'use client';
+import { useId, useState, type ComponentPropsWithoutRef } from 'react';
+import { Eye, EyeOff, TriangleAlert } from 'lucide-react';
+import { parseEmployees } from '@/lib/customer-auth/validation.mjs';
+import Dialog from './Dialog';
+
+type PasswordFieldProps = Omit<ComponentPropsWithoutRef<'input'>, 'type' | 'className' | 'id'> & {
+  readonly id: string;
+};
+
+function PasswordField({ id, ...props }: PasswordFieldProps) {
+  const [visible, setVisible] = useState(false);
+  const label = visible ? '비밀번호 숨기기' : '비밀번호 표시';
+  return (
+    <div className="relative">
+      <input {...props} id={id} type={visible ? 'text' : 'password'} className="ca-input pr-12" />
+      <button
+        type="button"
+        className="ca-icon-button absolute inset-y-0 right-0"
+        aria-label={label}
+        title={label}
+        aria-controls={id}
+        aria-pressed={visible}
+        disabled={props.disabled}
+        onClick={() => setVisible(value => !value)}
+      >
+        {visible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+      </button>
+    </div>
+  );
+}
+
+export function AddUsersDialog({bulk,onClose,onAdd}:{bulk:boolean;onClose:()=>void;onAdd:(numbers:string[])=>Promise<void>}) {
+  const [input,setInput]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const id=useId();
+  let numbers:string[]=[];let validation='';try{numbers=parseEmployees(bulk?input:[input]);}catch(e){validation=e instanceof Error?e.message:'사번을 확인해 주세요.';}
+  return <Dialog title={bulk?'사번 일괄 등록':'사번 추가'} description={bulk?'등록할 사번을 줄바꿈 또는 쉼표로 구분해 입력하세요.':'서비스 접근을 허용할 사번을 입력하세요.'} onClose={()=>{if(!busy)onClose();}}><form className="mt-6" onSubmit={async e=>{e.preventDefault();if(busy)return;if(validation){setError(validation);return;}setBusy(true);setError('');try{await onAdd(numbers);}catch(e){setError(e instanceof Error?e.message:'등록할 수 없습니다.');}finally{setBusy(false);}}}><label htmlFor={id} className="ca-label">{bulk?'등록할 사번':'사번'}</label>{bulk?<textarea id={id} autoFocus rows={6} maxLength={7000} value={input} disabled={busy} onChange={e=>{setInput(e.target.value);setError('');}} className="ca-input resize-y"/>:<input id={id} autoFocus maxLength={64} value={input} disabled={busy} onChange={e=>{setInput(e.target.value);setError('');}} className="ca-input"/>}<p className="mt-2 text-xs leading-5 text-slate-500">공백 없이 1~64자. 선행 0을 유지하며 최대 100명까지 등록합니다.</p>{bulk&&numbers.length>0&&<div className="mt-4 rounded-xl bg-slate-50 p-3 text-sm"><p className="font-semibold">{numbers.length}명의 사용자가 등록됩니다.</p><p className="mt-2 max-h-24 overflow-y-auto break-all text-xs text-slate-500">{numbers.join(', ')}</p></div>}<p className="mt-3 text-xs leading-5 text-slate-500">중복 또는 잘못된 사번이 있으면 전체 등록이 취소됩니다.</p>{error&&<p role="alert" className="mt-3 text-sm text-rose-700">{error}</p>}<div className="mt-6 flex justify-end gap-3"><button type="button" className="ca-secondary" disabled={busy} onClick={onClose}>취소</button><button type="submit" className="ca-primary" disabled={busy}>{busy?'등록 중…':bulk?`${numbers.length}명 등록`:'사번 추가'}</button></div></form></Dialog>;
+}
+
+export function ChangePasswordDialog({onClose,onConfirm}:{onClose:()=>void;onConfirm:(password:string,confirmation:string,adminPassword:string)=>Promise<void>}) {
+  const [password,setPassword]=useState('');const [confirmation,setConfirmation]=useState('');const [adminPassword,setAdminPassword]=useState('');const [error,setError]=useState('');const [busy,setBusy]=useState(false);const id=useId();
+  return <Dialog title="공용 비밀번호 변경" description="새 비밀번호와 현재 관리자 비밀번호를 입력해 주세요." onClose={()=>{if(!busy)onClose();}}><form className="mt-6 space-y-4" onSubmit={async e=>{e.preventDefault();if(busy)return;if(password.length<12){setError('새 비밀번호는 12자 이상 입력해 주세요.');return;}if(password!==confirmation){setError('두 비밀번호가 일치하지 않습니다.');return;}if(!adminPassword){setError('관리자 비밀번호를 입력해 주세요.');return;}setBusy(true);setError('');try{await onConfirm(password,confirmation,adminPassword);}catch(e){setError(e instanceof Error?e.message:'변경할 수 없습니다.');}finally{setPassword('');setConfirmation('');setAdminPassword('');setBusy(false);}}}><div><label htmlFor={`${id}-password`} className="ca-label">새 비밀번호</label><PasswordField id={`${id}-password`} autoFocus autoComplete="new-password" maxLength={512} disabled={busy} value={password} onChange={e=>setPassword(e.target.value)}/><p className="mt-2 text-xs text-slate-500">12자 이상, UTF-8 512바이트 이하</p></div><div><label htmlFor={`${id}-confirmation`} className="ca-label">새 비밀번호 확인</label><PasswordField id={`${id}-confirmation`} autoComplete="new-password" maxLength={512} disabled={busy} value={confirmation} onChange={e=>setConfirmation(e.target.value)}/></div><div><label htmlFor={`${id}-admin`} className="ca-label">현재 관리자 비밀번호</label><PasswordField id={`${id}-admin`} autoComplete="current-password" maxLength={512} disabled={busy} value={adminPassword} onChange={e=>setAdminPassword(e.target.value)}/></div>{error&&<p role="alert" className="text-sm text-rose-700">{error}</p>}<PasswordWarning/><div className="flex justify-end gap-3"><button type="button" disabled={busy} className="ca-secondary" onClick={onClose}>취소</button><button type="submit" disabled={busy} className="ca-primary">{busy?'변경 중…':'비밀번호 변경'}</button></div></form></Dialog>;
+}
+export function PasswordWarning(){return <div className="flex gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-amber-900"><TriangleAlert size={18} className="mt-0.5 shrink-0"/><div><p className="text-sm font-semibold leading-6">비밀번호를 변경하면 모든 사용자가 다시 로그인해야 합니다.</p><p className="mt-1 text-xs leading-5 text-amber-800">다음 보호 요청부터 기존 일반 사용자 세션이 거부됩니다. 관리자 세션은 유지됩니다.</p></div></div>;}

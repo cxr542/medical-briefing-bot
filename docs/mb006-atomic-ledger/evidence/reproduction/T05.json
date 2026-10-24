@@ -1,0 +1,135 @@
+{
+  "name": "T05 refuse reverse order",
+  "result": "PASS",
+  "target": {
+    "container": "76759292442e325089ec0c791a6fbe4818705b0fd25ad3d4abc3dd4381bf9f72",
+    "host": "container-local-unix-socket",
+    "port": 5432,
+    "database": "medical_mb006_ledger",
+    "system": "7698285664598581290",
+    "oid": "16384",
+    "version": "170006",
+    "network": "none",
+    "project": "synthetic-local-only"
+  },
+  "observed": {
+    "versions": [
+      "20260928064906",
+      "20260929063328",
+      "20261007041102",
+      "20261012043225"
+    ],
+    "support_tables": 0
+  },
+  "audit": [
+    {
+      "at": "2026-10-19T08:00:07.731Z",
+      "mode": "apply",
+      "version": "20261016035115",
+      "file": "20261016035115_support_attachments.sql",
+      "files": [
+        "20261016035115_support_attachments.sql"
+      ],
+      "sha256": "6c462bbf80b8469856be36d52c506e0372f6eb539c2551d0610b24226cacbd8b",
+      "target": {
+        "container": "76759292442e325089ec0c791a6fbe4818705b0fd25ad3d4abc3dd4381bf9f72",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285664598581290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:07.732Z",
+      "mode": "apply",
+      "version": "20261016035115",
+      "file": "20261016035115_support_attachments.sql",
+      "files": [
+        "20261016035115_support_attachments.sql"
+      ],
+      "sha256": "6c462bbf80b8469856be36d52c506e0372f6eb539c2551d0610b24226cacbd8b",
+      "target": {
+        "container": "76759292442e325089ec0c791a6fbe4818705b0fd25ad3d4abc3dd4381bf9f72",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285664598581290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "REJECTED_ORDER"
+    },
+    {
+      "at": "2026-10-19T08:00:07.964Z",
+      "mode": "apply",
+      "version": "20261019041429",
+      "file": "20261019041429_support_conflict_sqlstate.sql",
+      "files": [
+        "20261019041429_support_conflict_sqlstate.sql"
+      ],
+      "sha256": "610a8328a118e4c457acafb81fcdd28a3993efcd770f412ca7a04cdf4bf05da1",
+      "target": {
+        "container": "76759292442e325089ec0c791a6fbe4818705b0fd25ad3d4abc3dd4381bf9f72",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285664598581290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "BEGIN_VALIDATION",
+      "history": {
+        "count": 4,
+        "applied": [],
+        "legacy": [
+          "20260928064906",
+          "20260929063328",
+          "20261007041102",
+          "20261012043225"
+        ]
+      }
+    },
+    {
+      "at": "2026-10-19T08:00:07.965Z",
+      "mode": "apply",
+      "version": "20261019041429",
+      "file": "20261019041429_support_conflict_sqlstate.sql",
+      "files": [
+        "20261019041429_support_conflict_sqlstate.sql"
+      ],
+      "sha256": "610a8328a118e4c457acafb81fcdd28a3993efcd770f412ca7a04cdf4bf05da1",
+      "target": {
+        "container": "76759292442e325089ec0c791a6fbe4818705b0fd25ad3d4abc3dd4381bf9f72",
+        "host": "container-local-unix-socket",
+        "port": 5432,
+        "database": "medical_mb006_ledger",
+        "system": "7698285664598581290",
+        "oid": "16384",
+        "version": "170006",
+        "network": "none",
+        "project": "synthetic-local-only"
+      },
+      "event": "REJECTED_ORDER"
+    }
+  ],
+  "cleanup": "own container and volume removed"
+}

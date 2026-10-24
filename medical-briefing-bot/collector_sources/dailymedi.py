@@ -1,12 +1,19 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import http.client
+import json
+import platform
 import re
+import ssl
 import time
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Callable, Dict, List, Optional, Set, Tuple, TypedDict, Union
 from urllib.parse import parse_qs, urljoin, urlparse
 
 from bs4 import BeautifulSoup
+from bs4.element import Tag
 import requests
+import urllib3
+from collector_failure_diagnostics import ssl_failure_fields
 
 from collector_parsers import get_content_hash
 
@@ -14,7 +21,7 @@ from collector_parsers import get_content_hash
 SOURCE_NAME = "데일리메디"
 LIST_URL = "https://www.dailymedi.com/news/news_list.php"
 SECTION_IDS = ("22", "21", "31")
-MAX_PAGES_PER_SECTION = 10
+MAX_PAGES_PER_SECTION = 13
 ALLOWED_HOSTS = frozenset({"dailymedi.com", "www.dailymedi.com"})
 KST = timezone(timedelta(hours=9))
 RETRY_BACKOFFS = (1, 2)
@@ -46,6 +53,30 @@ class DailyMediPage:
     articles: Tuple[DailyMediArticle, ...]
     fingerprint: Tuple[str, ...]
     all_articles_older_than_cutoff: bool
+    listing_item_count: int
+    unresolved_date_count: int = 0
+
+
+class DailyMediArticleRecord(TypedDict):
+    source: str
+    title: str
+    url: str
+    published_date: str
+    content_hash: str
+    status: str
+
+
+@dataclass(frozen=True)
+class DailyMediCollection:
+    articles: Tuple[DailyMediArticleRecord, ...]
+    complete: bool
+    reason_code: Optional[str]
+
+
+@dataclass(frozen=True)
+class DailyMediDateResolution:
+    published_at: Optional[datetime]
+    reason: Optional[str]
 
 
 def _allowed_article_url(href: str, list_url: str) -> Optional[Tuple[str, str]]:
@@ -61,6 +92,38 @@ def _allowed_article_url(href: str, list_url: str) -> Optional[Tuple[str, str]]:
     return url, wr_ids[0]
 
 
+def _medi_box_article_url(
+    href: str,
+    list_url: str,
+    section_id: str,
+) -> Optional[Tuple[str, str]]:
+    link = _allowed_article_url(href, list_url)
+    if link is None:
+        return None
+    url, wr_id = link
+    ca_ids = parse_qs(urlparse(url).query).get("ca_id", [])
+    if len(ca_ids) != 1 or ca_ids[0] != section_id:
+        return None
+    return url, wr_id
+
+
+def _listing_for_section(soup: BeautifulSoup, section_id: str) -> Optional[Tag]:
+    if section_id in ("21", "31"):
+        return soup.select_one(".listNews.mediBox > ul")
+    return soup.select_one(".listNews > ul.webzin.main2")
+
+
+def _article_title_marker_found(soup: BeautifulSoup, section_id: str) -> bool:
+    if section_id in ("21", "31"):
+        return soup.select_one(".listNews.mediBox > ul > li > .subject.ml_subject > a[href]") is not None
+    return soup.select_one(".listNews > ul.webzin.main2 .stitle") is not None
+
+
+def _section_id_from_url(list_url: str) -> str:
+    section_ids = parse_qs(urlparse(list_url).query).get("ca_id", [])
+    return section_ids[0] if len(section_ids) == 1 else ""
+
+
 def _parse_kst_datetime(value: str) -> Optional[datetime]:
     candidate = value.strip()
     for date_format in _DATE_FORMATS:
@@ -72,33 +135,49 @@ def _parse_kst_datetime(value: str) -> Optional[datetime]:
 
 
 def parse_article_page_date(html: str) -> Optional[datetime]:
+    return _parse_article_date_resolution(html).published_at
+
+
+def _parse_article_date_resolution(html: str) -> DailyMediDateResolution:
     soup = BeautifulSoup(html, "html.parser")
+    has_date_element = False
+    has_date_value = False
     metadata = soup.select_one('meta[property="article:published_time"], meta[name="article:published_time"]')
     if metadata:
+        has_date_element = True
         raw_value = (metadata.get("content") or "").strip()
         if raw_value:
+            has_date_value = True
             try:
                 parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
                 if parsed.tzinfo is None:
                     parsed = parsed.replace(tzinfo=KST)
-                return parsed.astimezone(timezone.utc)
+                return DailyMediDateResolution(parsed.astimezone(timezone.utc), None)
             except ValueError:
                 pass
 
     time_tag = soup.select_one("time[datetime]")
     if time_tag:
+        has_date_element = True
         raw_value = (time_tag.get("datetime") or "").strip()
         if raw_value:
+            has_date_value = True
             try:
                 parsed = datetime.fromisoformat(raw_value.replace("Z", "+00:00"))
                 if parsed.tzinfo is None:
                     parsed = parsed.replace(tzinfo=KST)
-                return parsed.astimezone(timezone.utc)
+                return DailyMediDateResolution(parsed.astimezone(timezone.utc), None)
             except ValueError:
                 pass
 
     visible_match = _VISIBLE_DATE.search(soup.get_text(" ", strip=True))
-    return _parse_kst_datetime(visible_match.group(0)) if visible_match else None
+    if visible_match:
+        published_at = _parse_kst_datetime(visible_match.group(0))
+        return DailyMediDateResolution(published_at, None if published_at else "date-parse-failed")
+    reason = "date-element-not-found"
+    if has_date_element:
+        reason = "date-parse-failed" if has_date_value else "date-value-empty"
+    return DailyMediDateResolution(None, reason)
 
 
 def parse_list_page(
@@ -107,39 +186,69 @@ def parse_list_page(
     *,
     cutoff: datetime,
     now: datetime,
-    fetch_article_date: Optional[Callable[[str], Optional[datetime]]] = None,
+    fetch_article_date: Optional[Callable[[str], Union[datetime, DailyMediDateResolution, None]]] = None,
 ) -> DailyMediPage:
     soup = BeautifulSoup(html, "html.parser")
-    listing = soup.select_one(".listNews > ul.webzin.main2, .listNews.mediBox > ul")
+    section_id = _section_id_from_url(list_url)
+    is_medi_box = section_id in ("21", "31")
+    listing = _listing_for_section(soup, section_id)
     if listing is None:
         raise ValueError("DailyMedi article listing markup not found")
     articles: List[DailyMediArticle] = []
     fingerprint: List[str] = []
     all_older = True
+    unresolved_date_count = 0
+    unresolved_ids: List[str] = []
+    date_failure_count = 0
 
     for item in listing.select("li"):
-        title_node = item.select_one(".stitle, .ml_subject a[href]")
-        anchor = item.select_one("a[href]")
-        title = ""
-        if title_node:
-            if "stitle" in title_node.get("class", []):
-                title = title_node.get_text(" ", strip=True)
-            else:
-                title = " ".join(title_node.find_all(string=True, recursive=False)).strip()
-        link = _allowed_article_url((anchor.get("href") or "") if anchor else "", list_url)
+        if is_medi_box:
+            anchor = item.select_one(".subject.ml_subject > a[href]")
+            title = anchor.get_text(" ", strip=True) if anchor else ""
+            link = _medi_box_article_url(
+                (anchor.get("href") or "") if anchor else "",
+                list_url,
+                section_id,
+            )
+        else:
+            title_node = item.select_one(".stitle")
+            anchor = item.select_one("a[href]")
+            title = title_node.get_text(" ", strip=True) if title_node else ""
+            link = _allowed_article_url((anchor.get("href") or "") if anchor else "", list_url)
         if not title or link is None:
             continue
 
         url, wr_id = link
         fingerprint.append(wr_id)
-        date_node = item.select_one(".news_list_date, .ml_date")
+        date_node = item.select_one(".news_list_date")
         published_at = _parse_kst_datetime(date_node.get_text(" ", strip=True)) if date_node else None
+        date_failure = "date-resolution-unavailable"
         if published_at is None and fetch_article_date is not None:
             try:
-                published_at = fetch_article_date(url)
+                resolution = fetch_article_date(url)
+                if isinstance(resolution, DailyMediDateResolution):
+                    published_at = resolution.published_at
+                    date_failure = resolution.reason or date_failure
+                else:
+                    published_at = resolution
             except Exception:
                 published_at = None
         if published_at is None:
+            date_failure_count += 1
+            if date_failure_count <= 20:
+                context = _request_context(list_url)
+                print("DailyMedi date diagnostic: " + json.dumps({
+                    "source": "dailymedi", "section": context["section"],
+                    "page": context["page"], "article_id": wr_id,
+                    "date_resolution": date_failure,
+                    "fallback": "excluded" if is_medi_box else "current-time",
+                }, sort_keys=True, separators=(",", ":")))
+            if is_medi_box:
+                unresolved_date_count += 1
+                if len(unresolved_ids) < 20:
+                    unresolved_ids.append(wr_id)
+                all_older = False
+                continue
             published_at = now.astimezone(timezone.utc)
         if published_at >= cutoff:
             all_older = False
@@ -147,73 +256,262 @@ def parse_list_page(
 
     if not articles:
         all_older = False
-    return DailyMediPage(tuple(articles), tuple(fingerprint), all_older)
+    if date_failure_count:
+        context = _request_context(list_url)
+        print("DailyMedi unresolved date summary: " + json.dumps({
+            "source": "dailymedi", "section": context["section"], "page": context["page"],
+            "unresolved_date_count": unresolved_date_count,
+            "unresolved_article_ids_sample": unresolved_ids,
+            "unresolved_article_ids_total": unresolved_date_count,
+            "current_time_fallback_count": date_failure_count - unresolved_date_count,
+        }, sort_keys=True, separators=(",", ":")))
+    return DailyMediPage(
+        tuple(articles),
+        tuple(fingerprint),
+        all_older,
+        len(listing.select("li")),
+        unresolved_date_count,
+    )
 
 
 def collect_recent_articles(
     fetch_list_page: Callable[[str], str],
-    fetch_article_date: Callable[[str], Optional[datetime]],
+    fetch_article_date: Callable[[str], Union[datetime, DailyMediDateResolution, None]],
     *,
     now: Optional[datetime] = None,
     sections: Tuple[str, ...] = SECTION_IDS,
     max_pages: int = MAX_PAGES_PER_SECTION,
-) -> List[dict]:
+) -> DailyMediCollection:
     now = now or datetime.now(timezone.utc)
     if now.tzinfo is None:
         now = now.replace(tzinfo=timezone.utc)
     cutoff = now.astimezone(timezone.utc) - timedelta(days=7)
     articles_by_id: Dict[str, DailyMediArticle] = {}
+    def make_result(complete: bool, reason_code: Optional[str]) -> DailyMediCollection:
+        records = tuple(
+            {
+                "source": SOURCE_NAME,
+                "title": article.title,
+                "url": article.url,
+                "published_date": article.published_at.isoformat(),
+                "content_hash": get_content_hash(article.title + article.url),
+                "status": "NEW",
+            }
+            for article in articles_by_id.values()
+        )
+        return DailyMediCollection(records, complete, reason_code)
+
+    def make_partial(section_id: str, page_number: int, reason_code: str) -> DailyMediCollection:
+        print(
+            f"DailyMedi incomplete snapshot: section={section_id} page={page_number} "
+            f"retained={len(articles_by_id)} reason={reason_code}"
+        )
+        return make_result(False, reason_code)
 
     for section_id in sections:
         seen_pages: Set[Tuple[str, ...]] = set()
+        section_terminated = False
         for page_number in range(1, max_pages + 1):
             list_url = f"{LIST_URL}?ca_id={section_id}&page={page_number}"
             try:
                 html = fetch_list_page(list_url)
-            except TRANSIENT_ERRORS as error:
-                if page_number == 1 or not articles_by_id:
-                    raise
-                print(
-                    f"DailyMedi partial pagination: section={section_id} "
-                    f"page={page_number} retained={len(articles_by_id)} "
-                    f"error={type(error).__name__}"
+            except requests.RequestException as error:
+                return make_partial(section_id, page_number, f"list-request-{type(error).__name__}")
+            except ValueError:
+                return make_partial(section_id, page_number, "list-request-validation-failed")
+
+            try:
+                page = parse_list_page(
+                    html,
+                    list_url,
+                    cutoff=cutoff,
+                    now=now,
+                    fetch_article_date=fetch_article_date,
                 )
+            except ValueError:
+                return make_partial(section_id, page_number, "listing-markup-invalid")
+
+            if not page.fingerprint:
+                if page.listing_item_count:
+                    return make_partial(section_id, page_number, "listing-has-no-valid-article-ids")
+                section_terminated = True
                 break
-            page = parse_list_page(
-                html,
-                list_url,
-                cutoff=cutoff,
-                now=now,
-                fetch_article_date=fetch_article_date,
-            )
-            if not page.fingerprint or page.fingerprint in seen_pages:
-                break
+            if page.fingerprint in seen_pages:
+                return make_partial(section_id, page_number, "repeated-list-page")
             seen_pages.add(page.fingerprint)
 
             for article in page.articles:
                 if article.published_at >= cutoff and article.wr_id not in articles_by_id:
                     articles_by_id[article.wr_id] = article
 
+            if page.unresolved_date_count:
+                return make_partial(section_id, page_number, "article-date-unavailable")
+
             if page.all_articles_older_than_cutoff:
+                section_terminated = True
                 break
+        if not section_terminated:
+            return make_partial(section_id, max_pages, "maximum-pages-reached")
 
     if not articles_by_id:
-        raise ValueError("DailyMedi collection produced no recent valid articles")
-    return [
-        {
-            "source": SOURCE_NAME,
-            "title": article.title,
-            "url": article.url,
-            "published_date": article.published_at.isoformat(),
-            "content_hash": get_content_hash(article.title + article.url),
-            "status": "NEW",
-        }
-        for article in articles_by_id.values()
-    ]
+        return make_result(False, "no-recent-valid-articles")
+    return make_result(True, None)
+
+
+def _request_context(url: str) -> Dict[str, Optional[str]]:
+    parsed = urlparse(url)
+    query = parse_qs(parsed.query)
+    is_listing_request = parsed.path == urlparse(LIST_URL).path
+
+    def numeric_value(key: str) -> Optional[str]:
+        value = query.get(key, [None])[0]
+        return value if value is not None and value.isdecimal() else None
+
+    return {
+        "request_type": "list" if is_listing_request else "detail",
+        "section": numeric_value("ca_id"),
+        "page": numeric_value("page") if is_listing_request else None,
+        "article_id": numeric_value("wr_id") if not is_listing_request else None,
+    }
+
+
+def _exception_chain(error: BaseException) -> Tuple[BaseException, ...]:
+    pending = [error]
+    seen = set()
+    chain = []
+    while pending and len(chain) < 16:
+        current = pending.pop(0)
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        chain.append(current)
+        for attribute in ("__cause__", "__context__", "reason"):
+            related = getattr(current, attribute, None)
+            if isinstance(related, BaseException) and id(related) not in seen:
+                pending.append(related)
+        for related in current.args[:16]:
+            if isinstance(related, BaseException) and id(related) not in seen:
+                pending.append(related)
+    return tuple(chain)
+
+
+def _ssl_reason(error: BaseException) -> str:
+    """Normalize only exception types and allowlisted SSL reason codes, never messages."""
+    chain = _exception_chain(error)
+    if any(isinstance(item, ssl.SSLCertVerificationError) for item in chain):
+        return "certificate_verify_failed"
+    if any(isinstance(item, ssl.SSLEOFError) for item in chain):
+        return "unexpected_eof"
+    if any(isinstance(item, ssl.SSLZeroReturnError) for item in chain):
+        return "connection_closed"
+    reasons = {
+        "CERTIFICATE_VERIFY_FAILED": "certificate_verify_failed",
+        "UNEXPECTED_EOF_WHILE_READING": "unexpected_eof",
+        "SSLV3_ALERT_HANDSHAKE_FAILURE": "handshake_failure",
+        "TLSV1_ALERT_HANDSHAKE_FAILURE": "handshake_failure",
+        "SSL_HANDSHAKE_FAILURE": "handshake_failure",
+        "NO_SHARED_CIPHER": "handshake_failure",
+        "NO_SUITABLE_SIGNATURE_ALGORITHM": "handshake_failure",
+        "UNSUPPORTED_PROTOCOL": "protocol_error",
+        "WRONG_VERSION_NUMBER": "protocol_error",
+    }
+    for item in chain:
+        reason = getattr(item, "reason", None)
+        if isinstance(reason, str) and reason.upper() in reasons:
+            return reasons[reason.upper()]
+    classification = _classify_transient_error(error)
+    return {
+        "connection_reset": "connection_reset",
+        "remote_disconnect": "remote_disconnect",
+        "timeout_connect": "timeout",
+        "timeout_read": "timeout",
+        "timeout_unknown": "timeout",
+        "chunked_encoding": "chunked_encoding",
+        "unknown_connection": "unknown_connection",
+    }.get(classification, "unknown_ssl")
+
+
+def _classify_transient_error(error: BaseException) -> str:
+    chain = _exception_chain(error)
+
+    if any(isinstance(item, ssl.SSLEOFError) for item in chain):
+        return "ssl_eof"
+    if any(isinstance(item, http.client.RemoteDisconnected) for item in chain):
+        return "remote_disconnect"
+    if any(isinstance(item, (ConnectionResetError, ConnectionAbortedError, BrokenPipeError)) for item in chain):
+        return "connection_reset"
+
+    handshake_reasons = {
+        "SSLV3_ALERT_HANDSHAKE_FAILURE",
+        "TLSV1_ALERT_HANDSHAKE_FAILURE",
+        "SSL_HANDSHAKE_FAILURE",
+        "NO_SHARED_CIPHER",
+        "NO_SUITABLE_SIGNATURE_ALGORITHM",
+        "UNSUPPORTED_PROTOCOL",
+        "WRONG_VERSION_NUMBER",
+    }
+    for item in chain:
+        reason = getattr(item, "reason", None)
+        if isinstance(reason, str) and reason.upper() in handshake_reasons:
+            return "ssl_handshake"
+
+    if any(isinstance(item, (requests.exceptions.ConnectTimeout, urllib3.exceptions.ConnectTimeoutError)) for item in chain):
+        return "timeout_connect"
+    if any(isinstance(item, (requests.exceptions.ReadTimeout, urllib3.exceptions.ReadTimeoutError)) for item in chain):
+        return "timeout_read"
+    if any(isinstance(item, requests.exceptions.ChunkedEncodingError) for item in chain):
+        return "chunked_encoding"
+    if any(isinstance(item, (requests.exceptions.SSLError, ssl.SSLError, urllib3.exceptions.SSLError)) for item in chain):
+        return "unknown_ssl"
+    if any(isinstance(item, requests.exceptions.Timeout) for item in chain):
+        return "timeout_unknown"
+    return "unknown_connection"
+
+
+def _log_request_diagnostic(
+    context: Dict[str, Optional[str]],
+    attempt: int,
+    max_attempts: int,
+    result: str,
+    elapsed_ms: int,
+    error: Optional[BaseException] = None,
+) -> None:
+    record = {
+        **context,
+        "source": "dailymedi",
+        "request_kind": "list" if context["request_type"] == "list" else "article",
+        "attempt": attempt,
+        "max_attempts": max_attempts,
+        "result": result,
+        "exception_class": type(error).__name__ if error is not None else None,
+        "classification": _classify_transient_error(error) if error is not None else None,
+        "elapsed_ms": elapsed_ms,
+        "exception_type": type(error).__name__ if error is not None else None,
+        "cause_type": type(error.__cause__).__name__ if error is not None and error.__cause__ is not None else None,
+        "context_type": type(error.__context__).__name__ if error is not None and error.__context__ is not None else None,
+        "exception_chain_types": [type(item).__name__ for item in _exception_chain(error)] if error is not None else [],
+        "ssl_reason": _ssl_reason(error) if error is not None else None,
+        "retry_state": result,
+        **ssl_failure_fields(_exception_chain(error) if error is not None else ()),
+    }
+    print("DailyMedi request diagnostic: " + json.dumps(record, sort_keys=True, separators=(",", ":")))
+
+
+def _log_runtime_diagnostic() -> None:
+    record = {
+        "python_version": platform.python_version(),
+        "requests_version": requests.__version__,
+        "urllib3_version": urllib3.__version__,
+        "openssl_version": ssl.OPENSSL_VERSION,
+    }
+    print("DailyMedi runtime diagnostic: " + json.dumps(record, sort_keys=True, separators=(",", ":")))
 
 
 def _fetch_text(url: str) -> str:
-    for attempt in range(1, len(RETRY_BACKOFFS) + 2):
+    context = _request_context(url)
+    max_attempts = len(RETRY_BACKOFFS) + 1
+    for attempt in range(1, max_attempts + 1):
+        started_at = time.monotonic()
         try:
             response = requests.get(
                 url,
@@ -221,32 +519,86 @@ def _fetch_text(url: str) -> str:
                 timeout=(5, 20),
                 allow_redirects=True,
             )
-            break
         except TRANSIENT_ERRORS as error:
-            print(
-                f"DailyMedi transient request failure: url={url} "
-                f"attempt={attempt}/3 error={type(error).__name__}"
-            )
-            if attempt > len(RETRY_BACKOFFS):
+            elapsed_ms = max(0, int((time.monotonic() - started_at) * 1000))
+            result = "exhausted" if attempt == max_attempts else "retry"
+            _log_request_diagnostic(context, attempt, max_attempts, result, elapsed_ms, error)
+            if result == "exhausted":
                 raise
             time.sleep(RETRY_BACKOFFS[attempt - 1])
-    response.raise_for_status()
+        else:
+            if attempt > 1:
+                elapsed_ms = max(0, int((time.monotonic() - started_at) * 1000))
+                _log_request_diagnostic(context, attempt, max_attempts, "success", elapsed_ms)
+            break
+
+    try:
+        response.raise_for_status()
+    except requests.HTTPError:
+        if context["request_type"] == "list":
+            _log_listing_diagnostic(url, response, attempt, "http-status-error", response.text)
+        raise
+
     final_url = urlparse(response.url)
     final_host = (final_url.hostname or "").lower()
+    text = response.text
+    if context["request_type"] == "list":
+        soup = BeautifulSoup(text, "html.parser")
+        has_expected_list = _listing_for_section(soup, _section_id_from_url(url)) is not None
+        if not has_expected_list:
+            _log_listing_diagnostic(url, response, attempt, "missing-listing-selector", text)
     if final_url.scheme != "https" or final_host not in ALLOWED_HOSTS:
+        if context["request_type"] == "list":
+            _log_listing_diagnostic(url, response, attempt, "redirect-host-not-allowed", text)
         raise ValueError(f"DailyMedi redirected outside the approved host list: {final_host}")
-    return response.text
+    return text
+
+
+def _log_listing_diagnostic(url: str, response, attempt: int, classification: str, text: str) -> None:
+    query = parse_qs(urlparse(url).query)
+    section_id = query.get("ca_id", ["unknown"])[0]
+    page_number = query.get("page", ["unknown"])[0]
+    if not section_id.isdecimal():
+        section_id = "unknown"
+    if not page_number.isdecimal():
+        page_number = "unknown"
+
+    final_url = urlparse(response.url)
+    raw_final_host = (final_url.hostname or "unknown").lower()
+    final_host = raw_final_host if raw_final_host in ALLOWED_HOSTS else "other"
+    content_type = response.headers.get("content-type", "unknown").split(";", 1)[0]
+    content_type = re.sub(r"[^A-Za-z0-9.+/-]", "", content_type)[:80] or "unknown"
+    soup = BeautifulSoup(text, "html.parser")
+    has_list_container = soup.select_one(".listNews") is not None
+    has_expected_list = _listing_for_section(soup, section_id) is not None
+    has_article_title_marker = _article_title_marker_found(soup, section_id)
+    print(
+        f"DailyMedi listing diagnostic: section={section_id} page={page_number} "
+        f"final_host={final_host} status={response.status_code} content_type={content_type} "
+        f"response_bytes={len(response.content)} response_chars={len(text)} "
+        f"redirects={len(response.history)} attempt={attempt} "
+        f"marker_list_container={str(has_list_container).lower()} "
+        f"marker_expected_list={str(has_expected_list).lower()} "
+        f"marker_article_title={str(has_article_title_marker).lower()} classification={classification}"
+    )
 
 
 def _fetch_article_date(url: str) -> Optional[datetime]:
-    import requests
+    return _resolve_article_date(url).published_at
 
+
+def _resolve_article_date(url: str) -> DailyMediDateResolution:
     try:
-        return parse_article_page_date(_fetch_text(url))
+        html = _fetch_text(url)
     except (requests.RequestException, ValueError):
-        return None
+        return DailyMediDateResolution(None, "detail-request-failed")
+    try:
+        return _parse_article_date_resolution(html)
+    except ValueError:
+        return DailyMediDateResolution(None, "date-parse-failed")
 
 
-def fetch_dailymedi_articles() -> List[dict]:
+def fetch_dailymedi_articles() -> DailyMediCollection:
+    _log_runtime_diagnostic()
     print(f"DailyMedi HTML collection: sections={','.join(SECTION_IDS)} window_days=7")
-    return collect_recent_articles(_fetch_text, _fetch_article_date)
+    return collect_recent_articles(_fetch_text, _resolve_article_date)

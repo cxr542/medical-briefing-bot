@@ -1,0 +1,105 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { runInNewContext } from 'node:vm';
+import ts from 'typescript';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { kdcaNotices, storedKdcaArticle } from './fixtures/kdca-verified.mjs';
+
+// Exercise the real TSX without adding a second test runner or DOM dependency.
+const filename = new URL('../src/components/SourceLink.tsx', import.meta.url);
+const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
+  compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+}).outputText;
+const require = createRequire(filename);
+const exports = {};
+runInNewContext(compiled, { exports, require: (name) => require(name.startsWith('../lib/') ? `${name}.ts` : name) });
+const render = (article, props = {}) => renderToStaticMarkup(React.createElement(exports.SourceLink, { article, ...props }));
+const hira = { source: '심평원 e-평가 (평가알림방)', title: '전체 공지 제목 <원문>', url: 'https://aq.hira.or.kr/hira_aq/index.jsp#brdSno=2279' };
+const mfds = { source: '식품의약품안전처 보도자료', title: '식약처 공지', url: 'https://www.mfds.go.kr/brd/m_99/view.do?seq=50403' };
+
+test('KDCA table and content actions open verified detail while keeping the input identity', () => {
+  for (const notice of kdcaNotices) {
+    const article = Object.freeze(storedKdcaArticle(notice));
+    const before = JSON.stringify(article);
+    for (const variant of ['icon', 'content']) {
+      const html = render(article, { variant });
+      assert.ok(html.includes(`href="https://www.kdca.go.kr/bbs/kdca/42/${notice.id}/artclView.do"`));
+      assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+      assert.doesNotMatch(html, /<dialog|artclList\.do/);
+    }
+    assert.equal(JSON.stringify(article), before);
+  }
+});
+
+test('table guidance and direct actions share the same 44px button style without visible long labels', () => {
+  const guidance = render(hira, { variant: 'icon' });
+  const direct = render(mfds, { variant: 'icon' });
+  const trigger = guidance.split('</button>')[0];
+  assert.equal(trigger.match(/class="([^"]+)"/)[1], direct.match(/class="([^"]+)"/)[1]);
+  assert.match(trigger, /h-11 w-11/);
+  assert.match(trigger, /aria-haspopup="dialog"/);
+  assert.match(trigger, /lucide-info/);
+  assert.doesNotMatch(trigger, />기관에서 공지 찾기</);
+  assert.match(direct, /lucide-external-link/);
+  assert.match(direct, /target="_blank" rel="noopener noreferrer"/);
+  assert.ok(direct.includes(`href="${mfds.url}"`));
+});
+
+test('guidance has a labelled modal, complete escaped title, procedure and canonical homepage', () => {
+  const html = render(hira);
+  assert.match(html, /<dialog[^>]*aria-labelledby="[^"]+"[^>]*aria-describedby="[^"]+"/);
+  assert.match(html, /전체 공지 제목 &lt;원문&gt;/);
+  assert.match(html, /건강보험심사평가원 e-평가 · 평가알림방/);
+  assert.match(html, /기관 사이트 특성상 해당 공지로 직접 이동할 수 없습니다/);
+  assert.match(html, /기관 페이지 열기/);
+  assert.match(html, /aria-label="기관 안내 닫기"/);
+  assert.match(html, /href="https:\/\/aq.hira.or.kr\/hira_aq\/index.jsp"/);
+  assert.doesNotMatch(html, /href="[^"]*brdSno/);
+});
+
+test('unsafe URLs remain noninteractive in both variants', () => {
+  for (const variant of ['icon', 'content']) {
+    const html = render({ ...hira, url: 'javascript:alert(1)' }, { variant });
+    assert.doesNotMatch(html, /<(a|button|dialog)\b/);
+  }
+});
+
+test('unknown safe links retain the unverified accessible label and original href', () => {
+  const html = render({ source: 'Unknown', title: '제목', url: 'https://example.org/article' }, { variant: 'icon' });
+  assert.match(html, /상세 미확인/);
+  assert.match(html, /href="https:\/\/example.org\/article"/);
+  assert.match(html, /lucide-info/);
+});
+
+test('NHIS stored identity renders an official new-tab detail action without institution guidance', () => {
+  const article = Object.freeze({ source: '건보공단 업무포탈', title: '공지', url: 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886' });
+  const html = render(article, { variant: 'icon' });
+  assert.match(html, /원문 바로가기/);
+  assert.match(html, /bipaza410m02\.xml/);
+  assert.match(html, /brdCtsNo=/);
+  assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+  assert.doesNotMatch(html, /<dialog|기관에서 공지 찾기/);
+  assert.equal(article.url, 'https://medicare.nhis.or.kr/portal/index.do?artiId=26POR0000006000000000000005886');
+});
+
+test('optional metadata renders real SourceLink and old schema retains guidance', () => {
+  const article = storedKdcaArticle({ title: '오프라인 계약 공지' });
+  const href = 'https://www.kdca.go.kr/bbs/kdca/42/312999/artclView.do';
+  for (const variant of ['icon', 'content']) {
+    const html = render({ ...article, source_detail_url: href }, { variant });
+    assert.ok(html.includes(`href="${href}"`));
+    assert.match(html, /target="_blank" rel="noopener noreferrer"/);
+    assert.doesNotMatch(html, /<dialog|artclList\.do/);
+    const old = render(article, { variant });
+    // React-generated IDs differ across renders; compare behavior, not IDs.
+    for (const value of [undefined, null, 'https://evil.test/a']) {
+      const fallback = render({ ...article, source_detail_url: value }, { variant });
+      assert.match(fallback, /<dialog/);
+      assert.doesNotMatch(fallback, /href="[^"]*312999/);
+    }
+    assert.match(old, /<dialog/);
+  }
+});

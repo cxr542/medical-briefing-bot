@@ -1,0 +1,984 @@
+[
+  {
+    "token": "간호사는",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "간호사"
+    },
+    "morphology": [
+      {
+        "surface": "간호사",
+        "tag": "NNG",
+        "position": 0,
+        "length": 3
+      },
+      {
+        "surface": "는",
+        "tag": "JX",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "간호사"
+  },
+  {
+    "token": "전문의는",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "전문의"
+    },
+    "morphology": [
+      {
+        "surface": "전문의",
+        "tag": "NNG",
+        "position": 0,
+        "length": 3
+      },
+      {
+        "surface": "는",
+        "tag": "JX",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "전문의"
+  },
+  {
+    "token": "치료제는",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "치료제"
+    },
+    "morphology": [
+      {
+        "surface": "치료제",
+        "tag": "NNG",
+        "position": 0,
+        "length": 3
+      },
+      {
+        "surface": "는",
+        "tag": "JX",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "치료제"
+  },
+  {
+    "token": "당뇨병환자는",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "당뇨병환자"
+    },
+    "morphology": [
+      {
+        "surface": "당뇨병",
+        "tag": "NNG",
+        "position": 0,
+        "length": 3
+      },
+      {
+        "surface": "환자",
+        "tag": "NNG",
+        "position": 3,
+        "length": 2
+      },
+      {
+        "surface": "는",
+        "tag": "JX",
+        "position": 5,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "당뇨병환자"
+  },
+  {
+    "token": "AI의",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "AI"
+    },
+    "morphology": [
+      {
+        "surface": "AI",
+        "tag": "SL",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "의",
+        "tag": "JKG",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "AI"
+  },
+  {
+    "token": "안전의",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "안전"
+    },
+    "morphology": [
+      {
+        "surface": "안전",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "의",
+        "tag": "JKG",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "안전"
+  },
+  {
+    "token": "응급의료에",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "응급의료"
+    },
+    "morphology": [
+      {
+        "surface": "응급",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "의료",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      },
+      {
+        "surface": "에",
+        "tag": "JKB",
+        "position": 4,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "응급의료"
+  },
+  {
+    "token": "요양급여의",
+    "gold": {
+      "label": "NORMALIZE_NOUN",
+      "normalized": "요양급여"
+    },
+    "morphology": [
+      {
+        "surface": "요양",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "급여",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      },
+      {
+        "surface": "의",
+        "tag": "JKG",
+        "position": 4,
+        "length": 1
+      }
+    ],
+    "decision": "NORMALIZE_NOUN",
+    "normalized": "요양급여"
+  },
+  {
+    "token": "누리는",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "누리",
+        "tag": "VV",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "는",
+        "tag": "ETM",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "끊김없는",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "끊기",
+        "tag": "VV",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "ᆷ",
+        "tag": "ETN",
+        "position": 1,
+        "length": 1
+      },
+      {
+        "surface": "없",
+        "tag": "VA",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "는",
+        "tag": "ETM",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "안전하고",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "안전",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "하",
+        "tag": "XSA",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "고",
+        "tag": "EC",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "건강하게",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "건강",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "하",
+        "tag": "XSA",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "게",
+        "tag": "EC",
+        "position": 3,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "늘었지만",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "늘",
+        "tag": "VV",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "었",
+        "tag": "EP",
+        "position": 1,
+        "length": 1
+      },
+      {
+        "surface": "지만",
+        "tag": "EC",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "건전한",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "건전",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "하",
+        "tag": "XSA",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "ᆫ",
+        "tag": "ETM",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "검출된",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "검출",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "되",
+        "tag": "XSV",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "ᆫ",
+        "tag": "ETM",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "개척한",
+    "gold": {
+      "label": "REJECT_PREDICATE",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "개척",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "하",
+        "tag": "XSV",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "ᆫ",
+        "tag": "ETM",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "REJECT_PREDICATE",
+    "normalized": null
+  },
+  {
+    "token": "요양병원",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "요양병원"
+    },
+    "morphology": [
+      {
+        "surface": "요양",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "병원",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "요양병원"
+  },
+  {
+    "token": "환자안전",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "환자안전"
+    },
+    "morphology": [
+      {
+        "surface": "환자",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "안전",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "환자안전"
+  },
+  {
+    "token": "보험급여",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "보험급여"
+    },
+    "morphology": [
+      {
+        "surface": "보험",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "급여",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "보험급여"
+  },
+  {
+    "token": "급여중지",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "급여중지"
+    },
+    "morphology": [
+      {
+        "surface": "급여",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "중지",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "급여중지"
+  },
+  {
+    "token": "장기요양기관",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "장기요양기관"
+    },
+    "morphology": [
+      {
+        "surface": "장기",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "요양",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      },
+      {
+        "surface": "기관",
+        "tag": "NNG",
+        "position": 4,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "장기요양기관"
+  },
+  {
+    "token": "급식관리",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "급식관리"
+    },
+    "morphology": [
+      {
+        "surface": "급식",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "관리",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "급식관리"
+  },
+  {
+    "token": "질병군",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "질병군"
+    },
+    "morphology": [
+      {
+        "surface": "질병",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "군",
+        "tag": "NNG",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "질병군"
+  },
+  {
+    "token": "별도보상",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "별도보상"
+    },
+    "morphology": [
+      {
+        "surface": "별도",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "보상",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "별도보상"
+  },
+  {
+    "token": "제3차",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "제3차"
+    },
+    "morphology": [
+      {
+        "surface": "제",
+        "tag": "XPN",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "3",
+        "tag": "SN",
+        "position": 1,
+        "length": 1
+      },
+      {
+        "surface": "차",
+        "tag": "NNB",
+        "position": 2,
+        "length": 1
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "제3차"
+  },
+  {
+    "token": "GLP-1",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "GLP-1"
+    },
+    "morphology": [
+      {
+        "surface": "GLP",
+        "tag": "SL",
+        "position": 0,
+        "length": 3
+      },
+      {
+        "surface": "-",
+        "tag": "SO",
+        "position": 3,
+        "length": 1
+      },
+      {
+        "surface": "1",
+        "tag": "SN",
+        "position": 4,
+        "length": 1
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "GLP-1"
+  },
+  {
+    "token": "COVID-19",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "COVID-19"
+    },
+    "morphology": [
+      {
+        "surface": "COVID",
+        "tag": "SL",
+        "position": 0,
+        "length": 5
+      },
+      {
+        "surface": "-",
+        "tag": "SO",
+        "position": 5,
+        "length": 1
+      },
+      {
+        "surface": "19",
+        "tag": "SN",
+        "position": 6,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "COVID-19"
+  },
+  {
+    "token": "1형당뇨",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "1형당뇨"
+    },
+    "morphology": [
+      {
+        "surface": "1",
+        "tag": "SN",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "형",
+        "tag": "XSN",
+        "position": 1,
+        "length": 1
+      },
+      {
+        "surface": "당뇨",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "1형당뇨"
+  },
+  {
+    "token": "제2형당뇨",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "제2형당뇨"
+    },
+    "morphology": [
+      {
+        "surface": "제",
+        "tag": "XPN",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "2",
+        "tag": "SN",
+        "position": 1,
+        "length": 1
+      },
+      {
+        "surface": "형",
+        "tag": "XSN",
+        "position": 2,
+        "length": 1
+      },
+      {
+        "surface": "당뇨",
+        "tag": "NNG",
+        "position": 3,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "제2형당뇨"
+  },
+  {
+    "token": "24시간돌봄",
+    "gold": {
+      "label": "PRESERVE_POLICY_IDENTIFIER",
+      "normalized": "24시간돌봄"
+    },
+    "morphology": [
+      {
+        "surface": "24",
+        "tag": "SN",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "시간",
+        "tag": "NNB",
+        "position": 2,
+        "length": 2
+      },
+      {
+        "surface": "돌봄",
+        "tag": "NNG",
+        "position": 4,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "24시간돌봄"
+  },
+  {
+    "token": "심전도",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "심전도"
+    },
+    "morphology": [
+      {
+        "surface": "심전도",
+        "tag": "NNP",
+        "position": 0,
+        "length": 3
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "심전도"
+  },
+  {
+    "token": "뇌전이",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "뇌전이"
+    },
+    "morphology": [
+      {
+        "surface": "뇌",
+        "tag": "NNG",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "전이",
+        "tag": "NNG",
+        "position": 1,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "뇌전이"
+  },
+  {
+    "token": "의학전문의",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "의학전문의"
+    },
+    "morphology": [
+      {
+        "surface": "의학",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "전문의",
+        "tag": "NNG",
+        "position": 2,
+        "length": 3
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "의학전문의"
+  },
+  {
+    "token": "투약제한",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "투약제한"
+    },
+    "morphology": [
+      {
+        "surface": "투약",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "제한",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "투약제한"
+  },
+  {
+    "token": "지급상한",
+    "gold": {
+      "label": "PRESERVE_DOMAIN_CONCEPT",
+      "normalized": "지급상한"
+    },
+    "morphology": [
+      {
+        "surface": "지급",
+        "tag": "NNG",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "상한",
+        "tag": "NNG",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "지급상한"
+  },
+  {
+    "token": "미인증",
+    "gold": {
+      "label": "KEEP_AS_IS",
+      "normalized": "미인증"
+    },
+    "morphology": [
+      {
+        "surface": "미",
+        "tag": "XPN",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "인증",
+        "tag": "NNG",
+        "position": 1,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "미인증"
+  },
+  {
+    "token": "법적",
+    "gold": {
+      "label": "AMBIGUOUS",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "법",
+        "tag": "NNG",
+        "position": 0,
+        "length": 1
+      },
+      {
+        "surface": "적",
+        "tag": "XSN",
+        "position": 1,
+        "length": 1
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "법적"
+  },
+  {
+    "token": "24시간",
+    "gold": {
+      "label": "AMBIGUOUS",
+      "normalized": null
+    },
+    "morphology": [
+      {
+        "surface": "24",
+        "tag": "SN",
+        "position": 0,
+        "length": 2
+      },
+      {
+        "surface": "시간",
+        "tag": "NNB",
+        "position": 2,
+        "length": 2
+      }
+    ],
+    "decision": "KEEP",
+    "normalized": "24시간"
+  }
+]
