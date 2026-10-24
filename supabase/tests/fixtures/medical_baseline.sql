@@ -63,17 +63,19 @@ INSERT INTO public.collector_alert_state(singleton_id) VALUES (true);
 CREATE SCHEMA running_test;
 CREATE FUNCTION running_test.medical_snapshot() RETURNS jsonb LANGUAGE sql AS $$
   SELECT jsonb_build_object(
-    'schema_acl',(SELECT nspacl::text FROM pg_namespace WHERE nspname='public'),
-    'tables',(SELECT jsonb_agg(jsonb_build_object('name',c.relname,'acl',c.relacl::text,'rls',c.relrowsecurity,'force',c.relforcerowsecurity) ORDER BY c.relname)
-      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relkind IN ('r','S')),
-    'columns',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.table_name,x.ordinal_position) FROM information_schema.columns x WHERE x.table_schema='public'),
+    'buckets',(SELECT jsonb_agg(jsonb_build_object('id',id,'name',name,'public',public,'file_size_limit',file_size_limit,'allowed_mime_types',allowed_mime_types) ORDER BY id) FROM storage.buckets),
+    'schema_acl',(SELECT jsonb_agg(jsonb_build_object('name',nspname,'acl',nspacl::text) ORDER BY nspname) FROM pg_namespace WHERE nspname IN ('public','customer_auth','support','storage','auth')),
+    'tables',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',c.relname,'acl',c.relacl::text,'rls',c.relrowsecurity,'force',c.relforcerowsecurity) ORDER BY n.nspname,c.relname)
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','customer_auth','support','storage','auth') AND c.relkind IN ('r','S')),
+    'columns',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.table_schema,x.table_name,x.ordinal_position) FROM information_schema.columns x WHERE x.table_schema IN ('public','customer_auth','support','storage','auth')),
     'constraints',(SELECT jsonb_agg(jsonb_build_object('name',c.conname,'definition',pg_get_constraintdef(c.oid)) ORDER BY c.conname)
-      FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname='public'),
-    'indexes',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.indexname) FROM pg_indexes x WHERE x.schemaname='public'),
-    'policies',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.tablename,x.policyname) FROM pg_policies x WHERE x.schemaname='public'),
-    'triggers',(SELECT jsonb_agg(pg_get_triggerdef(t.oid) ORDER BY t.tgname) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND NOT t.tgisinternal),
+      FROM pg_constraint c JOIN pg_namespace n ON n.oid=c.connamespace WHERE n.nspname IN ('public','customer_auth','support','storage','auth')),
+    'indexes',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.schemaname,x.indexname) FROM pg_indexes x WHERE x.schemaname IN ('public','customer_auth','support','storage','auth')),
+    'policies',(SELECT jsonb_agg(to_jsonb(x) ORDER BY x.schemaname,x.tablename,x.policyname) FROM pg_policies x WHERE x.schemaname IN ('public','customer_auth','support','storage','auth')),
+    'triggers',(SELECT jsonb_agg(pg_get_triggerdef(t.oid) ORDER BY n.nspname,c.relname,t.tgname) FROM pg_trigger t JOIN pg_class c ON c.oid=t.tgrelid JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname IN ('public','customer_auth','support','storage','auth') AND NOT t.tgisinternal),
+    'functions',(SELECT jsonb_agg(jsonb_build_object('schema',n.nspname,'name',p.oid::regprocedure::text,'acl',p.proacl::text,'definition',pg_get_functiondef(p.oid)) ORDER BY n.nspname,p.oid::regprocedure::text) FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname IN ('public','customer_auth','support','storage','auth') AND p.prokind IN ('f','p')),
     'defaults',(SELECT jsonb_agg(jsonb_build_object('owner',d.defaclrole,'type',d.defaclobjtype,'acl',d.defaclacl::text) ORDER BY d.defaclrole,d.defaclobjtype)
-      FROM pg_default_acl d JOIN pg_namespace n ON n.oid=d.defaclnamespace WHERE n.nspname='public')
+      FROM pg_default_acl d JOIN pg_namespace n ON n.oid=d.defaclnamespace WHERE n.nspname IN ('public','customer_auth','support','storage','auth'))
   );
 $$;
 CREATE TABLE running_test.baseline(snapshot jsonb NOT NULL);

@@ -1,5 +1,7 @@
 # Latest-main reconciliation and commit candidate — 2026-10-02
 
+Historical report. Its two-row history, migration ordering and permission assumptions were superseded by the 2026-10-24 baseline described in [running-core-v1.md](running-core-v1.md). The readiness verdict below applies only to the October 2 candidate.
+
 **READY FOR COMMIT/PR**. No commit, push, PR or Production operation was performed.
 
 ## A. Latest Main State
