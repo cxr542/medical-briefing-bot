@@ -6,6 +6,7 @@ import Image from 'next/image';
 import Link from "next/link";
 
 import ArticleList from '@/components/ArticleList';
+import PwaInstallHelp from '@/components/PwaInstallHelp';
 import CollectionStatusBanner, { CollectionLastCheck, CollectionStatusProvider } from '@/components/CollectionStatusBanner';
 import { COLLECTION_DISPLAY_SCHEDULE_KST, getKstDateKey, getLatestCollectionRuntimeTime, getLatestCollectionTime, shiftKstDate } from '@/lib/collectionStatus';
 
@@ -43,6 +44,7 @@ export default async function Dashboard() {
           <div className="p-6 md:p-9"><div className="mb-4 inline-flex items-center gap-2 rounded-full bg-[#FEE500] px-3 py-1.5 text-xs font-black text-[#191919]"><Sparkles className="h-3.5 w-3.5" /> 오늘의 브리핑</div><h1 className="max-w-2xl text-3xl font-black tracking-tight text-[#191919] md:text-5xl">의료·보건 소식,<br /><span className="text-[#1D4ED8]">따뜻하게 한눈에.</span></h1><p className="mt-4 max-w-xl break-keep text-sm leading-6 text-slate-600 md:text-base">복잡한 의료 뉴스를 곰돌이 브리퍼와 함께 가볍게 살펴보세요. 매일 필요한 소식을 한곳에 <span className="whitespace-nowrap">모았어요.</span></p><div className="mt-6 flex flex-wrap gap-2" aria-label="수집 일정">{COLLECTION_DISPLAY_SCHEDULE_KST.map(time => <span key={time} className={`rounded-full px-3 py-1.5 text-xs font-bold ${time === getLatestCollectionTime(now) ? 'bg-[#FEE500] text-[#191919]' : 'bg-slate-100 text-slate-600'}`}>{time}</span>)}</div></div>
           <div className="flex max-h-60 items-end justify-center overflow-hidden bg-[#FFF8D8] px-3 pt-2 md:max-h-64 md:px-4"><Image src="/medical-briefing-bear.png" alt="Medical Briefing 곰돌이 캐릭터" width={1374} height={1145} className="h-auto max-h-56 w-full max-w-[36rem] object-contain object-bottom md:max-h-64" priority /></div>
         </section>
+        <PwaInstallHelp />
         <CollectionStatusBanner />
         {/* 클라이언트 컴포넌트(검색 및 렌더링)에 데이터 전달 */}
         <ArticleList initialArticles={articles || []} initialDate={initialDate} initialTime={initialTime} />

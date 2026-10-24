@@ -1,5 +1,17 @@
 # Medical Briefing Admin Design System
 
+## PWA installation
+
+Preserve the existing bear dashboard and login. Installation help is a native
+details/summary disclosure, with a 44px target, visible keyboard focus and
+wrapping Korean instructions. Dashboard help uses its existing white/slate
+surface and blue #1D4ED8 ink; login reuses it below the existing form.
+Offline fallback uses #F8F9FA background, white surface, #191919 ink,
+#1D4ED8 links, 4px spacing, 24px heading and 16px body. Bear app icons use
+the existing illustration on #FFF8D8. No new motion or runtime dependency.
+The document owns scrolling. Offline mode explains the connection requirement;
+it never stores authenticated pages, articles, API responses or credentials.
+
 ## 1. Atmosphere & Identity
 
 The Admin is a warm, restrained operations workspace. Existing cream page

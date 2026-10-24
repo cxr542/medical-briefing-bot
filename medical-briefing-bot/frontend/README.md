@@ -2,6 +2,11 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
+Use the current main branch: protected pages read articles through authenticated
+server routes. The old direct anonymous Supabase dashboard cannot read production
+data. Link to the existing Vercel project and use its development configuration;
+never copy a service-role key into a `NEXT_PUBLIC_` variable.
+
 First, run the development server:
 
 ```bash
@@ -21,6 +26,20 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
 ## Learn More
+
+## Install on a phone (PWA)
+
+Open https://medical-briefing-bot.vercel.app over HTTPS. On iPhone use Safari's
+Share > Add to Home Screen; on Android use Chrome's Add to Home Screen / Install
+app menu. The existing customer login remains required. Installation help is
+available on both login and dashboard. No push notification subscription is added.
+
+The service worker registers in production only. It stores only the static
+offline explanation and bear icon, never articles, authenticated HTML, API
+responses or credentials. Offline navigation shows a retry link; article reading
+requires a connection. Generate icons with `node scripts/generate-pwa-icons.mjs`.
+Use `npm test`, `npm run lint`, `npx tsc --noEmit` and a production build before
+release. Verify manifest/icons, login protection and offline recovery in a browser.
 
 To learn more about Next.js, take a look at the following resources:
 
