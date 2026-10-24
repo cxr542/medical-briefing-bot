@@ -48,7 +48,7 @@ globalThis.fetch = async (input, options = {}) => {
       finished_at: ['stale-alert', 'dispatch-stale', 'collector-queued', 'collector-in-progress', 'dispatch-attempted', 'dispatch-attempted-failed', 'dispatch-attempted-ambiguous', 'dispatch-fails', 'dispatch-ambiguous', 'dispatch-persist-fails'].includes(scenario)
         ? staleFinishedAt
         : new Date().toISOString(),
-      result: scenario === 'degraded' ? 'DEGRADED' : scenario === 'collector-failed' || scenario === 'recovery-failed' ? 'FAILED' : 'SUCCESS',
+      result: ['degraded', 'recovery-degraded'].includes(scenario) ? 'DEGRADED' : scenario === 'collector-failed' || scenario === 'recovery-failed' ? 'FAILED' : 'SUCCESS',
       source_health: scenario === 'degraded'
         ? { 'Example source': { count: 0, status: 'WARN', reason: 'test reason' } }
         : {},
@@ -86,7 +86,7 @@ globalThis.fetch = async (input, options = {}) => {
               },
         },
         events: [],
-        ...(['dispatch-attempted', 'dispatch-attempted-failed', 'dispatch-attempted-ambiguous', 'recovery-success', 'recovery-failed'].includes(scenario)
+        ...(['dispatch-attempted', 'dispatch-attempted-failed', 'dispatch-attempted-ambiguous', 'recovery-success', 'recovery-failed', 'recovery-degraded'].includes(scenario)
           ? {
             recovery: {
               recovery_slot: scenario.startsWith('dispatch-attempted') ? staleSlot : toKstSlot(Date.now() - 60 * 60 * 1000),

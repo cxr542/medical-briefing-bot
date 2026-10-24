@@ -118,7 +118,7 @@ const evaluateRecovery = async (health, runs, previousAttempt, now) => {
         .sort((left, right) => Date.parse(right.finished_at) - Date.parse(left.finished_at))[0]
       : null;
     if (latestAfterSlot?.result === 'SUCCESS') return { ...attempt, recovery_status: 'RECOVERED' };
-    if (latestAfterSlot?.result === 'FAILED') return { ...attempt, recovery_status: 'FAILED' };
+    if (['FAILED', 'DEGRADED'].includes(latestAfterSlot?.result)) return { ...attempt, recovery_status: 'FAILED' };
     if (attempt.recovery_status === 'DISPATCHING' || attempt.recovery_status === 'RECOVERY_TRIGGERED') {
       const workflowRuns = await getCollectorWorkflowRuns();
       const recoveryRun = workflowRuns.find(run => (
