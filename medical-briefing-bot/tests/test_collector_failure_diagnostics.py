@@ -75,7 +75,7 @@ class CollectorFailureDiagnosticsTests(unittest.TestCase):
         self.assertEqual(records(logs)[0]["ssl_verify_code"], 20)
         self.assertNotIn(SECRET, logs[0])
 
-    def run_hira_failure(self, observation_error=False):
+    def run_hira_failure(self, observation_error=False, inspection_visible=False):
         # Isolate the real function: importing collector.py would create a DB client.
         tree = ast.parse((Path(__file__).parents[1] / "collector.py").read_text())
         function = next(node for node in tree.body if isinstance(node, ast.FunctionDef) and node.name == "fetch_hira_biz_notices")
@@ -83,6 +83,7 @@ class CollectorFailureDiagnosticsTests(unittest.TestCase):
             pass
         click_error = BrowserError("blocked " + SECRET)
         page = Mock()
+        page.locator.return_value.is_visible.return_value = inspection_visible
         page.get_by_text.return_value.first.click.side_effect = click_error
         state = {"ready_state": "complete", "body_text_length": 123,
                  "inspection_element_count": 4, "visible_inspection_element_count": 2}
@@ -129,3 +130,18 @@ class CollectorFailureDiagnosticsTests(unittest.TestCase):
         self.assertIs(error.__cause__, cause)
         self.assertEqual(record["observation_error_type"], "BrowserError")
         self.assertNotIn(SECRET, encoded)
+
+    def test_hira_inspection_notice_is_closed_before_board_navigation(self):
+        page, _cause, _error, _record, _encoded = self.run_hira_failure(inspection_visible=True)
+        notice = page.locator.return_value
+        notice.locator.assert_called_once_with('[id$="_form_btn_close"]')
+        notice.locator.return_value.click.assert_called_once_with(timeout=5000)
+        notice.wait_for.assert_called_once_with(state="hidden", timeout=5000)
+        calls = [str(item) for item in page.mock_calls]
+        self.assertLess(calls.index("call.locator().wait_for(state='hidden', timeout=5000)"),
+                        calls.index("call.get_by_text('자보알림방', exact=True)"))
+
+    def test_hira_absent_inspection_notice_is_not_clicked(self):
+        page, _cause, _error, _record, _encoded = self.run_hira_failure()
+        page.locator.return_value.locator.assert_not_called()
+        page.locator.return_value.wait_for.assert_not_called()
