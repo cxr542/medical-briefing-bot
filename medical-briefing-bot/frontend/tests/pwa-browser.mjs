@@ -30,7 +30,7 @@ test('production login advertises an installable app while protected data stays 
     const manifest = await manifestResponse.json();
     assert.equal(manifest.display, 'standalone');
     assert.equal(manifest.start_url, '/');
-    assert.equal(await page.locator('meta[name="apple-mobile-web-app-capable"]').getAttribute('content'), 'yes');
+    assert.equal(await page.locator('meta[name="mobile-web-app-capable"]').getAttribute('content'), 'yes');
     assert.equal(await page.locator('link[rel="apple-touch-icon"]').getAttribute('href'), '/icons/apple-touch-icon.png');
     for (const icon of manifest.icons) {
       const response = await context.request.get(origin + icon.src);
