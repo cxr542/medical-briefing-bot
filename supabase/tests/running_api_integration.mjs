@@ -163,8 +163,15 @@ test('local running JWT isolation and medical service regression', async t => {
       }
     }
   });
-  await t.test('medical fixture retains public read and service writes', async () => {
-    const article=await rest({ path:'articles?limit=1',schema:'public' }); assert.equal(article.status,200);
+  await t.test('medical fixture retains private articles and service writes', async () => {
+    denied(await rest({ path:'articles?limit=1',schema:'public' }));
+    denied(await rest({ path:'articles?limit=1',schema:'public',token:a.token }));
+    for (const token of [anon,a.token]) {
+      for (const rpc of ['customer_auth_rpc','customer_admin_rpc','customer_support_rpc','admin_support_rpc']) {
+        denied(await rest({path:`rpc/${rpc}`,schema:'public',token,method:'POST',body:{operation:'list',payload:{}}}));
+      }
+    }
+    const article=await rest({ path:'articles?limit=1',schema:'public',key:service,token:service }); assert.equal(article.status,200);
     denied(await rest({ path:'collector_runs',schema:'public' }));
     const run=await rest({ path:'collector_runs',schema:'public',key:service,token:service,method:'POST',body:{started_at:'2026-10-02T00:00:00Z',finished_at:'2026-10-02T00:01:00Z',result:'SUCCESS'} });
     assert.equal(run.status,201);

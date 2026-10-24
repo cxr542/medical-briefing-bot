@@ -60,25 +60,32 @@ First sync must preserve the local collection, ask which logged-in account claim
 
 ## Migration strategy and deployment bundle
 
-The new file is 20261002054701_running_core_v1.sql. Its timestamp was generated in the earlier phase when CLI was absent. CLI 2.119.0 now verifies it as the only pending migration. Latest main contains only the two original medical migrations; no version change is needed. Existing versions were not changed.
+The immutable source is 20261002054701_running_core_v1.sql (SHA-256 73ebeb3c43db5c8d0ba817a16420f92dead1d82a1a35286a2a22cd0125b7e7ac). The 2026-10-24 baseline has seven recorded migrations through 20261019041429, so the original timestamp is no longer a valid append-only deployment version. The offline tool requires an explicit later deployment version and copies identical SQL to that bundle-only filename. It records both source and destination versions; no repository migration is renamed or edited. A local candidate version is not approved for Production.
 Never run db push/reset/start directly from this checkout's legacy migration folder. It does not contain a complete medical genesis schema and its timestamps differ from Production history.
-prepare-running-deployment-bundle.mjs is offline. It requires a version/name history JSON, verifies immutable original hashes, creates a fresh exclusive output directory with history-version mirrors plus the new migration, and emits a manifest. No key/config/linked-project state is copied. A caller-supplied pending-version list may be checked; this is not a substitute for executing the actual CLI dry-run.
+prepare-running-deployment-bundle.mjs is offline. It requires a version/name history JSON and deployment version, verifies all seven history source hashes and the running hash, creates a fresh exclusive output directory with seven history-version mirrors plus the running migration, and emits a v2 manifest. No key/config/linked-project state is copied. A caller-supplied pending-version list may be checked; this is not a substitute for executing the actual CLI dry-run. pending_verified never grants Production approval; production_approved is always false.
 
 Mappings:
 - 20260928000000 -> 20260928064906 collector_alert_state
 - 20260928010000 -> 20260929063328 20260928010000_collector_runs_admin_only
+- 20261007021457 -> 20261007041102 article_keyword_boundary
+- 20261012040738 -> 20261012043225 article_source_detail_url
+- 20261016014502 -> 20261016014502 support_foundation (nested source directory)
+- 20261016035115 -> 20261016035115 support_attachments (nested source directory)
+- 20261019041429 -> 20261019041429 support_conflict_sqlstate (nested source directory)
+
+Customer authentication objects exist without corresponding rows in the observed ledger. The local fixture reconstructs those empty schemas from repository SQL; it does not invent ledger rows or include those files as pending bundle migrations. This is not evidence that Production history should be repaired.
 
 In the final verified procedure, old mirror SQL is not replayed: matching synthetic history versions mark it applied. An earlier local startup accidentally replayed the first mirror and failed on the second; the incident is retained in running-disposable-verification.md. History fixtures are local synthetic markers only. Original SQL hashes in the bundle are SHA-256.
 
 Offline bundle command (local file creation only):
 ```sh
-node scripts/prepare-running-deployment-bundle.mjs --history supabase/tests/fixtures/production-history.json --output /private/tmp/NEW_UNIQUE_BUNDLE
+node scripts/prepare-running-deployment-bundle.mjs --history supabase/tests/fixtures/production-history.json --deployment-version 20261024000000 --output /private/tmp/NEW_UNIQUE_BUNDLE
 ```
-Before a future deployment, read actual current history again. Any extra/version/name difference blocks bundle preparation. A disposable dry-run must report exactly the new migration; pass that result as --pending OFFLINE_PENDING_JSON. No Production repair/replay/push is authorized here.
+The command above uses a synthetic local candidate version. Before a future deployment, read actual current history again and separately review the deployment version. Any extra/version/name difference blocks bundle preparation. A disposable dry-run must report exactly the new migration; pass that result as --pending OFFLINE_PENDING_JSON. No Production repair/replay/push is authorized here.
 
 ## Testing
 
-Latest-main verification passed: pgTAP 83/83, JWT/API 15/15, Contract 56/56, bundle tests 4/4, strict TypeScript and Biome lint. The original checkout remains preserved; the commit candidate is in the separate latest-main directory. See [running-main-reconciliation.md](running-main-reconciliation.md) for exact SHAs, evidence, diff classification and candidates.
+Historical October 2 verification is recorded in [running-main-reconciliation.md](running-main-reconciliation.md). Current baseline checks use 88 pgTAP assertions and six bundle tests; execution evidence belongs in the current verification report, not the historical report.
 
 Use the guarded disposable runner from the medical candidate, with a supported installed CLI and the separate Today Shoes Contract checkout:
 ```sh
@@ -86,9 +93,9 @@ RUNNING_LOCAL_CLI=/absolute/path/to/supabase \
 RUNNING_CONTRACT_ROOT=/absolute/path/to/today-shoes \
 node scripts/verify-running-disposable.mjs
 ```
-The runner creates a fresh temporary directory and unique local project. Ports 55320/55321/55322 must be free. It starts with public-only API exposure and no migration directory; only after successful empty startup does it load synthetic baseline/history, copy the offline bundle, execute actual local dry-run, verify one pending running version, apply the new migration, and expose running locally. This ordering prevents the previous mirror replay incident. Never start/reset the repository or a deployment bundle directly.
+The runner creates a fresh temporary directory and unique local project, selects three available ports, and starts Auth, API and Storage with no migration directory. It reconstructs public articles/collector tables, six empty customer_auth tables, ten empty support tables and two private attachment buckets, then loads seven synthetic history markers. Only afterwards does it copy the offline bundle, execute actual local dry-run, verify one pending running version, inject a transaction failure against the full baseline, apply the migration, and expose running locally. Never start/reset the repository or a deployment bundle directly.
 
-The runner strips inherited service/Production environment variables, reads local credentials from CLI status into memory, accepts only the expected loopback endpoint and records redacted evidence. It executes pgTAP, JWT/API and rollback tests, then retains the disposable stack for review. No repository config, .env, Production credentials or project link is needed. Existing migration files are hash-checked and remain unchanged.
+The runner strips inherited service/Production environment variables, reads local credentials from CLI status into memory, accepts only the expected loopback endpoint and records redacted evidence. It executes pgTAP, JWT/API and rollback tests, and stops/removes only its own disposable stack in a finally block. Text evidence and bundles remain in its temporary directory. No repository config, .env, Production credentials or project link is needed. Existing migration files are hash-checked and remain unchanged.
 
 The API test uses RUNNING_CONTRACT_ROOT, defaulting to an adjacent today-shoes checkout. This cross-repository fixture test dependency does not couple the two production implementations. Native TS stripping requires Node 22.18+ or a supported newer runtime; verified with Node 25.9.0. The existing Expo manifest is unchanged, so its module-type warning remains.
 
@@ -111,8 +118,8 @@ After a future deployment, disable running import/cloud features first and prese
 - Gemini EXPO_PUBLIC_GOOGLE_AI_API_KEY exposure remains HIGH priority. Future authenticated server/Edge Function calls Gemini using a server secret and user JWT for DB operations, not service_role by default.
 - Shared Project service trust boundary remains: DB object privileges restrict direct running access, but project Auth Admin capabilities and Storage service bypass are not isolated app boundaries.
 - Migration history mismatch remains. Original migrations/history were not repaired.
-- Public medical articles remain readable by any public client, including Today Shoes users. Existing broad public SQL grants are not changed.
+- Current medical articles are application-only; anon and authenticated SQL/API reads remain denied. Custom customer_auth is separate from Supabase Auth, which running uses.
 - The original medical checkout remains behind remote with user edits preserved. A separate latest-main commit candidate has now been reconciled; see running-main-reconciliation.md.
-- Disposable verification completed: pgTAP 83/83, JWT/API 15/15, actual CLI pending only 20261002054701, verified bundle pending_verified=true, rollback passed. See [running-disposable-verification.md](running-disposable-verification.md) for the full A-S report, initial local mirror replay mistake, environment caveats and every assertion. Production remains unchanged.
+- The October 2 [disposable report](running-disposable-verification.md) is historical and does not establish readiness against today's ledger or operational source failures. Production remains unchanged by this tooling work.
 - pgTAP fixture reproduces the relevant schema/permission shape with synthetic values, not every historical database setting or application runtime route.
 - Future providers require explicit adapter/source registry changes; DB acceptance of a slug does not mean an importer is implemented.

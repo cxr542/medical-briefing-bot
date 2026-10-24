@@ -1,4 +1,9 @@
 [
   {"version": "20260928064906", "name": "collector_alert_state"},
-  {"version": "20260929063328", "name": "20260928010000_collector_runs_admin_only"}
+  {"version": "20260929063328", "name": "20260928010000_collector_runs_admin_only"},
+  {"version": "20261007041102", "name": "article_keyword_boundary"},
+  {"version": "20261012043225", "name": "article_source_detail_url"},
+  {"version": "20261016014502", "name": "support_foundation"},
+  {"version": "20261016035115", "name": "support_attachments"},
+  {"version": "20261019041429", "name": "support_conflict_sqlstate"}
 ]
