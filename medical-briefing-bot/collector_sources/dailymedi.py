@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 import requests
 import urllib3
-from collector_failure_diagnostics import ssl_failure_fields
+from collector_failure_diagnostics import failure_trace_fields, ssl_failure_fields
 
 from collector_parsers import get_content_hash
 
@@ -493,6 +493,7 @@ def _log_request_diagnostic(
         "ssl_reason": _ssl_reason(error) if error is not None else None,
         "retry_state": result,
         **ssl_failure_fields(_exception_chain(error) if error is not None else ()),
+        **(failure_trace_fields(_exception_chain(error)) if error is not None else {}),
     }
     print("DailyMedi request diagnostic: " + json.dumps(record, sort_keys=True, separators=(",", ":")))
 
