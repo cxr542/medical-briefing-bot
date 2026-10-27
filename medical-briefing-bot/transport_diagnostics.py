@@ -6,6 +6,7 @@ import platform
 import ssl
 import subprocess
 import time
+import traceback
 from typing import Final, Optional
 
 import requests
@@ -26,15 +27,12 @@ class Probe:
     error_code: Optional[str] = None
     connect_ms: Optional[float] = None
     appconnect_ms: Optional[float] = None
+    failure_frames: tuple[str, ...] = ()
 
 
 ENDPOINTS: Final = (
-    Endpoint("mohw_press", "https://www.mohw.go.kr/rss/board.es?mid=a10503000000&bid=0027&info"),
-    Endpoint("mohw_law", "https://www.mohw.go.kr/board.es?mid=a10409020000&bid=0026"),
-    Endpoint("mfds_press", "http://www.mfds.go.kr/www/rss/brd.do?brdId=ntc0021"),
-    Endpoint("kdca_press", "https://www.kdca.go.kr/bbs/kdca/41/rssList.do?row=50"),
-    Endpoint("law_public_transport", "https://www.law.go.kr/DRF/lawSearch.do?target=law&type=JSON&query=medical"),
-    Endpoint("dailymedi_detail", "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=941822"),
+    Endpoint("dailymedi_listing_8", "https://www.dailymedi.com/news/news_list.php?ca_id=22&page=8"),
+    Endpoint("dailymedi_detail_941444", "https://www.dailymedi.com/news/news_view.php?ca_id=21&wr_id=941444"),
 )
 USER_AGENT: Final = "Mozilla/5.0 (compatible; MedicalBriefingBot/1.0)"
 
@@ -57,7 +55,8 @@ def requests_probe(endpoint: Endpoint) -> Probe:
                              round((time.monotonic() - started) * 1000))
     except requests.RequestException as error:
         return Probe("requests", None, round((time.monotonic() - started) * 1000),
-                     type(error).__name__)
+                     type(error).__name__, failure_frames=tuple(
+                         frame.name for frame in traceback.extract_tb(error.__traceback__)[-8:]))
 
 
 def curl_probe(endpoint: Endpoint) -> Probe:
