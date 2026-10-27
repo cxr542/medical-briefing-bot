@@ -30,10 +30,12 @@ First-attempt successes and retry-recovery success logs receive no new fields.
 
 ## Validation and interpretation
 
-Seven new offline tests cover known and unknown frames, absent tracebacks,
+Eight new offline tests cover known and unknown frames, absent tracebacks,
 wrapped and overlapping evidence, cycles, chain/frame bounds, secret sentinels,
-failure/recovery logging and unchanged request options. The full local suite on
-Python 3.12 ran 228 tests: 227 passed and one optional native keyword-boundary
+failure/recovery logging and unchanged request options. Real standard-library
+handshake/header/body functions are also exercised with fake I/O, without a
+network connection. The full local suite on
+Python 3.12 ran 229 tests: 228 passed and one optional native keyword-boundary
 smoke test was skipped. Existing tests cover three attempts, backoffs, partial
 snapshots, identity and deletion protection. Python 3.9 compatibility is checked
 by the existing Collector regression CI; no workflow change is required.

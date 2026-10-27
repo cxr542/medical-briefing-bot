@@ -1,8 +1,10 @@
+import http.client
+import io
 import json
 import ssl
 from types import FunctionType
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import requests
 import urllib3
@@ -33,6 +35,33 @@ def frame_error(module: str, name: str) -> ssl.SSLZeroReturnError:
 
 
 class DailyMediFailureTraceTests(unittest.TestCase):
+    def test_real_stdlib_frames_are_detected_without_a_network_connection(self) -> None:
+        handshake = Mock()
+        handshake._sslobj.do_handshake.side_effect = ssl.SSLZeroReturnError(6, SECRET)
+        header_socket = Mock()
+        header_socket.makefile.return_value.readline.side_effect = ssl.SSLZeroReturnError(6, SECRET)
+        headers = http.client.HTTPResponse(header_socket)
+        body_socket = Mock()
+        body_socket.makefile.return_value = io.BytesIO(b"HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok")
+        body = http.client.HTTPResponse(body_socket)
+        body.begin()
+        body.fp = Mock()
+        body.fp.read.side_effect = ssl.SSLZeroReturnError(6, SECRET)
+        for execute, expected in (
+            (lambda: ssl.SSLSocket.do_handshake(handshake), "trace_tls_handshake"),
+            (headers.begin, "trace_http_headers"),
+            (body.read, "trace_http_body"),
+        ):
+            with self.subTest(expected=expected):
+                try:
+                    execute()
+                except ssl.SSLZeroReturnError as error:
+                    fields = failure_trace_fields((error,))
+                else:
+                    self.fail("Expected the simulated TLS failure")
+                self.assertEqual({key for key, value in fields.items() if value}, {expected})
+                self.assertNotIn(SECRET, json.dumps(fields))
+
     def test_known_frames_emit_only_coarse_presence_flags(self) -> None:
         cases = (
             ("ssl", "do_handshake", "trace_tls_handshake"),
