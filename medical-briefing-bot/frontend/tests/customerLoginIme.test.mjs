@@ -25,8 +25,9 @@ function loginHarness() {
   const compiled = ts.transpileModule(readFileSync(filename, 'utf8'), {
     compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS },
   }).outputText;
+  const requests = [];
   const exports = {};
-  runInNewContext(compiled, { exports, require: name => {
+  runInNewContext(compiled, { exports, fetch: async (url, options) => { requests.push({url, body: JSON.parse(options.body)}); return {ok:false,status:503}; }, require: name => {
     if (name === 'react') return hooks;
     if (name === '@/lib/customerReturn') return { safeUserNext() { assert.fail('No navigation during typing'); } };
     return require(name);
@@ -41,6 +42,9 @@ function loginHarness() {
     }
     visit(exports.default({ next: '/' }));
     return {
+      requests,
+      form: elements.find(element => element.type === 'form'),
+      remember: elements.find(element => element.props.name === 'remember'),
       input: elements.find(element => element.props.id === 'shared-password'),
       toggle: elements.find(element => element.props['aria-controls'] === 'shared-password'),
     };
@@ -67,4 +71,17 @@ test('revealing replaces the password element while preserving Korean text throu
   assert.equal(render().input.props.value, '한글Password123!');
   render().toggle.props.onClick();
   assert.equal(render().input.props.value, '한글Password123!');
+});
+
+
+test('remember login defaults off and submits only an explicit selection', async () => {
+  // Given: a fresh login form with no saved browser preference.
+  const render = loginHarness();
+  assert.equal(render().remember.props.checked, false);
+  render().remember.props.onChange({target:{checked:true}});
+  // When: the selected form is submitted.
+  await render().form.props.onSubmit({preventDefault(){}});
+  // Then: the HTTP request carries the explicit boolean opt-in.
+  assert.equal(render().requests[0].body.remember, true);
+  assert.equal(render().requests[0].url, '/api/customer-auth/login');
 });
