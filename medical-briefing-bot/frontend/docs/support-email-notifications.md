@@ -1,41 +1,45 @@
-# 새 문의 관리자 이메일 알림
+# 새 문의 관리자 이메일 알림 (Gmail SMTP)
 
-고객 관리센터에서 문의가 저장된 뒤 Next.js `after()`로 Resend에 발송합니다.
-수신 주소 기본값은 `cxr542@gmail.com`이며 서버 환경변수로 바꿀 수 있습니다.
-등록 응답은 메일 발송을 기다리지 않습니다. 메일 오류로 이미 저장된 글이 실패 처리되지 않습니다.
+고객 문의가 저장된 뒤 Next.js `after()`에서 Gmail SMTP로 관리자에게 메일을 보냅니다.
+기본 발신·수신 계정은 `cxr542@gmail.com`입니다. 메일 오류가 이미 저장된 문의를 실패 처리하지 않습니다.
+Resend 가입, 도메인 인증, Resend API 키는 필요하지 않습니다.
 
 ## 활성화
 
-Resend 계정을 만들고 API 키를 발급한 다음, 해당 Vercel 프로젝트의 Production 환경변수를 설정하고 재배포합니다.
+1. 발신 Google 계정의 2단계 인증을 켭니다.
+2. https://myaccount.google.com/apppasswords 에서 `Medical Briefing` 앱 비밀번호를 발급합니다.
+3. Vercel의 `medical-briefing-bot` 프로젝트 Production 환경변수에 아래를 설정합니다. 앱 비밀번호를 채팅·소스·로그에 입력하지 않습니다.
+4. `../supabase/migrations/20261029082347_support_email_notifications.sql`을 서비스가 사용하는 DB에 적용한 뒤 운영 코드를 배포합니다.
 
 | 변수 | 값 |
 | --- | --- |
+| `GMAIL_APP_PASSWORD` | 발신 계정에서 만든 16자리 앱 비밀번호. 표시용 공백은 자동 제거됩니다. |
+| `GMAIL_SMTP_USER` | 기본값 `cxr542@gmail.com` |
+| `SUPPORT_NOTIFICATION_TO` | 기본값 `cxr542@gmail.com` |
 | `SUPPORT_EMAIL_NOTIFICATIONS_ENABLED` | `true` |
-| `RESEND_API_KEY` | Resend에서 발급한 발송 권한 API 키 |
-| `SUPPORT_NOTIFICATION_FROM` | Resend에서 사용 가능한 발신 이메일 주소(표시 이름 없이 주소만) |
-| `SUPPORT_NOTIFICATION_TO` | `cxr542@gmail.com` (생략해도 동일) |
-| `SUPPORT_NOTIFICATION_SITE_URL` | `https://medical-briefing-bot.vercel.app` (기본값) |
+| `SUPPORT_NOTIFICATION_SITE_URL` | 기본값 `https://medical-briefing-bot.vercel.app` |
 
-발신 주소로 Gmail 주소를 임의 지정하면 안 됩니다. 인증한 도메인의 발신 주소를 사용합니다.
-도메인 인증 전 Resend 테스트 발신자 `onboarding@resend.dev`를 사용할 경우 수신 주소가 Resend 계정에 등록된 본인 이메일이어야 합니다.
-키를 소스 코드에 넣거나 `NEXT_PUBLIC_` 변수로 만들지 않습니다.
-Preview/Development에는 활성화 변수를 설정하지 않으면 테스트 문의가 실제 메일로 발송되지 않습니다.
-기존 `SUPPORT_ENABLED`와 고객 인증 설정도 활성화되어 있어야 합니다.
+`GMAIL_APP_PASSWORD`는 Production 전용 Secret/Sensitive로 저장합니다. 일반 Google 로그인 비밀번호는 사용하지 않습니다.
+Preview/Development에는 발송 활성화 변수를 설정하지 않습니다. 기존 `SUPPORT_ENABLED`와 고객 인증은 계속 필요합니다.
+Google 계정 비밀번호를 변경하면 앱 비밀번호가 취소될 수 있으므로 재발급해 Vercel 값을 갱신하고 재배포합니다.
 
-## 동작과 운영
+## 발송과 중복 방지
 
-- 메일에는 문의 번호, 제목, 우선순위, 한국 시간 등록일, ID와 관리자 목록 링크가 들어갑니다. 본문과 첨부파일, 세션 정보는 전송하지 않습니다.
-- 인증·입력 검증·저장에 실패한 요청, 조회, 답변, 상태 변경은 메일을 보내지 않습니다.
-- Resend idempotency 키를 문의 UUID에서 만들어 24시간 내 동일 문의 재시도의 중복 메일을 방지합니다. 등록 후 23시간이 지난 생성 RPC 재실행은 발송하지 않습니다.
-- 한 번의 요청은 5초 제한, 일시적인 통신 오류/429/일부 5xx에 최대 1회 재시도하며 전체 12초로 제한합니다.
-- `support.notification.failed` 로그에는 문의 ID, 실패 분류, HTTP 상태만 기록합니다. 키와 문의 제목·본문, 공급자 응답은 기록하지 않습니다.
-- 이 구현은 영속 큐가 아닙니다. 인스턴스 중단이나 재시도 후에도 계속되는 장애의 자동 재전송을 보장하지 않습니다. 메일 접수 성공도 Gmail 수신함 도착을 보장하지 않으므로 Resend 발송 내역과 스팸함을 확인합니다.
-- 비활성화는 `SUPPORT_EMAIL_NOTIFICATIONS_ENABLED=false` 설정 후 재배포합니다. 설정 전 등록된 과거 문의는 소급 발송하지 않습니다.
+- 서버는 `smtp.gmail.com:465`에 TLS로 접속합니다. 발신 주소는 SMTP 로그인 계정과 동일합니다.
+- 문의 번호·제목·우선순위·한국 시간 등록일·ID와 관리자 목록 링크만 보냅니다. 문의 본문·첨부파일·세션은 메일에 넣지 않습니다.
+- `support.support_email_notifications`의 문의 UUID 기본 키와 원자적 INSERT로 한 문의당 한 번만 발송을 시도합니다. 병렬 요청·등록 재시도·인스턴스 재시작에도 이 기록을 사용합니다.
+- SMTP에는 공급자 중복 방지 키가 없습니다. 응답 유실 시 이미 접수된 메일을 또 보낼 수 있으므로 자동 재전송하지 않습니다. DB 상태는 `attempting`, `accepted`, `failed`입니다. `accepted`는 SMTP 접수이며 Gmail 수신함 도착을 의미하지 않습니다.
+- 연결·인사·DNS는 각 5초, 소켓 비활성은 10초 제한입니다. 메일 처리 후 연결을 닫습니다.
+- DB 기록에 실패하면 메일을 보내지 않습니다. 접수 후 완료 기록이 실패해도 기존 시도 기록으로 중복 발송을 막습니다.
+- 이 구현은 영속 재시도 큐가 아닙니다. 프로세스 중단이나 통신 오류로 알림을 놓칠 수 있습니다. 실패·장기 `attempting` 기록은 운영자가 문의 목록 및 실제 수신 내역과 대조해 수동 처리합니다.
+- 23시간이 지난 등록 재실행은 발송하지 않습니다. 과거 문의를 자동으로 소급 발송하지 않습니다.
+- 실패 로그에는 문의 ID와 오류 분류만 기록합니다. 비밀번호·메일 내용·SMTP 원문 응답은 기록하지 않습니다.
+- 알림을 끄려면 `SUPPORT_EMAIL_NOTIFICATIONS_ENABLED=false`로 변경하고 재배포합니다.
 
 ## 검증
 
-로컬: `npm test`, `npm run lint`, `npm run test:support:http` (프로덕션 빌드 포함), `npx tsc --noEmit`, `npm run test:support:notification:http` (빌드 후 실행).
-실제 발송 설정 뒤 고객 관리자 계정으로 테스트 문의 1건을 등록하여 등록 성공, 관리자 목록의 문의 번호, Resend 발송 결과와 수신 메일을 확인합니다.
-실제 발송 API 키가 없는 로컬 검증은 Resend HTTP 대역으로 수행하며 실제 수신 검증을 대신하지 않습니다.
+`npm test`, `npm run lint`, `npm run test:support:http`(프로덕션 빌드 포함), `npx tsc --noEmit`, `npm run test:support:notification:http`(빌드 후).
+알림 테스트는 실제 로컬 SMTP 서버와 Postgres 함수를 사용하며 Google에 접속하지 않습니다.
+운영에서는 테스트 문의를 등록하고 메일 도착(스팸함 포함), 문의 번호와 DB의 `accepted` 상태를 확인합니다.
 
-참고: [Resend 발송 API](https://resend.com/docs/api-reference/emails/send-email), [24시간 idempotency](https://resend.com/docs/dashboard/emails/idempotency-keys), [Next.js after](https://nextjs.org/docs/app/api-reference/functions/after).
+참고: [Google 앱 비밀번호](https://support.google.com/accounts/answer/185833?hl=ko), [Nodemailer Gmail](https://nodemailer.com/usage/using-gmail/), [Next.js after](https://nextjs.org/docs/app/api-reference/functions/after).
