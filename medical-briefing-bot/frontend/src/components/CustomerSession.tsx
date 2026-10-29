@@ -17,7 +17,7 @@ export default function CustomerSession() {
       if (pending) return pending;
       pending = (async () => {
         try {
-          const result = await fetch('/api/customer-auth/session', { cache: 'no-store' });
+          const result = await fetch('/api/customer-auth/session', { method: document.visibilityState === 'visible' ? 'POST' : 'GET', cache: 'no-store' });
           if (!result.ok) leave();
         } catch { leave(); }
       })().finally(() => { pending = null; });

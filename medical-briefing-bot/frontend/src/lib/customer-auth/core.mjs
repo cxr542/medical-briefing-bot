@@ -4,6 +4,7 @@ import { hash, verify, Algorithm } from '@node-rs/argon2';
 export const LOGIN_FAILURE = '사번 또는 비밀번호를 확인해 주세요.';
 export const ADMIN_LOGIN_FAILURE = '관리자 인증 정보를 확인해 주세요.';
 export const SESSION_TTL = { user: 8 * 3600, admin: 3600 };
+export const REMEMBER_TTL = 30 * 24 * 3600;
 export const COOKIE_NAMES = { user: 'medical_customer_session', admin: 'medical_customer_admin_session' };
 const HASH_OPTIONS = { algorithm: Algorithm.Argon2id, memoryCost: 19456, timeCost: 2, parallelism: 1, outputLen: 32 };
 // A non-credential fixture hash used only to equalize missing-credential verification.
@@ -36,9 +37,10 @@ export function readSessionCookie(request, kind, secure = process.env.NODE_ENV =
   const token = entries[0].slice(name.length + 1);
   return /^[A-Za-z0-9_-]{43}$/.test(token) ? token : null;
 }
-export function sessionCookie(kind, token, secure = process.env.NODE_ENV === 'production', clear = false) {
+export function sessionCookie(kind, token, secure = process.env.NODE_ENV === 'production', clear = false, maxAge = SESSION_TTL[kind]) {
   if (!clear && !/^[A-Za-z0-9_-]{43}$/.test(token)) throw new Error('Invalid session token');
-  return `${cookieName(kind, secure)}=${clear ? '' : token}; Path=/; Max-Age=${clear ? 0 : SESSION_TTL[kind]}; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
+  if (!Number.isInteger(maxAge) || maxAge < 1 || maxAge > (kind === 'user' ? REMEMBER_TTL : SESSION_TTL.admin)) throw new Error('Invalid session lifetime');
+  return `${cookieName(kind, secure)}=${clear ? '' : token}; Path=/; Max-Age=${clear ? 0 : maxAge}; HttpOnly; SameSite=Lax${secure ? '; Secure' : ''}`;
 }
 export function rateKeys(kind, identifier, ip, secret) {
   if (typeof secret !== 'string' || Buffer.byteLength(secret) < 32) throw new Error('Rate limit configuration unavailable');
@@ -49,7 +51,7 @@ export function rateKeys(kind, identifier, ip, secret) {
 // Repository is the persistence boundary. No module-level sessions or authorization cache.
 export class CustomerAuthService {
   constructor(repository) { this.repository = repository; }
-  async login(kind, identifier, password, keys) {
+  async login(kind, identifier, password, keys, remember = false) {
     const limit = await this.repository.call('consume_attempt', keys);
     if (!limit.allowed) return { status: 429, error: '잠시 후 다시 시도해 주세요.' };
     const validIdentifier = typeof identifier === 'string' && identifier.length > 0 && identifier.length <= 64 && !/[\s\x00-\x1f\x7f]/.test(identifier);
@@ -64,6 +66,7 @@ export class CustomerAuthService {
     const issued = await this.repository.call('issue_session', {
       kind, principal_id: credential.id, token_hash: tokenHash(token),
       credential_version: credential.credential_version, principal_version: credential.session_version,
+      remember: kind === 'user' && remember === true,
     });
     if (!issued.ok) return { status: 401, error: kind === 'user' ? LOGIN_FAILURE : ADMIN_LOGIN_FAILURE };
     return { status: 200, token, principal: { id: credential.id, kind } };
@@ -72,6 +75,11 @@ export class CustomerAuthService {
     if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
     const result = await this.repository.call('validate_session', { kind, token_hash: tokenHash(token) });
     return result?.id ? { id: result.id, kind } : null;
+  }
+  async refresh(token) {
+    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    const result = await this.repository.call('refresh_session', { kind: 'user', token_hash: tokenHash(token) });
+    return result?.id ? { principal: { id: result.id, kind: 'user' }, expiresAt: result.remember ? result.expires_at : null } : null;
   }
   async logout(kind, token) {
     if (typeof token === 'string' && /^[A-Za-z0-9_-]{43}$/.test(token)) await this.repository.call('revoke_session', { kind, token_hash: tokenHash(token) });

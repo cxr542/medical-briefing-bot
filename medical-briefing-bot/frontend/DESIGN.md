@@ -201,3 +201,11 @@ Status changes follow the existing DB transition graph with version checks at
 each step. Interrupted changes reload the current state before another save.
 Show an explicit attachment-unavailable message when uploads are disabled.
 Replies alone determine detail pagination. Keep phone stacking and desktop rail.
+
+## 12. Remember login
+
+Customer login reuses slate/blue text, 4px spacing and the existing focus ring.
+An unchecked native checkbox has a labelled 44px-high click target, keyboard
+Space support and disabled/busy states. Supporting text explains the rolling
+30-day window and personal-PC use. No credentials or preferences enter browser
+storage. CustomerSession renews only while the document is visible.
