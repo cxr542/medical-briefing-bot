@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 
-export const notificationMigration = await readFile(new URL('../../../supabase/migrations/20261029082347_support_email_notifications.sql', import.meta.url), 'utf8');
+export const notificationMigration = await readFile(new URL('../../../supabase/migrations/20261029083035_support_email_notifications.sql', import.meta.url), 'utf8');
 export function notificationStore(db) {
   return { record: (operation, requestId) => db.transaction(async tx => {
     await tx.exec('SET LOCAL ROLE service_role');

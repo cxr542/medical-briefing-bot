@@ -9,7 +9,7 @@ Resend 가입, 도메인 인증, Resend API 키는 필요하지 않습니다.
 1. 발신 Google 계정의 2단계 인증을 켭니다.
 2. https://myaccount.google.com/apppasswords 에서 `Medical Briefing` 앱 비밀번호를 발급합니다.
 3. Vercel의 `medical-briefing-bot` 프로젝트 Production 환경변수에 아래를 설정합니다. 앱 비밀번호를 채팅·소스·로그에 입력하지 않습니다.
-4. `../supabase/migrations/20261029082347_support_email_notifications.sql`을 서비스가 사용하는 DB에 적용한 뒤 운영 코드를 배포합니다.
+4. `../supabase/migrations/20261029083035_support_email_notifications.sql`을 서비스가 사용하는 DB에 적용한 뒤 운영 코드를 배포합니다.
 
 | 변수 | 값 |
 | --- | --- |
