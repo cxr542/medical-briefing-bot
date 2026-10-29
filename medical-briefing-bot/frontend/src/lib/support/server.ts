@@ -85,9 +85,15 @@ export async function supportApi(request: Request, audience: Audience, operation
       if (!parsed.success) throw new SupportError(503, 'SUPPORT_UNAVAILABLE');
       const created = parsed.data;
       after(async () => {
-        const result = await notifySupportCreated(created.request);
+        const result = await notifySupportCreated(created.request, {
+          async record(operation, requestId) {
+            const { data, error } = await client.rpc('support_email_notification_rpc', { operation, request_id: requestId });
+            if (error) throw new SupportError(503, 'NOTIFICATION_STORE_UNAVAILABLE');
+            return z.boolean().parse(data);
+          },
+        });
         if (result.status === 'failed') {
-          console.warn('support.notification.failed', { requestId: created.request.id, reason: result.reason, httpStatus: result.httpStatus });
+          console.warn('support.notification.failed', { requestId: created.request.id, reason: result.reason });
         }
       });
       return json(created, 201);

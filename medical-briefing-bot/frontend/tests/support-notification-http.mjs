@@ -3,6 +3,8 @@ import { spawn } from 'node:child_process';
 import { EventEmitter, once } from 'node:events';
 import { createServer } from 'node:http';
 import { after, before, test } from 'node:test';
+import { SMTPServer } from 'smtp-server';
+import { notificationMigration, notificationStore } from './fixtures/supportNotificationDatabase.mjs';
 import { fileURLToPath } from 'node:url';
 import { createDatabase, rpc, TOKEN_A } from './fixtures/supportDatabase.mjs';
 import { attachmentMigration } from './fixtures/supportAttachments.mjs';
@@ -12,9 +14,9 @@ const path = '/api/customer-admin/support/requests';
 const cookie = `${cookieName('admin', true)}=${TOKEN_A}`;
 const mailEvents = new EventEmitter();
 const mailCalls = [];
-const delivered = new Set();
-let db, server, app, origin, serviceOrigin;
-let mailStatus = 200;
+
+let db, server, smtpServer, app, origin, serviceOrigin;
+let rejectAuth = false;
 let databaseFailure = false;
 
 async function listen(server) {
@@ -26,18 +28,23 @@ async function listen(server) {
 before(async () => {
   db = await createDatabase();
   await db.exec(attachmentMigration);
+  await db.exec(notificationMigration);
+  smtpServer = new SMTPServer({ secure: false, disabledCommands: ['STARTTLS'], allowInsecureAuth: true,
+    onAuth(auth, session, callback) {
+      if (rejectAuth) { mailEvents.emit('mail'); callback(Object.assign(new Error('TEST_AUTH_REJECTION'), { responseCode: 535 })); }
+      else callback(null, { user: auth.username });
+    },
+    onData(stream, session, callback) {
+      const chunks = []; stream.on('data', chunk => chunks.push(chunk));
+      stream.on('end', () => { mailCalls.push({ raw: Buffer.concat(chunks).toString(), envelope: session.envelope }); callback(); mailEvents.emit('mail'); });
+    },
+  });
+  smtpServer.listen(0, '127.0.0.1'); await once(smtpServer.server, 'listening');
   server = createServer(async (req, res) => {
     const chunks = [];
     for await (const chunk of req) chunks.push(chunk);
     const input = JSON.parse(Buffer.concat(chunks));
     res.setHeader('Content-Type', 'application/json');
-    if (req.url === '/emails') {
-      mailCalls.push({ headers: req.headers, body: input });
-      if (mailStatus === 200) delivered.add(req.headers['idempotency-key']);
-      res.writeHead(mailStatus).end(JSON.stringify({ id: 'local-mail-id' }));
-      mailEvents.emit('mail');
-      return;
-    }
     if (req.headers.apikey !== 'local-service-key') { res.writeHead(401).end('{}'); return; }
     try {
       if (req.url === '/rest/v1/rpc/customer_auth_rpc') {
@@ -46,6 +53,10 @@ before(async () => {
         return;
       }
       if (databaseFailure) { res.writeHead(500).end(JSON.stringify({ code: 'XX000' })); return; }
+      if (req.url === '/rest/v1/rpc/support_email_notification_rpc') {
+        const result = await notificationStore(db).record(input.operation, input.request_id);
+        res.end(JSON.stringify(result)); mailEvents.emit('record:' + input.operation, result); return;
+      }
       const result = req.url === '/rest/v1/rpc/support_attachment_create_rpc'
         ? await db.transaction(async tx => {
           await tx.exec('SET LOCAL ROLE service_role');
@@ -64,8 +75,8 @@ before(async () => {
     env: { ...process.env, NODE_ENV: 'production', SUPPORT_ENABLED: 'true', SUPPORT_ATTACHMENTS_ENABLED: 'true',
       CUSTOMER_AUTH_FOUNDATION_ENABLED: 'true', NEXT_PUBLIC_SUPABASE_URL: serviceOrigin,
       NEXT_PUBLIC_SUPABASE_ANON_KEY: 'local-anon', SUPABASE_SERVICE_ROLE_KEY: 'local-service-key',
-      SUPPORT_EMAIL_NOTIFICATIONS_ENABLED: 'true', RESEND_API_KEY: 'local-resend-key',
-      SUPPORT_NOTIFICATION_FROM: 'sender@example.invalid', SUPPORT_NOTIFICATION_TO: 'operator@example.invalid',
+      SUPPORT_EMAIL_NOTIFICATIONS_ENABLED: 'true', GMAIL_APP_PASSWORD: 'aaaabbbbccccdddd', GMAIL_SMTP_USER: 'sender@example.invalid',
+      SUPPORT_NOTIFICATION_TO: 'operator@example.invalid', SUPPORT_TEST_SMTP_PORT: String(smtpServer.server.address().port),
       SUPPORT_TEST_MAIL_ORIGIN: serviceOrigin },
   });
   await new Promise((resolve, reject) => {
@@ -78,6 +89,7 @@ before(async () => {
 after(async () => {
   if (app && app.exitCode === null) { const exited = once(app, 'exit'); app.kill(); await exited; }
   if (server) await new Promise(resolve => server.close(resolve));
+  if (smtpServer) await new Promise(resolve => smtpServer.close(resolve));
   await db?.close();
 });
 
@@ -95,14 +107,14 @@ test('saved customer request sends a metadata notification after a successful HT
   await notified;
   // Then
   assert.equal(response.status, 201);
-  assert.equal(mailCalls.at(-1).headers['idempotency-key'], `support-created/${data.request.id}`);
-  assert.deepEqual(mailCalls.at(-1).body.to, ['operator@example.invalid']);
-  assert.equal(JSON.stringify(mailCalls.at(-1).body).includes('PRIVATE_DESCRIPTION'), false);
+  assert.ok(mailCalls.at(-1).raw.includes(`support-created.${data.request.id}@`));
+  assert.deepEqual(mailCalls.at(-1).envelope.rcptTo.map(value => value.address), ['operator@example.invalid']);
+  assert.equal(mailCalls.at(-1).raw.includes('PRIVATE_DESCRIPTION'), false);
 });
 
 test('saved request remains readable when the email provider rejects delivery', async () => {
   // Given
-  mailStatus = 403;
+  rejectAuth = true;
   const notified = nextMail();
   // When
   const response = await create();
@@ -113,24 +125,24 @@ test('saved request remains readable when the email provider rejects delivery', 
   const detail = await fetch(`${origin}${path}/${request.id}`, { headers: { cookie } });
   assert.equal(detail.status, 200);
   assert.equal((await detail.json()).request.id, request.id);
-  mailStatus = 200;
+  rejectAuth = false;
 });
 
-test('creation replays use the same provider idempotency key and produce one delivery', async () => {
+test('creation replays claim one SMTP delivery in the database', async () => {
   // Given
   const headers = { 'x-support-request-key': '33333333-3333-4333-8333-333333333333' };
-  const beforeDeliveries = delivered.size;
+  const beforeDeliveries = mailCalls.length;
   let notified = nextMail();
   const first = await (await create(undefined, headers)).json();
   await notified;
   // When
-  notified = nextMail();
+  notified = once(mailEvents, 'record:claim', { signal: AbortSignal.timeout(10000) });
   const retry = await (await create(undefined, headers)).json();
   await notified;
   // Then
   assert.equal(first.request.id, retry.request.id);
-  assert.equal(delivered.size, beforeDeliveries + 1);
-  assert.equal(mailCalls.at(-1).headers['idempotency-key'], mailCalls.at(-2).headers['idempotency-key']);
+  assert.equal(mailCalls.length, beforeDeliveries + 1);
+  assert.equal((await db.query('SELECT count(*)::int AS count FROM support.support_email_notifications WHERE request_id=$1', [first.request.id])).rows[0].count, 1);
 });
 
 test('unauthorized invalid and failed database creates never reach the email provider', async () => {
