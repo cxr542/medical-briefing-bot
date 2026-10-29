@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.mjs",
     "test:support:http": "node --experimental-strip-types --test tests/support-http.mjs",
+    "test:support:notification:http": "node --experimental-strip-types --test tests/support-notification-http.mjs",
     "test:support:ui": "playwright test",
     "dev": "next dev --webpack",
     "build": "next build",
@@ -14,6 +15,7 @@
   "dependencies": {
     "@node-rs/argon2": "2.2.2",
     "@supabase/supabase-js": "^2.112.3",
+    "ky": "2.2.0",
     "lucide-react": "^1.31.0",
     "next": "16.3.1",
     "react": "19.2.8",
