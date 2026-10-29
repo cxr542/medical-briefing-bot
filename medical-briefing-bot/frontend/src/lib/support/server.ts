@@ -1,4 +1,6 @@
 import 'server-only';
+import { after } from 'next/server';
+import { notifySupportCreated } from '@/lib/support/notification';
 import { z } from 'zod';
 import { createHash } from 'node:crypto';
 import { getAdminSessionToken, hasSameOrigin, isAdminRequestAuthorized } from '@/lib/adminAuth.mjs';
@@ -78,6 +80,18 @@ export async function supportApi(request: Request, audience: Audience, operation
       ? await client.rpc('support_attachment_create_rpc', { payload: { ...payload, ...auth }, client_key: z.uuid().parse(retryKey) })
       : await client.rpc(audience === 'customer' ? 'customer_support_rpc' : 'admin_support_rpc', { operation, payload: { ...payload, ...auth } });
     if (error) throw databaseError(error.code);
+    if (audience === 'customer' && operation === 'create') {
+      const parsed = customerCreated.safeParse(data);
+      if (!parsed.success) throw new SupportError(503, 'SUPPORT_UNAVAILABLE');
+      const created = parsed.data;
+      after(async () => {
+        const result = await notifySupportCreated(created.request);
+        if (result.status === 'failed') {
+          console.warn('support.notification.failed', { requestId: created.request.id, reason: result.reason, httpStatus: result.httpStatus });
+        }
+      });
+      return json(created, 201);
+    }
     return json(dto(audience, operation, data), operation === 'create' || operation === 'comment' || operation === 'note' ? 201 : 200);
   } catch (error) {
     if (error instanceof SupportError) return json({ error: error.code }, error.status);
