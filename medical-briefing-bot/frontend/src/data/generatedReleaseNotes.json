@@ -1,5 +1,27 @@
 [
   {
+    "id": "2026-10-29-pr-115",
+    "date": "2026.10.29",
+    "category": "개선",
+    "title": "문의 이메일 알림을 Gmail SMTP로 전환",
+    "summary": "PR #115 merge로 반영된 변경입니다.",
+    "issues": [],
+    "changes": [
+      "별도 이메일 발송 서비스 가입 없이 Gmail 앱 비밀번호로 관리자 알림을 보냅니다.",
+      "문의 등록 성공 후 발송하며, 메일 오류로 문의가 사라지지 않습니다.",
+      "등록 재시도와 병렬 요청의 중복 알림을 DB 기록으로 방지합니다."
+    ],
+    "verification": [
+      "PR merge 완료"
+    ],
+    "links": [
+      {
+        "label": "PR #115",
+        "url": "https://github.com/cxr542/medical-briefing-bot/pull/115"
+      }
+    ]
+  },
+  {
     "id": "2026-10-24-pr-110",
     "date": "2026.10.24",
     "category": "기능",
