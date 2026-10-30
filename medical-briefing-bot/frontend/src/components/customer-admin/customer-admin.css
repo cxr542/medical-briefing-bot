@@ -17,3 +17,5 @@
 .customer-admin .ca-label { display: block; margin-bottom: .5rem; font-size: .875rem; font-weight: 600; }
 @media (max-width: 639px) { .customer-admin .ca-card { padding: 1.125rem; } }
 @media (prefers-reduced-motion: reduce) { .customer-admin button { transition: none; } }
+
+.customer-admin .usage-query:active { background: #1e40af; }

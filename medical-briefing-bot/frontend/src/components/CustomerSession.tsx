@@ -23,6 +23,7 @@ export default function CustomerSession() {
       })().finally(() => { pending = null; });
       return pending;
     };
+    const visible = () => { if (document.visibilityState === 'visible') void show(); };
     const hide = () => { document.documentElement.style.visibility = 'hidden'; };
     const show = async () => {
       await check();
@@ -34,6 +35,7 @@ export default function CustomerSession() {
     window.addEventListener('pagehide', hide);
     window.addEventListener('pageshow', show);
     window.addEventListener('focus', show);
+    document.addEventListener('visibilitychange', visible);
     const timer = setInterval(check, 60000);
     return () => {
       disposed = true;
@@ -42,6 +44,7 @@ export default function CustomerSession() {
       window.removeEventListener('pagehide', hide);
       window.removeEventListener('pageshow', show);
       window.removeEventListener('focus', show);
+      document.removeEventListener('visibilitychange', visible);
       document.documentElement.style.visibility = '';
     };
   }, []);
