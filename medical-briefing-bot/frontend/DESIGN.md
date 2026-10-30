@@ -209,3 +209,18 @@ An unchecked native checkbox has a labelled 44px-high click target, keyboard
 Space support and disabled/busy states. Supporting text explains the rolling
 30-day window and personal-PC use. No credentials or preferences enter browser
 storage. CustomerSession renews only while the document is visible.
+
+## 13. ID usage
+
+Reuse customer-admin ca-card, ca-input, ca-primary/secondary, slate/blue colors,
+44px controls and 4px spacing. Reuse CustomerAdminNav and the existing light
+workspace in either OS theme. The document owns scrolling. A wrapping filter
+form precedes a paginated ID list; native details exposes period breakdowns.
+On phones metrics stack; table overflow stays within each expanded detail.
+Idle/loading/error/empty/populated states are explicit. Search applies on
+submit, stale data clears on failure, status announces loading and page changes.
+Date inputs and selects retain native controls and visible focus. No motion,
+new dependency, runtime overlay, or unrelated tooling installation is added.
+
+Usage query primary-button press uses the existing Tailwind blue-800 ramp
+(#1e40af), darker than blue-700 hover. Native keyboard focus rings stay visible.

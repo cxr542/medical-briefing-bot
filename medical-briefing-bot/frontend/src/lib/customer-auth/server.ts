@@ -14,7 +14,8 @@ export function createCustomerAuthService() {
   const client = createAdminSupabaseClient();
   return new CustomerAuthService({
     async call(operation, payload) {
-      const rpc = operation === 'refresh_session' || (operation === 'issue_session' && payload.remember === true) ? 'customer_session_rpc' : 'customer_auth_rpc';
+      const rpc = operation === 'refresh_session' ? 'customer_usage_rpc'
+        : operation === 'issue_session' && payload.remember === true ? 'customer_session_rpc' : 'customer_auth_rpc';
       const { data, error } = await client.rpc(rpc, { operation, payload });
       if (error) throw new Error('Customer authentication store unavailable');
       return data;

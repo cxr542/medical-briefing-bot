@@ -16,7 +16,7 @@ async function call(path,body,cookie,method='POST') {
 before(async()=>{
   db=new PGlite();
   await db.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;');
-  for(const name of ['20261013043423_customer_auth_foundation','20261029093624_customer_remember_login']) {
+  for(const name of ['20261013043423_customer_auth_foundation','20261029093624_customer_remember_login','20261030010818_customer_usage']) {
     await db.exec(await readFile(new URL(`../../../supabase/migrations/${name}.sql`,import.meta.url),'utf8'));
   }
   await db.exec("INSERT INTO customer_auth.customer_users(employee_number) VALUES ('synthetic-http-user');");
@@ -24,10 +24,10 @@ before(async()=>{
   wire=createServer(async(req,res)=>{
     const chunks=[]; for await(const chunk of req)chunks.push(chunk);
     res.setHeader('Content-Type','application/json');
-    if(!['/rest/v1/rpc/customer_auth_rpc','/rest/v1/rpc/customer_session_rpc'].includes(req.url)){res.end('[]');return;}
+    if(!['/rest/v1/rpc/customer_auth_rpc','/rest/v1/rpc/customer_session_rpc','/rest/v1/rpc/customer_usage_rpc'].includes(req.url)){res.end('[]');return;}
     try {
       const body=JSON.parse(Buffer.concat(chunks).toString());
-      const fn=req.url.endsWith('/customer_session_rpc')?'customer_session_rpc':'customer_auth_rpc';
+      const fn=req.url.split('/').at(-1);
       const result=await db.transaction(async tx=>{
         await tx.exec('SET LOCAL ROLE service_role');
         return tx.query(`SELECT public.${fn}($1,$2::jsonb) AS value`,[body.operation,JSON.stringify(body.payload)]);
