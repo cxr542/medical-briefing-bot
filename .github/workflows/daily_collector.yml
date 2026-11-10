@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   collect-data:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     steps:
     - name: 저장소 코드 체크아웃
