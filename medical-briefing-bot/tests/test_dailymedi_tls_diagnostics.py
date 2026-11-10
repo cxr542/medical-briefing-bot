@@ -75,28 +75,28 @@ class DailyMediTlsDiagnosticsTests(unittest.TestCase):
         self.assertEqual(diagnostics[0]["request_type"], "list")
         self.assertEqual(diagnostics[0]["section"], "22")
         self.assertEqual(diagnostics[0]["page"], "1")
-        self.assertEqual(diagnostics[0]["max_attempts"], 3)
+        self.assertEqual(diagnostics[0]["max_attempts"], 5)
         self.assertEqual(diagnostics[0]["exception_class"], "SSLError")
         self.assertIsInstance(diagnostics[0]["elapsed_ms"], int)
         self.assertNotIn(fake_secret, "\n".join(logs))
         self.assertNotIn("https://", "\n".join(logs))
 
-    def test_three_ssl_failures_log_exhaustion_without_changing_retry_count(self):
+    def test_repeated_ssl_failures_log_exhaustion_at_retry_limit(self):
         fake_secret = "FAKE_LAW_CREDENTIAL_DO_NOT_LOG"
         error = requests.exceptions.SSLError(fake_secret)
         logs = []
 
-        with patch.object(dailymedi.requests, "get", side_effect=[error, error, error]) as get, \
+        with patch.object(dailymedi.requests, "get", side_effect=[error] * 5) as get, \
             patch.object(dailymedi.time, "sleep") as sleep, \
             patch("builtins.print", side_effect=logs.append):
             with self.assertRaises(requests.exceptions.SSLError):
                 dailymedi._fetch_text(LISTING_URL)
 
-        self.assertEqual(get.call_count, 3)
-        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2])
+        self.assertEqual(get.call_count, 5)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [1, 2, 4, 8])
         diagnostics = records(logs)
-        self.assertEqual([item["result"] for item in diagnostics], ["retry", "retry", "exhausted"])
-        self.assertEqual([item["attempt"] for item in diagnostics], [1, 2, 3])
+        self.assertEqual([item["result"] for item in diagnostics], ["retry"] * 4 + ["exhausted"])
+        self.assertEqual([item["attempt"] for item in diagnostics], [1, 2, 3, 4, 5])
         self.assertTrue(all(item["classification"] == "unknown_ssl" for item in diagnostics))
         self.assertTrue(all(item["request_type"] == "list" for item in diagnostics))
         self.assertTrue(all(item["section"] == "22" and item["page"] == "1" for item in diagnostics))
@@ -134,7 +134,7 @@ class DailyMediTlsDiagnosticsTests(unittest.TestCase):
         ]
         self.assertEqual(find_absent_article_urls(old_rows, result.articles, {"데일리메디"}), set())
         page_two = [item for item in records(logs) if item["page"] == "2"]
-        self.assertEqual([item["result"] for item in page_two], ["retry", "retry", "exhausted"])
+        self.assertEqual([item["result"] for item in page_two], ["retry"] * 4 + ["exhausted"])
         self.assertEqual(page_two[-1]["request_type"], "list")
         self.assertEqual(page_two[-1]["page"], "2")
         self.assertNotIn("?ca_id=", "\n".join(logs))

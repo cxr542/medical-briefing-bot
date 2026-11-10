@@ -42,7 +42,7 @@ class CollectorFailureDiagnosticsTests(unittest.TestCase):
         error.__cause__ = ssl.SSLZeroReturnError(6, SECRET)
         logs = []
 
-        # When the existing three-attempt transport path fails.
+        # When the bounded-retry transport path fails.
         with patch.object(dailymedi.requests, "get", side_effect=error) as get, \
                 patch.object(dailymedi.time, "sleep") as sleep, \
                 patch("builtins.print", side_effect=logs.append):
@@ -51,8 +51,8 @@ class CollectorFailureDiagnosticsTests(unittest.TestCase):
 
         # Then diagnostic fields preserve the error and transport policy.
         self.assertIs(raised.exception, error)
-        self.assertEqual(get.call_count, 3)
-        self.assertEqual([call.args for call in sleep.call_args_list], [(1,), (2,)])
+        self.assertEqual(get.call_count, 5)
+        self.assertEqual([call.args for call in sleep.call_args_list], [(1,), (2,), (4,), (8,)])
         self.assertTrue(all(record["ssl_errno"] == 6 for record in records(logs)))
         self.assertTrue(all(record["ssl_verify_code"] is None for record in records(logs)))
         self.assertNotIn(SECRET, "\n".join(logs))

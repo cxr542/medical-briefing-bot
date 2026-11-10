@@ -21,10 +21,10 @@ from collector_parsers import get_content_hash
 SOURCE_NAME = "데일리메디"
 LIST_URL = "https://www.dailymedi.com/news/news_list.php"
 SECTION_IDS = ("22", "21", "31")
-MAX_PAGES_PER_SECTION = 13
+MAX_PAGES_PER_SECTION = 25
 ALLOWED_HOSTS = frozenset({"dailymedi.com", "www.dailymedi.com"})
 KST = timezone(timedelta(hours=9))
-RETRY_BACKOFFS = (1, 2)
+RETRY_BACKOFFS = (1, 2, 4, 8)
 TRANSIENT_ERRORS = (
     requests.exceptions.ConnectionError,
     requests.exceptions.Timeout,
@@ -308,6 +308,10 @@ def collect_recent_articles(
         )
         return make_result(False, reason_code)
 
+    # A date that stays unresolved only excludes that article. Keep paging so one
+    # dropped detail request does not discard the remaining pages and sections;
+    # the snapshot is still reported incomplete so lifecycle reconciliation skips it.
+    first_unresolved: Optional[Tuple[str, int]] = None
     for section_id in sections:
         seen_pages: Set[Tuple[str, ...]] = set()
         section_terminated = False
@@ -344,8 +348,8 @@ def collect_recent_articles(
                 if article.published_at >= cutoff and article.wr_id not in articles_by_id:
                     articles_by_id[article.wr_id] = article
 
-            if page.unresolved_date_count:
-                return make_partial(section_id, page_number, "article-date-unavailable")
+            if page.unresolved_date_count and first_unresolved is None:
+                first_unresolved = (section_id, page_number)
 
             if page.all_articles_older_than_cutoff:
                 section_terminated = True
@@ -353,6 +357,8 @@ def collect_recent_articles(
         if not section_terminated:
             return make_partial(section_id, max_pages, "maximum-pages-reached")
 
+    if first_unresolved is not None:
+        return make_partial(first_unresolved[0], first_unresolved[1], "article-date-unavailable")
     if not articles_by_id:
         return make_result(False, "no-recent-valid-articles")
     return make_result(True, None)
