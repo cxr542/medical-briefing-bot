@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Home, Shield, Database, Trash2, Activity, RefreshCw, Clock, CheckCircle2, AlertTriangle, XCircle } from 'lucide-react';
 import Link from 'next/link';
@@ -25,7 +25,8 @@ export default function AdminPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [stats, setStats] = useState<{source: string, count: number}[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [totalCount, setTotalCount] = useState(0);
@@ -34,14 +35,43 @@ export default function AdminPage() {
   const [statsError, setStatsError] = useState('');
   const [statsLoaded, setStatsLoaded] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  // 비밀번호 검증은 서버(/api/admin/session)에서만 수행한다. 클라이언트 코드에는 비밀번호가 없다.
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 심플한 비밀번호 (추후 환경변수로 분리 권장)
-    if (password.trim().toLowerCase() === 'admin1234!' || password.trim().toLowerCase() === 'admin1234') {
-      setIsAuthenticated(true);
-      fetchStats();
-    } else {
-      setError('비밀번호가 일치하지 않습니다.');
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    setError('');
+    try {
+      const response = await fetch('/api/admin/session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ password }),
+      });
+      if (response.ok) {
+        setPassword('');
+        setIsAuthenticated(true);
+        fetchStats();
+      } else if (response.status === 401) {
+        setError('비밀번호가 일치하지 않습니다.');
+      } else if (response.status === 503) {
+        setError('관리자 비밀번호가 서버에 설정되지 않았습니다. ADMIN_PASSWORD 환경 변수를 확인해주세요.');
+      } else {
+        setError('로그인에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      }
+    } catch {
+      setError('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    setIsAuthenticated(false);
+    try {
+      await fetch('/api/admin/session', { method: 'DELETE', credentials: 'same-origin' });
+    } catch {
+      // 쿠키 삭제 요청이 실패해도 화면은 로그아웃 상태로 둔다. 세션은 만료 시간에 무효가 된다.
     }
   };
 
@@ -80,6 +110,26 @@ export default function AdminPage() {
     setIsLoading(false);
   };
 
+  // 새로고침 후에도 유효한 세션 쿠키가 있으면 로그인 상태를 복원한다.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const response = await fetch('/api/admin/session', { credentials: 'same-origin', cache: 'no-store' });
+        const body = (await response.json()) as { authenticated?: boolean };
+        if (!cancelled && body.authenticated === true) {
+          setIsAuthenticated(true);
+          fetchStats();
+        }
+      } catch {
+        // 세션 확인 실패 시 로그인 화면을 그대로 보여준다.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const latestRun = collectorRuns[0];
   const userServiceStatus = getCollectionServiceStatus(latestRun);
   const nextCollectionTime = getNextCollectionTime();
@@ -109,20 +159,25 @@ export default function AdminPage() {
           
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
+              <label htmlFor="admin-password" className="sr-only">관리자 비밀번호</label>
               <input
+                id="admin-password"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="비밀번호 입력"
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C05A12] focus:border-[#C05A12] transition-colors"
+                aria-describedby={error ? 'admin-password-error' : undefined}
+                autoComplete="current-password"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-[#C05A12] focus:border-[#C05A12] transition-colors"
               />
             </div>
-            {error && <p className="text-red-500 text-sm font-medium px-1">{error}</p>}
+            {error && <p id="admin-password-error" role="alert" className="text-red-500 text-sm font-medium px-1">{error}</p>}
             <button 
               type="submit"
-              className="w-full bg-[#5C2D0C] text-white font-bold py-3 rounded-xl hover:bg-[#4A240A] transition-colors"
+              disabled={isSubmitting}
+              className="w-full bg-[#5C2D0C] text-white font-bold py-3 rounded-xl hover:bg-[#4A240A] transition-colors disabled:opacity-60"
             >
-              접속하기
+              {isSubmitting ? '확인 중...' : '접속하기'}
             </button>
           </form>
           
@@ -149,7 +204,7 @@ export default function AdminPage() {
             <Home className="w-4 h-4" /> 서비스 뷰
           </Link>
           <button 
-            onClick={() => setIsAuthenticated(false)}
+            onClick={handleLogout}
             className="text-sm bg-gray-700 hover:bg-gray-600 px-3 py-1.5 rounded-lg transition-colors"
           >
             로그아웃
