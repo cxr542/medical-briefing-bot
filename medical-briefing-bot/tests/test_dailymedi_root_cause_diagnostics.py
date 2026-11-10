@@ -25,6 +25,9 @@ def medibox_html(count=1):
     ) + '</ul></div>'
 
 
+EMPTY_MEDIBOX = '<div class="listNews mediBox"><ul></ul></div>'
+
+
 class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
     def test_wrapped_ssl_exhaustion_logs_structured_chain_and_preserves_retry(self):
         inner = ssl.SSLZeroReturnError(6, SECRET)
@@ -40,11 +43,11 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
             with self.assertRaises(requests.exceptions.SSLError):
                 dailymedi._fetch_text(LISTING_URL)
 
-        self.assertEqual(get.call_count, 3)
-        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+        self.assertEqual(get.call_count, 5)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2), call(4), call(8)])
         logged = records(logs)
-        self.assertEqual([item["retry_state"] for item in logged], ["retry", "retry", "exhausted"])
-        self.assertEqual([item["attempt"] for item in logged], [1, 2, 3])
+        self.assertEqual([item["retry_state"] for item in logged], ["retry"] * 4 + ["exhausted"])
+        self.assertEqual([item["attempt"] for item in logged], [1, 2, 3, 4, 5])
         self.assertEqual(logged[-1]["exception_type"], "SSLError")
         self.assertIsNone(logged[-1]["cause_type"])
         self.assertEqual(logged[-1]["context_type"], "ConnectionResetError")
@@ -118,7 +121,7 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
 
         def get(url, **_kwargs):
             if "news_list.php" in url:
-                return response(url, listing)
+                return response(url, listing if "page=1" in url else EMPTY_MEDIBOX)
             if isinstance(detail, Exception):
                 raise detail
             return response(url, detail)
@@ -138,8 +141,8 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
         self.assertEqual(collection.reason_code, "article-date-unavailable")
         self.assertFalse(collection.complete)
         self.assertEqual(collection.articles, ())
-        self.assertEqual(get.call_count, 4)
-        self.assertEqual(sleep.call_args_list, [call(1), call(2)])
+        self.assertEqual(get.call_count, 7)
+        self.assertEqual(sleep.call_args_list, [call(1), call(2), call(4), call(8)])
         date = records(logs, DATE_PREFIX)[0]
         self.assertEqual(date["date_resolution"], "detail-request-failed")
         self.assertEqual((date["section"], date["page"], date["article_id"]), ("21", "1", "941143"))
@@ -153,7 +156,7 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
     def test_successful_http_without_date_element_is_identified(self):
         collection, logs, get, sleep = self.collect_date_failure('<html>Article ' + SECRET + '</html>')
 
-        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_count, 3)
         sleep.assert_not_called()
         self.assertFalse(collection.complete)
         self.assertEqual(records(logs, DATE_PREFIX)[0]["date_resolution"], "date-element-not-found")
@@ -163,14 +166,14 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
     def test_empty_date_element_is_identified(self):
         _collection, logs, get, sleep = self.collect_date_failure('<meta property="article:published_time" content=" ">')
 
-        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_count, 3)
         sleep.assert_not_called()
         self.assertEqual(records(logs, DATE_PREFIX)[0]["date_resolution"], "date-value-empty")
 
     def test_invalid_date_value_is_identified_without_logging_raw_value(self):
         _collection, logs, get, sleep = self.collect_date_failure('<time datetime="' + SECRET + '"></time>')
 
-        self.assertEqual(get.call_count, 2)
+        self.assertEqual(get.call_count, 3)
         sleep.assert_not_called()
         self.assertEqual(records(logs, DATE_PREFIX)[0]["date_resolution"], "date-parse-failed")
         self.assertNotIn(SECRET, "\n".join(logs))
@@ -225,7 +228,7 @@ class DailyMediRootCauseDiagnosticsTests(unittest.TestCase):
             if "ca_id=22" in url:
                 return response(url, empty)
             if "news_list.php" in url:
-                return response(url, html)
+                return response(url, html if "ca_id=21&page=1" in url else EMPTY_MEDIBOX)
             return response(url, '<html>No date</html>')
 
         with patch.object(dailymedi.requests, "get", side_effect=get), \

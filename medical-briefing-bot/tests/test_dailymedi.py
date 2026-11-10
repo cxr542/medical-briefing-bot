@@ -324,18 +324,18 @@ class DailyMediNetworkTests(unittest.TestCase):
         self.assertTrue(all(article["url"].startswith("https://www.dailymedi.com/news/news_view.php?") for article in articles.articles))
 
     def test_page_four_exhausted_ssl_retries_preserves_previous_articles(self):
-        articles, attempts, _sleep = self.run_collection(failures=3)
+        articles, attempts, _sleep = self.run_collection(failures=5)
         self.assertFalse(articles.complete)
         self.assertEqual(articles.reason_code, "list-request-SSLError")
         self.assertEqual(len(articles.articles), 3)
-        self.assertEqual(attempts, {1: 1, 2: 1, 3: 1, 4: 3})
+        self.assertEqual(attempts, {1: 1, 2: 1, 3: 1, 4: 5})
 
     def test_first_page_exhausted_retries_fails(self):
-        articles, attempts, _sleep = self.run_collection(failures=3, fail_page=1)
+        articles, attempts, _sleep = self.run_collection(failures=5, fail_page=1)
         self.assertFalse(articles.complete)
         self.assertEqual(articles.articles, ())
         self.assertEqual(articles.reason_code, "list-request-SSLError")
-        self.assertEqual(attempts, {1: 3})
+        self.assertEqual(attempts, {1: 5})
         old_article_rows = [
             {"source": "데일리메디", "url": "https://www.dailymedi.com/news/news_view.php?wr_id=3"},
         ]
@@ -406,7 +406,7 @@ class DailyMediNetworkTests(unittest.TestCase):
             )
 
         self.assertTrue(result.complete)
-        self.assertEqual(detail_attempts, 3)
+        self.assertEqual(detail_attempts, 5)
         self.assertEqual(len(result.articles), 2)
         self.assertTrue(all("dailymedi.com/news/news_view.php" in article["url"] for article in result.articles))
 
@@ -472,10 +472,10 @@ class DailyMediNetworkTests(unittest.TestCase):
         self.assertEqual(logs, [])
 
     def test_later_page_exhaustion_is_marked_incomplete(self):
-        result, attempts, _sleep = self.run_collection(failures=3, fail_page=3)
+        result, attempts, _sleep = self.run_collection(failures=5, fail_page=3)
         self.assertFalse(result.complete)
         self.assertEqual(result.reason_code, "list-request-SSLError")
-        self.assertEqual(attempts, {1: 1, 2: 1, 3: 3})
+        self.assertEqual(attempts, {1: 1, 2: 1, 3: 5})
         self.assertEqual(len(result.articles), 2)
 
         old_article_rows = [
@@ -498,7 +498,7 @@ class DailyMediNetworkTests(unittest.TestCase):
             return NOW if "wr_id=941199" in url else None
 
         collection = collect_recent_articles(
-            lambda _url: html,
+            lambda url: html if "page=1" in url else '<div class="listNews mediBox"><ul></ul></div>',
             article_date,
             now=NOW,
             sections=("21",),
