@@ -181,7 +181,7 @@ class LawApiSecurityTests(unittest.TestCase):
                     collector.fetch_law_api()
 
     def test_malformed_json_fails_closed_without_echoing_error(self):
-        with patch.dict(os.environ, {"LAW_API_KEY": FAKE_CREDENTIAL}):
+        with patch.dict(os.environ, {"LAW_API_KEY": FAKE_CREDENTIAL}), patch.object(collector.time, "sleep"):
             with patch.object(
                 collector,
                 "get_with_transient_retry",
@@ -234,6 +234,54 @@ class LawApiSecurityTests(unittest.TestCase):
             ):
                 with self.assertRaises(collector.LawApiError):
                     collector.fetch_law_api()
+
+    def test_non_json_response_is_retried_and_recovers(self):
+        payload = {"LawSearch": {"law": [{"법령명한글": "의료법", "법령일련번호": "1"}]}}
+        maintenance = response(200, json_error=ValueError("not json"))
+        maintenance.text = f"<html>점검 중 {FAKE_CREDENTIAL}</html>"
+        maintenance.headers = {"content-type": "text/html; charset=utf-8"}
+        with patch.dict(os.environ, {"LAW_API_KEY": FAKE_CREDENTIAL}), \
+                patch.object(collector.time, "sleep") as sleep, \
+                patch("builtins.print") as output, \
+                patch.object(
+                    collector,
+                    "get_with_transient_retry",
+                    side_effect=[maintenance, response(200, payload)],
+                ) as request:
+            articles = collector.fetch_law_api()
+
+        self.assertEqual(len(articles), 1)
+        self.assertEqual(request.call_count, 2)
+        sleep.assert_called_once_with(5)
+        logged = str(output.call_args_list)
+        self.assertIn("content_type=text/html", logged)
+        self.assertIn("점검 중", logged)
+        self.assertNotIn(FAKE_CREDENTIAL, logged)
+
+    def test_server_error_exhausts_retries_with_diagnostic(self):
+        failing = response(503, {})
+        failing.text = "Service Unavailable"
+        failing.headers = {"content-type": "text/plain"}
+        with patch.dict(os.environ, {"LAW_API_KEY": FAKE_CREDENTIAL}), \
+                patch.object(collector.time, "sleep") as sleep, \
+                patch("builtins.print") as output, \
+                patch.object(collector, "get_with_transient_retry", return_value=failing) as request:
+            with self.assertRaisesRegex(collector.LawApiError, "503"):
+                collector.fetch_law_api()
+
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual([call.args[0] for call in sleep.call_args_list], [5, 15])
+        self.assertIn("status=503", str(output.call_args_list))
+
+    def test_client_error_is_not_retried(self):
+        with patch.dict(os.environ, {"LAW_API_KEY": FAKE_CREDENTIAL}), \
+                patch.object(collector.time, "sleep") as sleep, \
+                patch.object(collector, "get_with_transient_retry", return_value=response(403, {})) as request:
+            with self.assertRaisesRegex(collector.LawApiError, "403"):
+                collector.fetch_law_api()
+
+        self.assertEqual(request.call_count, 1)
+        sleep.assert_not_called()
 
     def test_frontend_has_no_law_api_key_reference(self):
         frontend = PACKAGE_ROOT / "frontend"
