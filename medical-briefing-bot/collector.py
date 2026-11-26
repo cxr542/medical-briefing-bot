@@ -298,7 +298,19 @@ def fetch_kdca_press_releases():
     return articles
 
 
+class IncompleteCollection:
+    """일부만 수집된 결과. 수집한 기사는 저장하되 삭제(absent) 판정에서는 제외한다."""
+    complete = False
+
+    def __init__(self, articles, reason_code):
+        self.articles = tuple(articles)
+        self.reason_code = reason_code
+
+
 # 2. 대한병원협회 웹 스크래퍼 (BeautifulSoup)
+KHA_TIMEOUT = (5, 30)
+
+
 def fetch_kha_notices():
     source_name = "대한병원협회 공지사항"
     print(f"🔄 크롤링 수집: {source_name}")
@@ -311,9 +323,17 @@ def fetch_kha_notices():
             headers = {'User-Agent': 'Mozilla/5.0'}
             # SSL 인증서 오류 방지를 위해 verify=False 설정 (InsecureRequestWarning 무시)
             requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
-            response = get_with_transient_retry(
-                url, source_name=source_name, headers=headers, timeout=10, verify=False
-            )
+            try:
+                response = get_with_transient_retry(
+                    url, source_name=source_name, headers=headers, timeout=KHA_TIMEOUT, verify=False
+                )
+            except requests.exceptions.RequestException as error:
+                if not articles_to_save:
+                    raise
+                # 앞 페이지에서 받은 공지는 보존하고, 삭제 판정에서만 제외한다.
+                reason = f"page-offset-{offset}-{type(error).__name__}"
+                print(f"⚠️ {source_name} 일부 페이지 수집 실패, 확보한 {len(articles_to_save)}건 유지: {reason}")
+                return IncompleteCollection(articles_to_save, reason)
             soup = BeautifulSoup(response.text, 'html.parser')
             
             rows = soup.select('div.tr')
@@ -365,6 +385,21 @@ def fetch_kha_notices():
 class LawApiError(RuntimeError):
     pass
 
+
+LAW_RETRY_DELAYS = (5, 15)
+
+
+def law_response_diagnostic(response, api_key: str) -> str:
+    """JSON이 아니거나 5xx인 응답을 원인 추적용으로 요약한다. API 키는 가린다."""
+    status = getattr(response, "status_code", None)
+    headers = getattr(response, "headers", None)
+    content_type = headers.get("content-type", "unknown") if isinstance(headers, dict) else "unknown"
+    content_type = re.sub(r"[^A-Za-z0-9.+/;=-]", "", str(content_type))[:60] or "unknown"
+    body = getattr(response, "text", "")
+    body = body if isinstance(body, str) else ""
+    body = re.sub(r"\s+", " ", body.replace(api_key, "[redacted]"))[:80]
+    return f"status={status} content_type={content_type} body_prefix={body!r}"
+
 def fetch_law_api():
     source_name = "국가법령정보센터"
     print(f"🔄 오픈 API 수집: {source_name}")
@@ -374,33 +409,47 @@ def fetch_law_api():
     if not api_key or not api_key.strip():
         raise LawApiError("LAW_API_KEY is not configured")
 
-    try:
-        response = get_with_transient_retry(
-            "https://www.law.go.kr/DRF/lawSearch.do",
-            source_name=source_name,
-            headers={"Referer": "https://medical-briefing-bot.vercel.app"},
-            timeout=10,
-            params={
-                "OC": api_key,
-                "target": "law",
-                "type": "JSON",
-                "query": "의료법",
-            },
-        )
-    except requests.exceptions.RequestException as error:
-        raise LawApiError(
-            f"LAW API request failed: {type(error).__name__}"
-        ) from None
+    # 점검 페이지(비JSON)나 5xx는 일시 장애일 수 있어 재시도하고, 4xx는 즉시 실패시킨다.
+    max_attempts = len(LAW_RETRY_DELAYS) + 1
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = get_with_transient_retry(
+                "https://www.law.go.kr/DRF/lawSearch.do",
+                source_name=source_name,
+                headers={"Referer": "https://medical-briefing-bot.vercel.app"},
+                timeout=10,
+                params={
+                    "OC": api_key,
+                    "target": "law",
+                    "type": "JSON",
+                    "query": "의료법",
+                },
+            )
+        except requests.exceptions.RequestException as error:
+            raise LawApiError(
+                f"LAW API request failed: {type(error).__name__}"
+            ) from None
 
-    if response.status_code != 200:
-        raise LawApiError(
-            f"LAW API returned HTTP status {response.status_code}"
-        )
+        if response.status_code == 200:
+            try:
+                data = response.json()
+                break
+            except ValueError:
+                failure = "LAW API returned invalid JSON"
+        elif response.status_code >= 500:
+            failure = f"LAW API returned HTTP status {response.status_code}"
+        else:
+            raise LawApiError(
+                f"LAW API returned HTTP status {response.status_code}"
+            )
 
-    try:
-        data = response.json()
-    except ValueError:
-        raise LawApiError("LAW API returned invalid JSON") from None
+        print(
+            f"⚠️ LAW API 비정상 응답: attempt={attempt}/{max_attempts} "
+            f"{law_response_diagnostic(response, api_key)}"
+        )
+        if attempt == max_attempts:
+            raise LawApiError(failure)
+        time.sleep(LAW_RETRY_DELAYS[attempt - 1])
 
     if not isinstance(data, dict):
         raise LawApiError("LAW API returned an unexpected response")
@@ -1018,7 +1067,7 @@ if __name__ == "__main__":
     def collect_source(name: str, collector) -> None:
         try:
             collection = collector()
-            if isinstance(collection, DailyMediCollection):
+            if isinstance(collection, (DailyMediCollection, IncompleteCollection)):
                 collected = list(collection.articles)
                 if not collection.complete:
                     incomplete_sources.add(name)
